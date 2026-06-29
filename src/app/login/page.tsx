@@ -12,7 +12,7 @@ import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { useAuthStore } from "@/store/auth.store";
 import type { MasterUser } from "@/types";
 
-type Step = "phone" | "otp" | "loading";
+type Step = "phone" | "otp" | "loading" | "nickname";
 
 // useSearchParams를 사용하는 내부 컴포넌트 (Suspense 경계 필요)
 function LoginForm() {
@@ -29,6 +29,9 @@ function LoginForm() {
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [countdown, setCountdown] = useState(0);
+  // 닉네임 Step 3
+  const [nickname, setNickname] = useState("");
+  const [pendingUser, setPendingUser] = useState<{ id: string; phone: string; masterUserId?: string } | null>(null);
 
   const otpRefs = useRef<(HTMLInputElement | null)[]>([]);
 
@@ -118,8 +121,8 @@ function LoginForm() {
         return;
       }
 
-      // im-core-auth sync
-      const res = await fetch("/api/auth/sync", {
+      // im-core-auth sync — 신규 유저 여부 판별
+      const syncRes = await fetch("/api/auth/sync", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -129,12 +132,23 @@ function LoginForm() {
         }),
       });
 
-      if (res.ok) {
-        const meRes = await fetch("/api/auth/me");
-        if (meRes.ok) {
-          const meData = await meRes.json();
-          setMasterUser(meData.user as MasterUser);
+      if (syncRes.ok) {
+        const syncData = await syncRes.json();
+        const masterUser = syncData as MasterUser & { masterUserId?: string };
+
+        // 신규 유저이거나 닉네임(name)이 없으면 → Step 3 닉네임 설정
+        if (!masterUser.name || masterUser.name.trim() === "") {
+          setPendingUser({
+            id: data.user.id,
+            phone: data.user.phone ?? "",
+            masterUserId: masterUser.masterUserId,
+          });
+          setStep("nickname");
+          return;
         }
+
+        // 기존 유저 — 바로 로그인 완료
+        setMasterUser(masterUser);
       }
 
       router.push(redirectTo);
@@ -142,6 +156,48 @@ function LoginForm() {
     } catch {
       setStep("otp");
       setError("인증 처리 중 오류가 발생했습니다.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Step 3: 닉네임 설정 후 완료
+  const handleSetNickname = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const trimmed = nickname.trim();
+    if (!trimmed || trimmed.length < 2) {
+      setError("닉네임은 2자 이상 입력해주세요.");
+      return;
+    }
+    if (trimmed.length > 12) {
+      setError("닉네임은 12자 이하로 입력해주세요.");
+      return;
+    }
+    setIsSubmitting(true);
+    setStep("loading");
+    try {
+      // im-core-auth에 닉네임 저장
+      await fetch("/api/auth/sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          masterUserId: pendingUser?.masterUserId,
+          name: trimmed,
+        }),
+      });
+
+      // 최신 유저 정보 로드
+      const meRes = await fetch("/api/auth/me");
+      if (meRes.ok) {
+        const meData = await meRes.json();
+        setMasterUser(meData.user as MasterUser);
+      }
+
+      router.push(redirectTo);
+      router.refresh();
+    } catch {
+      setStep("nickname");
+      setError("닉네임 저장 중 오류가 발생했습니다. 다시 시도해주세요.");
     } finally {
       setIsSubmitting(false);
     }
@@ -203,6 +259,12 @@ function LoginForm() {
         setError(signInError?.message || "이메일 또는 비밀번호가 올바르지 않습니다.");
         return;
       }
+      // 이메일 유저도 /api/auth/me로 마스터유저 정보 로드
+      const meRes = await fetch("/api/auth/me");
+      if (meRes.ok) {
+        const meData = await meRes.json();
+        setMasterUser(meData.user as MasterUser);
+      }
       router.push(redirectTo);
       router.refresh();
     } catch {
@@ -223,8 +285,44 @@ function LoginForm() {
         </div>
       )}
 
-      {/* 로그인 모드 탭 */}
-      {step !== "loading" && step !== "otp" && (
+      {/* Step 3: 닉네임 설정 (신규 회원 전용) */}
+      {step === "nickname" && (
+        <form onSubmit={handleSetNickname} className="login-form">
+          <div className="login-form-header">
+            <div style={{ fontSize: "2rem", marginBottom: "0.5rem" }}>🎉</div>
+            <h2>환영합니다!</h2>
+            <p>사용할 닉네임을 설정해 주세요.<br/>모카, IMFF 앱과 함께 사용됩니다.</p>
+          </div>
+          <div className="login-field">
+            <label htmlFor="nickname">닉네임</label>
+            <input
+              id="nickname"
+              type="text"
+              placeholder="2~12자 닉네임 입력"
+              value={nickname}
+              onChange={(e) => setNickname(e.target.value)}
+              className="login-input"
+              autoFocus
+              maxLength={12}
+              required
+            />
+            <span style={{ fontSize: "0.75rem", color: "var(--mb-gray-400)", marginTop: "0.25rem", display: "block" }}>
+              {nickname.length}/12자 · 나중에 마이페이지에서 변경할 수 있어요
+            </span>
+          </div>
+          {error && <p className="login-error">{error}</p>}
+          <button
+            type="submit"
+            className="login-btn"
+            disabled={isSubmitting || nickname.trim().length < 2}
+          >
+            {isSubmitting ? "저장 중..." : "가입 완료 →"}
+          </button>
+        </form>
+      )}
+
+      {/* 로그인 모드 탭 — phone/email 선택 (nickname step에서는 숨김) */}
+      {step !== "loading" && step !== "otp" && step !== "nickname" && (
         <div style={{
           display: "flex",
           gap: "0",
@@ -267,7 +365,7 @@ function LoginForm() {
       )}
 
       {/* 이메일 로그인 폼 */}
-      {step !== "loading" && step !== "otp" && loginMode === "email" && (
+      {step !== "loading" && step !== "otp" && step !== "nickname" && loginMode === "email" && (
         <form onSubmit={handleEmailLogin} className="login-form">
           <div className="login-form-header">
             <h2>이메일로 로그인</h2>

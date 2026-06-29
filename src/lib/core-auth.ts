@@ -52,6 +52,60 @@ export async function syncMasterUser(params: {
   return data as MasterUser;
 }
 
+/**
+ * masterUserId로 마스터 유저 조회
+ */
+export async function getMasterUser(masterUserId: string): Promise<MasterUser> {
+  const res = await coreAuthFetch(`/api/auth/user/${masterUserId}`);
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || `마스터 유저 조회 실패: ${res.status}`);
+  }
+
+  return res.json();
+}
+
+/**
+ * 전화번호로 마스터 유저 조회
+ */
+export async function getMasterUserByPhone(
+  phoneNumber: string
+): Promise<MasterUser | null> {
+  const res = await coreAuthFetch(`/api/auth/user/phone/${encodeURIComponent(phoneNumber)}`);
+
+  if (res.status === 404) return null;
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || `유저 조회 실패: ${res.status}`);
+  }
+
+  return res.json();
+}
+
+/**
+ * 닉네임(name) 등 마스터 유저 정보 업데이트
+ * 모든 연동 앱(모카, IMFF, 모델뷰티)에 즉시 반영됨
+ */
+export async function updateMasterUser(
+  masterUserId: string,
+  params: { name?: string }
+): Promise<MasterUser> {
+  const res = await coreAuthFetch(`/api/auth/user/${masterUserId}`, {
+    method: "PATCH",
+    body: JSON.stringify(params),
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || `유저 정보 업데이트 실패: ${res.status}`);
+  }
+
+  return res.json();
+}
+
+
 // ── 포인트 ────────────────────────────────────────────────
 
 /**

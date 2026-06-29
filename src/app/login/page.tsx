@@ -43,6 +43,13 @@ function LoginForm() {
     return () => clearTimeout(timer);
   }, [countdown]);
 
+  // URL mode 파라미터가 admin인 경우 자동으로 이메일 로그인 모드 설정
+  useEffect(() => {
+    if (mode === "admin") {
+      setLoginMode("email");
+    }
+  }, [mode]);
+
   // 전화번호 포맷팅 (010-XXXX-XXXX)
   const formatPhone = (value: string) => {
     const digits = value.replace(/\D/g, "").slice(0, 11);
@@ -266,7 +273,15 @@ function LoginForm() {
         const meData = await meRes.json();
         setMasterUser(meData.user as MasterUser);
       }
-      router.push(redirectTo);
+      
+      // 관리자 이메일 계정이거나 mode=admin 인 경우 어드민 화면으로 바로 리다이렉트
+      let targetUrl = redirectTo;
+      const isAdminEmail = data.user.email?.startsWith("admin") || data.user.email === "admin@immodel.kr";
+      if (isAdminEmail && redirectTo === "/") {
+        targetUrl = "/admin";
+      }
+
+      router.push(targetUrl);
       router.refresh();
     } catch {
       setStep("phone");
@@ -407,6 +422,26 @@ function LoginForm() {
           >
             {isSubmitting ? "로그인 중..." : "로그인"}
           </button>
+
+          <div style={{ textAlign: "center", fontSize: "0.875rem", borderTop: "1px solid var(--mb-gray-100)", paddingTop: "1rem", marginTop: "1rem" }}>
+            <div style={{ color: "var(--mb-gray-500)" }}>
+              일반 회원이신가요?{" "}
+              <button
+                type="button"
+                onClick={() => {
+                  setError("");
+                  setLoginMode("phone");
+                  router.push("/login");
+                }}
+                style={{
+                  background: "none", border: "none", color: "var(--mb-pink-500)",
+                  fontWeight: 700, cursor: "pointer", padding: 0, textDecoration: "underline"
+                }}
+              >
+                휴대폰 번호로 로그인하기
+              </button>
+            </div>
+          </div>
         </form>
       )}
 
@@ -479,22 +514,41 @@ function LoginForm() {
                 </button>
               </div>
             ) : (
-              <div style={{ color: "var(--mb-gray-500)" }}>
-                아직 회원이 아니신가요?{" "}
-                <button
-                  type="button"
-                  onClick={() => {
-                    setError("");
-                    setPhone("");
-                    router.push("/login?mode=signup");
-                  }}
-                  style={{
-                    background: "none", border: "none", color: "var(--mb-pink-500)",
-                    fontWeight: 700, cursor: "pointer", padding: 0, textDecoration: "underline"
-                  }}
-                >
-                  10초 회원가입하기
-                </button>
+              <div style={{ color: "var(--mb-gray-500)", display: "flex", flexDirection: "column", gap: "0.5rem", alignItems: "center" }}>
+                <div>
+                  아직 회원이 아니신가요?{" "}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setError("");
+                      setPhone("");
+                      router.push("/login?mode=signup");
+                    }}
+                    style={{
+                      background: "none", border: "none", color: "var(--mb-pink-500)",
+                      fontWeight: 700, cursor: "pointer", padding: 0, textDecoration: "underline"
+                    }}
+                  >
+                    10초 회원가입하기
+                  </button>
+                </div>
+                <div style={{ fontSize: "0.8125rem", marginTop: "0.25rem" }}>
+                  관리자이신가요?{" "}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setError("");
+                      setLoginMode("email");
+                      router.push("/login?mode=admin");
+                    }}
+                    style={{
+                      background: "none", border: "none", color: "var(--mb-gray-500)",
+                      fontWeight: 700, cursor: "pointer", padding: 0, textDecoration: "underline"
+                    }}
+                  >
+                    어드민 로그인 바로가기
+                  </button>
+                </div>
               </div>
             )}
           </div>

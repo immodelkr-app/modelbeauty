@@ -19,6 +19,7 @@ function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const redirectTo = searchParams.get("redirect") || "/";
+  const mode = searchParams.get("mode"); // 'signup' 여부 확인
 
   const { setMasterUser } = useAuthStore();
   const supabase = createSupabaseBrowserClient();
@@ -321,8 +322,8 @@ function LoginForm() {
         </form>
       )}
 
-      {/* 로그인 모드 탭 — phone/email 선택 (nickname step에서는 숨김) */}
-      {step !== "loading" && step !== "otp" && step !== "nickname" && (
+      {/* 로그인 모드 탭 — phone/email 선택 (nickname step 또는 회원가입 모드에서는 숨김) */}
+      {step !== "loading" && step !== "otp" && step !== "nickname" && mode !== "signup" && (
         <div style={{
           display: "flex",
           gap: "0",
@@ -413,8 +414,12 @@ function LoginForm() {
       {step === "phone" && loginMode === "phone" && (
         <form onSubmit={handleSendOtp} className="login-form">
           <div className="login-form-header">
-            <h2>전화번호로 로그인</h2>
-            <p>인증번호를 문자로 보내드립니다</p>
+            <h2>{mode === "signup" ? "10초 간편 회원가입" : "전화번호로 로그인"}</h2>
+            <p>
+              {mode === "signup" 
+                ? "휴대폰 번호만 있으면 10초 만에 가입 완료!" 
+                : "인증번호를 문자로 보내드립니다"}
+            </p>
           </div>
 
           <div className="login-field">
@@ -446,13 +451,53 @@ function LoginForm() {
             {isSubmitting ? (
               <span className="login-btn-spinner" />
             ) : (
-              "인증번호 받기"
+              mode === "signup" ? "인증번호 받고 가입하기" : "인증번호 받기"
             )}
           </button>
 
-          <p className="login-notice">
-            로그인 시 <span>이용약관</span> 및 <span>개인정보처리방침</span>에 동의하게 됩니다
+          <p className="login-notice" style={{ marginBottom: "1rem" }}>
+            {mode === "signup" ? "가입" : "로그인"} 시 <span>이용약관</span> 및 <span>개인정보처리방침</span>에 동의하게 됩니다
           </p>
+
+          <div style={{ textAlign: "center", fontSize: "0.875rem", borderTop: "1px solid var(--mb-gray-100)", paddingTop: "1rem", marginTop: "0.5rem" }}>
+            {mode === "signup" ? (
+              <div style={{ color: "var(--mb-gray-500)" }}>
+                이미 계정이 있으신가요?{" "}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setError("");
+                    setPhone("");
+                    router.push("/login");
+                  }}
+                  style={{
+                    background: "none", border: "none", color: "var(--mb-pink-500)",
+                    fontWeight: 700, cursor: "pointer", padding: 0, textDecoration: "underline"
+                  }}
+                >
+                  로그인하기
+                </button>
+              </div>
+            ) : (
+              <div style={{ color: "var(--mb-gray-500)" }}>
+                아직 회원이 아니신가요?{" "}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setError("");
+                    setPhone("");
+                    router.push("/login?mode=signup");
+                  }}
+                  style={{
+                    background: "none", border: "none", color: "var(--mb-pink-500)",
+                    fontWeight: 700, cursor: "pointer", padding: 0, textDecoration: "underline"
+                  }}
+                >
+                  10초 회원가입하기
+                </button>
+              </div>
+            )}
+          </div>
         </form>
       )}
 

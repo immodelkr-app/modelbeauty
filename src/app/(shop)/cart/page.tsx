@@ -6,6 +6,7 @@
 
 import { useState, useMemo } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useCartStore } from "@/store/cart.store";
 import { useAuthStore } from "@/store/auth.store";
 import CartItemRow from "@/components/cart/CartItem";
@@ -22,6 +23,7 @@ function formatPrice(price: number): string {
 }
 
 export default function CartPage() {
+  const router = useRouter();
   const { isLoggedIn, isLoading: authLoading } = useAuthStore();
   const { items, total, itemCount, isLoading, clearCart } = useCartStore();
   const [checkedIds, setCheckedIds] = useState<Set<string>>(
@@ -72,8 +74,12 @@ export default function CartPage() {
   };
 
   const handleCheckout = () => {
-    // Phase 5에서 토스페이먼츠 결제 연동
-    alert("Phase 5에서 결제 기능이 추가될 예정입니다.");
+    if (!isLoggedIn) {
+      router.push("/login?redirect=/checkout");
+      return;
+    }
+    if (selectedItems.length === 0) return;
+    router.push("/checkout");
   };
 
   // ── 로딩 중 ─────────────────────────────────────────────

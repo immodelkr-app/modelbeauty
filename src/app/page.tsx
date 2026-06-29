@@ -104,8 +104,51 @@ async function getHomeData(): Promise<{
 export default async function HomePage() {
   const { categories, featured } = await getHomeData();
 
+  const APP_URL = "https://www.modelbeauty.kr";
+
+  // ── JSON-LD: Organization + WebSite ────────────────────────
+  const organizationJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    name: "모델뷰티",
+    alternateName: "Model Beauty",
+    url: APP_URL,
+    logo: `${APP_URL}/og-image.png`,
+    contactPoint: {
+      "@type": "ContactPoint",
+      contactType: "customer service",
+      availableLanguage: "Korean",
+    },
+    sameAs: [],
+  };
+
+  const websiteJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    name: "모델뷰티",
+    url: APP_URL,
+    potentialAction: {
+      "@type": "SearchAction",
+      target: {
+        "@type": "EntryPoint",
+        urlTemplate: `${APP_URL}/products?q={search_term_string}`,
+      },
+      "query-input": "required name=search_term_string",
+    },
+  };
+
   return (
     <div className="shop-layout">
+      {/* JSON-LD 구조화 데이터 */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationJsonLd) }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(websiteJsonLd) }}
+      />
+
       <Header />
 
       <main className="shop-main">

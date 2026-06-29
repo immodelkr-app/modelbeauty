@@ -11,7 +11,7 @@ import ProductOptions from "@/components/products/ProductOptions";
 import ProductCard from "@/components/products/ProductCard";
 import type { Product, ProductOption, ProductVariant } from "@/types";
 
-// ── 동적 메타데이터 ─────────────────────────────────────
+const APP_URL = "https://www.modelbeauty.kr";
 
 export async function generateMetadata({
   params,
@@ -22,16 +22,45 @@ export async function generateMetadata({
   const supabase = await createSupabaseServerClient();
   const { data } = await supabase
     .from("products")
-    .select("name, description")
+    .select("name, description, price, images, categories(name)")
     .eq("slug", slug)
     .eq("is_active", true)
     .single();
 
   if (!data) return { title: "상품을 찾을 수 없습니다" };
 
+  const title = `${data.name}`;
+  const description = data.description ?? `모델뷰티의 ${data.name}`;
+  const productUrl = `${APP_URL}/products/${slug}`;
+  const images = (data.images as { url: string }[] | null) ?? [];
+  const ogImage = images[0]?.url ?? `${APP_URL}/og-image.png`;
+
   return {
-    title: data.name,
-    description: data.description ?? `모델뷰티의 ${data.name}`,
+    title,
+    description,
+    alternates: { canonical: productUrl },
+    openGraph: {
+      type: "website",
+      locale: "ko_KR",
+      url: productUrl,
+      siteName: "모델뷰티",
+      title: `${title} | 모델뷰티`,
+      description,
+      images: [
+        {
+          url: ogImage,
+          width: 800,
+          height: 800,
+          alt: title,
+        },
+      ],
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: `${title} | 모델뷰티`,
+      description,
+      images: [ogImage],
+    },
   };
 }
 
@@ -201,8 +230,52 @@ export default async function ProductDetailPage({
     ? calcDiscountRate(product.basePrice, product.salePrice!)
     : 0;
 
+  // ── JSON-LD 구조화 데이터 (schema.org/Product) ───────────
+  const images = product.images ?? [];
+  const productJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "Product",
+    name: product.name,
+    description: product.description ?? `모델뷰티의 ${product.name}`,
+    image: images.map((img: { url: string }) => img.url),
+    url: `${APP_URL}/products/${product.slug}`,
+    brand: {
+      "@type": "Brand",
+      name: "모델뷰티",
+    },
+    offers: {
+      "@type": "Offer",
+      priceCurrency: "KRW",
+      price: displayPrice,
+      availability:
+        product.stockQuantity > 0
+          ? "https://schema.org/InStock"
+          : "https://schema.org/OutOfStock",
+      seller: {
+        "@type": "Organization",
+        name: "모델뷰티",
+      },
+      url: `${APP_URL}/products/${product.slug}`,
+    },
+    ...(hasDiscount && {
+      // 할인가격이 있을 때만 추가
+      offers: {
+        "@type": "AggregateOffer",
+        priceCurrency: "KRW",
+        lowPrice: displayPrice,
+        highPrice: product.basePrice,
+        offerCount: 1,
+      },
+    }),
+  };
+
   return (
     <>
+      {/* JSON-LD 구조화 데이터 */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(productJsonLd) }}
+      />
       <div className="product-detail">
         {/* 브레드크럼 */}
         <nav className="product-detail-breadcrumb" aria-label="페이지 위치">

@@ -183,6 +183,36 @@ function LoginForm() {
     setStep("phone");
   };
 
+  // ── 이메일 로그인 ──────────────────────────────────────────
+  const [loginMode, setLoginMode] = useState<"phone" | "email">("phone");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+
+  const handleEmailLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+    setIsSubmitting(true);
+    setStep("loading");
+    try {
+      const { data, error: signInError } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+      if (signInError || !data.user) {
+        setStep("phone");
+        setError(signInError?.message || "이메일 또는 비밀번호가 올바르지 않습니다.");
+        return;
+      }
+      router.push(redirectTo);
+      router.refresh();
+    } catch {
+      setStep("phone");
+      setError("네트워크 오류가 발생했습니다. 다시 시도해주세요.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   return (
     <>
       {/* 로딩 상태 */}
@@ -193,8 +223,96 @@ function LoginForm() {
         </div>
       )}
 
+      {/* 로그인 모드 탭 */}
+      {step !== "loading" && step !== "otp" && (
+        <div style={{
+          display: "flex",
+          gap: "0",
+          marginBottom: "1.5rem",
+          borderRadius: "12px",
+          overflow: "hidden",
+          border: "1px solid rgba(219,39,119,0.2)",
+        }}>
+          <button
+            type="button"
+            onClick={() => { setLoginMode("phone"); setError(""); }}
+            style={{
+              flex: 1,
+              padding: "0.75rem",
+              fontSize: "0.875rem",
+              fontWeight: 600,
+              border: "none",
+              cursor: "pointer",
+              background: loginMode === "phone" ? "linear-gradient(135deg,#db2777,#9333ea)" : "transparent",
+              color: loginMode === "phone" ? "#fff" : "#9ca3af",
+              transition: "all 0.2s",
+            }}
+          >📱 휴대폰 인증</button>
+          <button
+            type="button"
+            onClick={() => { setLoginMode("email"); setError(""); }}
+            style={{
+              flex: 1,
+              padding: "0.75rem",
+              fontSize: "0.875rem",
+              fontWeight: 600,
+              border: "none",
+              cursor: "pointer",
+              background: loginMode === "email" ? "linear-gradient(135deg,#db2777,#9333ea)" : "transparent",
+              color: loginMode === "email" ? "#fff" : "#9ca3af",
+              transition: "all 0.2s",
+            }}
+          >✉️ 이메일 로그인</button>
+        </div>
+      )}
+
+      {/* 이메일 로그인 폼 */}
+      {step !== "loading" && step !== "otp" && loginMode === "email" && (
+        <form onSubmit={handleEmailLogin} className="login-form">
+          <div className="login-form-header">
+            <h2>이메일로 로그인</h2>
+            <p>이메일과 비밀번호를 입력하세요</p>
+          </div>
+          <div className="login-field">
+            <label htmlFor="email">이메일</label>
+            <input
+              id="email"
+              type="email"
+              placeholder="admin@immodel.kr"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="login-input"
+              autoComplete="email"
+              autoFocus
+              required
+            />
+          </div>
+          <div className="login-field">
+            <label htmlFor="password">비밀번호</label>
+            <input
+              id="password"
+              type="password"
+              placeholder="비밀번호 입력"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="login-input"
+              autoComplete="current-password"
+              required
+            />
+          </div>
+          {error && <p className="login-error">{error}</p>}
+          <button
+            type="submit"
+            className="login-btn"
+            disabled={isSubmitting}
+          >
+            {isSubmitting ? "로그인 중..." : "로그인"}
+          </button>
+        </form>
+      )}
+
       {/* Step 1: 전화번호 입력 */}
-      {step === "phone" && (
+      {step === "phone" && loginMode === "phone" && (
         <form onSubmit={handleSendOtp} className="login-form">
           <div className="login-form-header">
             <h2>전화번호로 로그인</h2>

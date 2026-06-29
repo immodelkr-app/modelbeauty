@@ -38,7 +38,7 @@ export async function POST(request: NextRequest) {
       toPhone = "0" + toPhone.slice(3);
     }
 
-    const response = await messageService.sendOne({
+    const response = await messageService.send({
       to: toPhone,
       from: SENDER_NUMBER,
       text: `[모델뷰티] 인증번호 [${sms.otp}]를 입력해주세요.`,

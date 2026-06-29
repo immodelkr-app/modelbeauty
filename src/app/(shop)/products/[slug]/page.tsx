@@ -1,0 +1,354 @@
+// ============================================================
+// GET /products/[slug] — 상품 상세 페이지 (Server Component)
+// ============================================================
+
+import { notFound } from "next/navigation";
+import Link from "next/link";
+import type { Metadata } from "next";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
+import ProductGallery from "@/components/products/ProductGallery";
+import ProductOptions from "@/components/products/ProductOptions";
+import ProductCard from "@/components/products/ProductCard";
+import type { Product, ProductOption, ProductVariant } from "@/types";
+
+// ── 동적 메타데이터 ─────────────────────────────────────
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ slug: string }>;
+}): Promise<Metadata> {
+  const { slug } = await params;
+  const supabase = await createSupabaseServerClient();
+  const { data } = await supabase
+    .from("products")
+    .select("name, description")
+    .eq("slug", slug)
+    .eq("is_active", true)
+    .single();
+
+  if (!data) return { title: "상품을 찾을 수 없습니다" };
+
+  return {
+    title: data.name,
+    description: data.description ?? `모델뷰티의 ${data.name}`,
+  };
+}
+
+// ── 데이터 패칭 ─────────────────────────────────────────
+
+async function getProduct(slug: string): Promise<Product | null> {
+  const supabase = await createSupabaseServerClient();
+
+  const { data, error } = await supabase
+    .from("products")
+    .select(
+      `id, name, slug, description, content, base_price, sale_price,
+       stock_quantity, sku, images, tags, is_active, is_featured,
+       created_at, updated_at, category_id,
+       categories ( id, name, slug, parent_id )`
+    )
+    .eq("slug", slug)
+    .eq("is_active", true)
+    .single();
+
+  if (error || !data) return null;
+
+  const cat = Array.isArray(data.categories)
+    ? data.categories[0]
+    : data.categories;
+
+  return {
+    id: data.id,
+    name: data.name,
+    slug: data.slug,
+    description: data.description,
+    content: data.content,
+    basePrice: data.base_price,
+    salePrice: data.sale_price,
+    stockQuantity: data.stock_quantity,
+    sku: data.sku,
+    images: (data.images as Product["images"]) ?? [],
+    tags: data.tags ?? [],
+    isActive: data.is_active,
+    isFeatured: data.is_featured,
+    createdAt: data.created_at,
+    updatedAt: data.updated_at,
+    categoryId: data.category_id,
+    category: cat
+      ? { id: cat.id, name: cat.name, slug: cat.slug, parentId: cat.parent_id, sortOrder: 0, imageUrl: null, isActive: true, createdAt: "" }
+      : undefined,
+  };
+}
+
+async function getProductOptions(productId: string): Promise<{
+  options: ProductOption[];
+  variants: ProductVariant[];
+}> {
+  const supabase = await createSupabaseServerClient();
+
+  const [{ data: optData }, { data: varData }] = await Promise.all([
+    supabase
+      .from("product_options")
+      .select("id, name, values, sort_order")
+      .eq("product_id", productId)
+      .order("sort_order"),
+    supabase
+      .from("product_variants")
+      .select("id, option_values, sku, price_adjustment, stock_quantity, is_active, created_at")
+      .eq("product_id", productId)
+      .eq("is_active", true),
+  ]);
+
+  const options: ProductOption[] = (optData ?? []).map((o) => ({
+    id: o.id,
+    productId,
+    name: o.name,
+    values: o.values as string[],
+    sortOrder: o.sort_order,
+  }));
+
+  const variants: ProductVariant[] = (varData ?? []).map((v) => ({
+    id: v.id,
+    productId,
+    optionValues: v.option_values as Record<string, string>,
+    sku: v.sku,
+    priceAdjustment: v.price_adjustment,
+    stockQuantity: v.stock_quantity,
+    isActive: v.is_active,
+    createdAt: v.created_at,
+  }));
+
+  return { options, variants };
+}
+
+async function getRelatedProducts(
+  categoryId: string | null,
+  excludeId: string
+): Promise<Product[]> {
+  if (!categoryId) return [];
+
+  const supabase = await createSupabaseServerClient();
+  const { data } = await supabase
+    .from("products")
+    .select(
+      `id, name, slug, description, base_price, sale_price,
+       stock_quantity, sku, images, tags, is_active, is_featured,
+       created_at, updated_at, category_id,
+       categories ( id, name, slug )`
+    )
+    .eq("is_active", true)
+    .eq("category_id", categoryId)
+    .neq("id", excludeId)
+    .order("created_at", { ascending: false })
+    .limit(4);
+
+  return (data ?? []).map((p) => {
+    const cat = Array.isArray(p.categories) ? p.categories[0] : p.categories;
+    return {
+      id: p.id,
+      name: p.name,
+      slug: p.slug,
+      description: p.description,
+      content: null,
+      basePrice: p.base_price,
+      salePrice: p.sale_price,
+      stockQuantity: p.stock_quantity,
+      sku: p.sku,
+      images: (p.images as Product["images"]) ?? [],
+      tags: p.tags ?? [],
+      isActive: p.is_active,
+      isFeatured: p.is_featured,
+      createdAt: p.created_at,
+      updatedAt: p.updated_at,
+      categoryId: p.category_id,
+      category: cat ? { id: cat.id, name: cat.name, slug: cat.slug, parentId: null, sortOrder: 0, imageUrl: null, isActive: true, createdAt: "" } : undefined,
+    } satisfies Product;
+  });
+}
+
+// ── 유틸리티 ─────────────────────────────────────────────
+
+function formatPrice(price: number): string {
+  return price.toLocaleString("ko-KR") + "원";
+}
+
+function calcDiscountRate(base: number, sale: number): number {
+  return Math.round(((base - sale) / base) * 100);
+}
+
+// ── 페이지 컴포넌트 ───────────────────────────────────────
+
+export default async function ProductDetailPage({
+  params,
+}: {
+  params: Promise<{ slug: string }>;
+}) {
+  const { slug } = await params;
+
+  const product = await getProduct(slug);
+  if (!product) notFound();
+
+  const [{ options, variants }, relatedProducts] = await Promise.all([
+    getProductOptions(product.id),
+    getRelatedProducts(product.categoryId ?? null, product.id),
+  ]);
+
+  const displayPrice = product.salePrice ?? product.basePrice;
+  const hasDiscount =
+    product.salePrice !== null && product.salePrice < product.basePrice;
+  const discountRate = hasDiscount
+    ? calcDiscountRate(product.basePrice, product.salePrice!)
+    : 0;
+
+  return (
+    <>
+      <div className="product-detail">
+        {/* 브레드크럼 */}
+        <nav className="product-detail-breadcrumb" aria-label="페이지 위치">
+          <Link href="/">홈</Link>
+          <span className="product-detail-breadcrumb-sep" aria-hidden="true">/</span>
+          <Link href="/products">전체 상품</Link>
+          {product.category && (
+            <>
+              <span className="product-detail-breadcrumb-sep" aria-hidden="true">/</span>
+              <Link href={`/products?category=${product.category.slug}`}>
+                {product.category.name}
+              </Link>
+            </>
+          )}
+          <span className="product-detail-breadcrumb-sep" aria-hidden="true">/</span>
+          <span className="product-detail-breadcrumb-current">{product.name}</span>
+        </nav>
+
+        <div className="product-detail-grid">
+          {/* 이미지 갤러리 (Client Component) */}
+          <ProductGallery images={product.images} productName={product.name} />
+
+          {/* 상품 정보 */}
+          <div className="product-info">
+            {product.category && (
+              <p className="product-info-category">{product.category.name}</p>
+            )}
+
+            <h1 className="product-info-name">{product.name}</h1>
+
+            {/* 가격 */}
+            <div className="product-info-price-wrap">
+              <span className="product-info-price">{formatPrice(displayPrice)}</span>
+              {hasDiscount && (
+                <>
+                  <span className="product-info-price-original">
+                    {formatPrice(product.basePrice)}
+                  </span>
+                  <span className="product-info-discount-badge">
+                    {discountRate}% 할인
+                  </span>
+                </>
+              )}
+            </div>
+
+            <div className="product-info-divider" role="separator" />
+
+            {/* 간단 설명 */}
+            {product.description && (
+              <p className="product-info-desc">{product.description}</p>
+            )}
+
+            {/* 옵션 + 수량 + CTA (Client Component) */}
+            <ProductOptions
+              productId={product.id}
+              options={options}
+              variants={variants}
+              basePrice={product.basePrice}
+              salePrice={product.salePrice}
+              stockQuantity={product.stockQuantity}
+            />
+
+            {/* 태그 */}
+            {product.tags.length > 0 && (
+              <div>
+                <div className="product-info-divider" role="separator" />
+                <div className="product-tags" style={{ marginTop: "1rem" }}>
+                  {product.tags.map((tag) => (
+                    <Link
+                      key={tag}
+                      href={`/products?tag=${tag}`}
+                      className="product-tag"
+                    >
+                      # {tag}
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* 배송/혜택 안내 */}
+            <div
+              style={{
+                padding: "1.25rem",
+                background: "var(--mb-gray-50)",
+                borderRadius: "16px",
+                display: "flex",
+                flexDirection: "column",
+                gap: "0.625rem",
+              }}
+            >
+              {[
+                { icon: "🚚", text: "50,000원 이상 구매 시 무료배송" },
+                { icon: "✨", text: "구매 시 포인트 1% 적립" },
+                { icon: "🔄", text: "수령 후 7일 이내 무료 반품" },
+              ].map((item) => (
+                <div
+                  key={item.text}
+                  style={{ display: "flex", gap: "0.625rem", fontSize: "0.875rem", color: "var(--mb-gray-600)" }}
+                >
+                  <span>{item.icon}</span>
+                  <span>{item.text}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* 상세 설명 탭 */}
+      {product.content && (
+        <div className="product-content-section">
+          <div className="product-content-tabs">
+            <button className="product-content-tab active">상품 상세</button>
+          </div>
+          <div className="product-content-body">{product.content}</div>
+        </div>
+      )}
+
+      {/* 연관 상품 */}
+      {relatedProducts.length > 0 && (
+        <div
+          className="products-section"
+          style={{ marginTop: "4rem" }}
+        >
+          <div className="section-header">
+            <div>
+              <p className="section-eyebrow">같은 카테고리</p>
+              <h2 className="section-title">연관 상품</h2>
+            </div>
+            {product.category && (
+              <Link
+                href={`/products?category=${product.category.slug}`}
+                className="section-link"
+              >
+                전체 보기 →
+              </Link>
+            )}
+          </div>
+          <div className="product-grid">
+            {relatedProducts.map((p) => (
+              <ProductCard key={p.id} product={p} />
+            ))}
+          </div>
+        </div>
+      )}
+    </>
+  );
+}

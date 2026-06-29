@@ -1,0 +1,187 @@
+// ============================================================
+// GET    /api/admin/products/[id] — 상품 상세
+// PATCH  /api/admin/products/[id] — 상품 수정 (Admin Only)
+// DELETE /api/admin/products/[id] — 상품 삭제 (Admin Only, Cascade)
+// ============================================================
+
+import { requireAdmin } from "@/lib/auth-admin";
+import { createSupabaseAdmin } from "@/lib/supabase/server";
+
+export async function GET(
+  _request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const notAllowed = await requireAdmin();
+  if (notAllowed) return notAllowed;
+
+  try {
+    const { id } = await params;
+    const admin = createSupabaseAdmin();
+    const { data, error } = await admin
+      .from("products")
+      .select(`*, categories ( id, name, slug ), product_options ( * ), product_variants ( * )`)
+      .eq("id", id)
+      .single();
+
+    if (error || !data) {
+      return Response.json({ success: false, error: "상품을 찾을 수 없습니다." }, { status: 404 });
+    }
+    return Response.json({ success: true, data });
+  } catch (err) {
+    console.error("[GET /api/admin/products/[id]]", err);
+    return Response.json({ success: false, error: "서버 오류" }, { status: 500 });
+  }
+}
+
+export async function PATCH(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const notAllowed = await requireAdmin();
+  if (notAllowed) return notAllowed;
+
+  try {
+    const { id } = await params;
+    const body = await request.json();
+
+    const {
+      name,
+      slug,
+      categoryId,
+      description,
+      content,
+      basePrice,
+      salePrice,
+      stockQuantity,
+      sku,
+      images,
+      tags,
+      isActive,
+      isFeatured,
+    } = body;
+
+    if (slug && !/^[a-z0-9-]+$/.test(slug)) {
+      return Response.json(
+        { success: false, error: "slug는 소문자, 숫자, 하이픈(-)만 사용 가능합니다." },
+        { status: 400 }
+      );
+    }
+    if (basePrice !== undefined && basePrice < 0) {
+      return Response.json(
+        { success: false, error: "basePrice는 0 이상이어야 합니다." },
+        { status: 400 }
+      );
+    }
+
+    // 업데이트할 필드만 포함
+    const updatePayload: Record<string, unknown> = {};
+    if (name !== undefined) updatePayload.name = name;
+    if (slug !== undefined) updatePayload.slug = slug;
+    if (categoryId !== undefined) updatePayload.category_id = categoryId;
+    if (description !== undefined) updatePayload.description = description;
+    if (content !== undefined) updatePayload.content = content;
+    if (basePrice !== undefined) updatePayload.base_price = basePrice;
+    if (salePrice !== undefined) updatePayload.sale_price = salePrice;
+    if (stockQuantity !== undefined) updatePayload.stock_quantity = stockQuantity;
+    if (sku !== undefined) updatePayload.sku = sku;
+    if (images !== undefined) updatePayload.images = images;
+    if (tags !== undefined) updatePayload.tags = tags;
+    if (isActive !== undefined) updatePayload.is_active = isActive;
+    if (isFeatured !== undefined) updatePayload.is_featured = isFeatured;
+
+    if (Object.keys(updatePayload).length === 0) {
+      return Response.json(
+        { success: false, error: "수정할 항목이 없습니다." },
+        { status: 400 }
+      );
+    }
+
+    const admin = createSupabaseAdmin();
+
+    const { data, error } = await admin
+      .from("products")
+      .update(updatePayload)
+      .eq("id", id)
+      .select()
+      .single();
+
+    if (error) {
+      if (error.code === "PGRST116") {
+        return Response.json(
+          { success: false, error: "상품을 찾을 수 없습니다." },
+          { status: 404 }
+        );
+      }
+      if (error.code === "23505") {
+        return Response.json(
+          { success: false, error: "이미 사용 중인 slug 또는 SKU입니다." },
+          { status: 409 }
+        );
+      }
+      console.error("[PATCH /api/admin/products/[id]] Supabase error:", error);
+      return Response.json(
+        { success: false, error: "상품 수정에 실패했습니다." },
+        { status: 500 }
+      );
+    }
+
+    return Response.json({
+      success: true,
+      data: {
+        id: data.id,
+        name: data.name,
+        slug: data.slug,
+        basePrice: data.base_price,
+        salePrice: data.sale_price,
+        stockQuantity: data.stock_quantity,
+        isActive: data.is_active,
+        isFeatured: data.is_featured,
+        updatedAt: data.updated_at,
+      },
+    });
+  } catch (err) {
+    console.error("[PATCH /api/admin/products/[id]] Unexpected error:", err);
+    return Response.json(
+      { success: false, error: "서버 오류가 발생했습니다." },
+      { status: 500 }
+    );
+  }
+}
+
+export async function DELETE(
+  _request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const notAllowed = await requireAdmin();
+  if (notAllowed) return notAllowed;
+
+  try {
+    const { id } = await params;
+    const admin = createSupabaseAdmin();
+
+    // 상품 삭제 (product_options, product_variants는 CASCADE 삭제)
+    const { error } = await admin.from("products").delete().eq("id", id);
+
+    if (error) {
+      if (error.code === "PGRST116") {
+        return Response.json(
+          { success: false, error: "상품을 찾을 수 없습니다." },
+          { status: 404 }
+        );
+      }
+      console.error("[DELETE /api/admin/products/[id]] Supabase error:", error);
+      return Response.json(
+        { success: false, error: "상품 삭제에 실패했습니다." },
+        { status: 500 }
+      );
+    }
+
+    return Response.json({ success: true, message: "상품이 삭제되었습니다." });
+  } catch (err) {
+    console.error("[DELETE /api/admin/products/[id]] Unexpected error:", err);
+    return Response.json(
+      { success: false, error: "서버 오류가 발생했습니다." },
+      { status: 500 }
+    );
+  }
+}

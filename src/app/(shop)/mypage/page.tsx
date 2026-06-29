@@ -34,11 +34,12 @@ interface RecentOrder {
 }
 
 export default function MypagePage() {
-  const { masterUser } = useAuthStore();
+  const { masterUser, setMasterUser } = useAuthStore();
   const { items: wishlistItems } = useWishlistStore();
   const [recentOrders, setRecentOrders] = useState<RecentOrder[]>([]);
   const [orderCount, setOrderCount] = useState(0);
   const [isLoadingOrders, setIsLoadingOrders] = useState(true);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   useEffect(() => {
     fetch("/api/mypage/orders?page=1")
@@ -50,6 +51,23 @@ export default function MypagePage() {
       .catch(() => {})
       .finally(() => setIsLoadingOrders(false));
   }, []);
+
+  const handleLogout = async () => {
+    if (confirm("로그아웃 하시겠습니까?")) {
+      setIsLoggingOut(true);
+      try {
+        const res = await fetch("/api/auth/logout", { method: "POST" });
+        if (res.ok) {
+          setMasterUser(null);
+          window.location.href = "/";
+        }
+      } catch {
+        alert("로그아웃 중 오류가 발생했습니다.");
+      } finally {
+        setIsLoggingOut(false);
+      }
+    }
+  };
 
   const points = masterUser?.integratedPoints ?? 0;
 
@@ -86,9 +104,35 @@ export default function MypagePage() {
 
   return (
     <>
-      <h1 className="mypage-section-title">
-        안녕하세요, {masterUser?.name ?? "회원"}님 👋
-      </h1>
+      <div style={{
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        marginBottom: "1.5rem",
+        flexWrap: "wrap",
+        gap: "1rem"
+      }}>
+        <h1 className="mypage-section-title" style={{ margin: 0 }}>
+          안녕하세요, {masterUser?.name ?? "회원"}님 👋
+        </h1>
+        <button
+          onClick={handleLogout}
+          disabled={isLoggingOut}
+          style={{
+            background: "transparent",
+            border: "1px solid var(--mb-gray-300)",
+            color: "var(--mb-gray-600)",
+            padding: "0.5rem 0.875rem",
+            borderRadius: "10px",
+            fontSize: "0.8125rem",
+            fontWeight: 600,
+            cursor: "pointer",
+            transition: "all 0.2s"
+          }}
+        >
+          {isLoggingOut ? "로그아웃 중..." : "로그아웃"}
+        </button>
+      </div>
 
       {/* 요약 카드 그리드 */}
       <div className="mypage-summary-grid">

@@ -143,10 +143,31 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         {/* 데스크탑 탑바 */}
         <header className="admin-topbar">
           <h1 className="admin-topbar-title">{pageTitle}</h1>
-          <div className="admin-topbar-actions">
+          <div className="admin-topbar-actions" style={{ display: "flex", gap: "0.5rem" }}>
             <Link href="/" className="admin-btn admin-btn-secondary admin-btn-sm">
               🏪 쇼핑몰
             </Link>
+            <button
+              onClick={async () => {
+                if (confirm("관리자 로그아웃 하시겠습니까?")) {
+                  try {
+                    const res = await fetch("/api/auth/logout", { method: "POST" });
+                    if (res.ok) {
+                      window.location.href = "/";
+                    }
+                  } catch {
+                    alert("로그아웃 중 오류가 발생했습니다.");
+                  }
+                }
+              }}
+              className="admin-btn admin-btn-secondary admin-btn-sm"
+              style={{
+                borderColor: "rgba(239, 68, 68, 0.4)",
+                color: "#ef4444"
+              }}
+            >
+              🚪 로그아웃
+            </button>
           </div>
         </header>
 

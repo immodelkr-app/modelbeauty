@@ -100,14 +100,16 @@ export default function CheckoutPage() {
     setIsSubmitting(true);
     try {
       // 주문 생성
-      const orderItems = items.map((item) => ({
-        productId: item.productId,
-        variantId: item.variantId,
-        productName: item.product?.name ?? "상품",
-        variantInfo: item.variant?.optionValues ?? null,
-        unitPrice: item.product?.salePrice ?? item.product?.basePrice ?? 0,
-        quantity: item.quantity,
-      }));
+      const orderItems = items.map((item) => {
+        return {
+          productId: item.product?.id,
+          variantId: item.variant?.id ?? null,
+          productName: item.product?.name ?? "상품",
+          variantInfo: item.variant?.optionValues ?? null,
+          unitPrice: item.unitPrice,
+          quantity: item.quantity,
+        };
+      });
 
       const res = await fetch("/api/orders", {
         method: "POST",

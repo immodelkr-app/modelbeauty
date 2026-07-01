@@ -4,6 +4,7 @@
 // ============================================================
 
 import Link from "next/link";
+import Image from "next/image";
 import type { Metadata } from "next";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import Header from "@/components/layout/Header";
@@ -213,10 +214,143 @@ export default async function HomePage() {
               </div>
             </div>
 
-            {/* 비주얼 */}
-            <div className="hero-image-wrap" aria-hidden="true">
-              <div className="hero-image-card">
-                <div className="hero-image-inner">💄</div>
+            {/* 비주얼 - 라이브 방송 & 상품 쇼케이스 컨셉 */}
+            <div className="hero-image-wrap">
+              <div className="hero-image-card" style={{ display: "block", overflow: "visible" }}>
+                {/* 메인 방송 커버 이미지 */}
+                <div style={{ position: "relative", width: "100%", height: "100%", borderRadius: "32px", overflow: "hidden" }}>
+                  <Image
+                    src="/images/live_cover_makeup.png"
+                    alt="뷰티 라이브 쇼"
+                    fill
+                    sizes="(max-width: 768px) 100vw, 50vw"
+                    style={{ objectFit: "cover" }}
+                    priority
+                  />
+                  {/* 그라데이션 오버레이 */}
+                  <div style={{
+                    position: "absolute",
+                    inset: 0,
+                    background: "linear-gradient(to top, rgba(0,0,0,0.6) 0%, transparent 60%)"
+                  }} />
+                  
+                  {/* 라이브 상태 배지 */}
+                  <div style={{
+                    position: "absolute",
+                    top: "1.25rem",
+                    left: "1.25rem",
+                    display: "flex",
+                    gap: "0.5rem",
+                    alignItems: "center",
+                    zIndex: 10
+                  }}>
+                    <span className="visual-live-badge" style={{ position: "static", margin: 0 }}>LIVE</span>
+                    <span style={{
+                      background: "rgba(0,0,0,0.5)",
+                      color: "#fff",
+                      fontSize: "0.75rem",
+                      fontWeight: 600,
+                      padding: "0.25rem 0.625rem",
+                      borderRadius: "100px",
+                      backdropFilter: "blur(4px)"
+                    }}>
+                      👤 3,420명
+                    </span>
+                  </div>
+
+                  {/* 중앙 플레이 버튼 */}
+                  <Link
+                    href="/live"
+                    className="play-btn-glow"
+                    style={{
+                      position: "absolute",
+                      top: "50%",
+                      left: "50%",
+                      transform: "translate(-50%, -50%)",
+                      width: "64px",
+                      height: "64px",
+                      borderRadius: "50%",
+                      background: "rgba(255,255,255,0.9)",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      color: "var(--mb-pink-500)",
+                      boxShadow: "0 10px 25px rgba(0,0,0,0.15)",
+                      zIndex: 10,
+                      transition: "transform 0.2s, background-color 0.2s"
+                    }}
+                    aria-label="라이브 보러가기"
+                  >
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M8 5v14l11-7z" />
+                    </svg>
+                  </Link>
+
+                  {/* 방송 제목 텍스트 */}
+                  <div style={{
+                    position: "absolute",
+                    bottom: "1.5rem",
+                    left: "1.5rem",
+                    right: "1.5rem",
+                    color: "#fff",
+                    zIndex: 10
+                  }}>
+                    <p style={{ fontSize: "0.8125rem", color: "rgba(255,255,255,0.8)", marginBottom: "0.25rem" }}>스트리머 지아(Jia)의</p>
+                    <h3 style={{ fontSize: "1.125rem", fontWeight: 700, lineHeight: 1.3, margin: 0, textShadow: "0 2px 4px rgba(0,0,0,0.3)" }}>
+                      벨벳 립스틱 전색상 단독 특가 쇼!
+                    </h3>
+                  </div>
+                </div>
+
+                {/* 플로팅 추천 상품 카드 1 */}
+                <div className="floating-product-card float-card-1" style={{
+                  position: "absolute",
+                  left: "-2.5rem",
+                  top: "20%",
+                  background: "rgba(255,255,255,0.9)",
+                  border: "1px solid rgba(255,255,255,0.7)",
+                  backdropFilter: "blur(12px)",
+                  padding: "0.75rem",
+                  borderRadius: "20px",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "0.75rem",
+                  boxShadow: "0 10px 30px rgba(0,0,0,0.08)",
+                  zIndex: 20
+                }}>
+                  <div style={{ position: "relative", width: "48px", height: "48px", borderRadius: "12px", overflow: "hidden", background: "#f5f5f5" }}>
+                    <Image src="/images/velvet_lipstick.png" alt="립스틱" fill style={{ objectFit: "cover" }} />
+                  </div>
+                  <div>
+                    <h4 style={{ fontSize: "0.8125rem", fontWeight: 700, margin: 0, color: "var(--mb-gray-900)" }}>벨벳 립스틱</h4>
+                    <p style={{ fontSize: "0.75rem", fontWeight: 800, color: "var(--mb-pink-500)", margin: "0.125rem 0 0 0" }}>18,000원</p>
+                  </div>
+                </div>
+
+                {/* 플로팅 추천 상품 카드 2 */}
+                <div className="floating-product-card float-card-2" style={{
+                  position: "absolute",
+                  right: "-2.5rem",
+                  bottom: "15%",
+                  background: "rgba(255,255,255,0.9)",
+                  border: "1px solid rgba(255,255,255,0.7)",
+                  backdropFilter: "blur(12px)",
+                  padding: "0.75rem",
+                  borderRadius: "20px",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "0.75rem",
+                  boxShadow: "0 10px 30px rgba(0,0,0,0.08)",
+                  zIndex: 20
+                }}>
+                  <div style={{ position: "relative", width: "48px", height: "48px", borderRadius: "12px", overflow: "hidden", background: "#f5f5f5" }}>
+                    <Image src="/images/moisture_cream.png" alt="크림" fill style={{ objectFit: "cover" }} />
+                  </div>
+                  <div>
+                    <h4 style={{ fontSize: "0.8125rem", fontWeight: 700, margin: 0, color: "var(--mb-gray-900)" }}>아쿠아 수분크림</h4>
+                    <p style={{ fontSize: "0.75rem", fontWeight: 800, color: "var(--mb-pink-500)", margin: "0.125rem 0 0 0" }}>24,000원</p>
+                  </div>
+                </div>
               </div>
             </div>
           </div>

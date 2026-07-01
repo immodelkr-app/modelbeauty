@@ -3762,3 +3762,27 @@ body {
   }
 }
 
+/* 홈 히어로 플로팅 카드 애니메이션 */
+@keyframes float {
+  0% { transform: translateY(0px); }
+  50% { transform: translateY(-8px); }
+  100% { transform: translateY(0px); }
+}
+
+.floating-product-card {
+  animation: float 4s ease-in-out infinite;
+}
+
+.float-card-1 {
+  animation-delay: 0s;
+}
+
+.float-card-2 {
+  animation-delay: 2s;
+}
+
+.play-btn-glow:hover {
+  transform: translate(-50%, -50%) scale(1.1) !important;
+  background-color: #fff !important;
+  box-shadow: 0 12px 30px rgba(232, 121, 160, 0.3) !important;
+}

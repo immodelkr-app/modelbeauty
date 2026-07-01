@@ -3786,3 +3786,51 @@ body {
   background-color: #fff !important;
   box-shadow: 0 12px 30px rgba(232, 121, 160, 0.3) !important;
 }
+
+/* 전역 가로 스크롤 방지 및 모바일 웹 뷰포트 안정화 */
+html, body {
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+/* 홈 히어로 모바일 최적화 반응형 디자인 */
+@media (max-width: 768px) {
+  .hero-section {
+    padding: 5rem 1.25rem 4rem; /* 모바일 상하 여백 조절 */
+  }
+
+  .hero-content {
+    gap: 2rem;
+  }
+
+  .hero-image-wrap {
+    padding: 0 1rem;
+  }
+
+  .hero-image-card {
+    max-width: 290px !important; /* 모바일에서 메인 이미지 가로폭을 살짝 축소하여 여유 확보 */
+    aspect-ratio: 4/5;
+  }
+
+  .floating-product-card.float-card-1 {
+    left: -1.25rem !important; /* 양옆 화면 밖으로 이탈하여 좌우 흔들림 유발 방지 */
+    top: 20% !important;
+    transform: scale(0.8) !important;
+  }
+
+  .floating-product-card.float-card-2 {
+    right: -1.25rem !important; /* 양옆 화면 밖으로 이탈하여 좌우 흔들림 유발 방지 */
+    bottom: 12% !important;
+    transform: scale(0.8) !important;
+  }
+
+  .hero-stats {
+    gap: 1.25rem;
+    padding-top: 1.75rem;
+    margin-top: 1.75rem;
+  }
+
+  .hero-stat-value {
+    font-size: 1.375rem;
+  }
+}

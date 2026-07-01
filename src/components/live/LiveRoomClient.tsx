@@ -226,46 +226,48 @@ export default function LiveRoomClient({ initialStream, initialChats }: LiveRoom
 
             {/* 실시간 전시 상품 오버레이 팝업 */}
             {activeProduct && (
-              <div className="featured-product-overlay-card">
-                <div style={{ display: "flex", gap: "0.75rem", alignItems: "center" }}>
-                  <div className="overlay-prod-image">
-                    {pimg(activeProduct) ? (
-                      <Image
-                        src={pimg(activeProduct)!}
-                        alt={activeProduct.name}
-                        fill
-                        sizes="60px"
-                        style={{ objectFit: "cover" }}
-                      />
-                    ) : (
-                      "💄"
-                    )}
-                  </div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div className="overlay-prod-label">방송에서 소개 중인 제품</div>
-                    <div className="overlay-prod-name">{activeProduct.name}</div>
-                    <div className="overlay-prod-price">
-                      {activeProduct.salePrice ? (
-                        <>
-                          <span className="sale-p">
-                            {activeProduct.salePrice.toLocaleString()}원
-                          </span>
-                          <span className="base-p">
-                            {activeProduct.basePrice.toLocaleString()}원
-                          </span>
-                        </>
+              <div className="floating-live-product-wrap">
+                <div className="featured-product-overlay-card">
+                  <div style={{ display: "flex", gap: "0.75rem", alignItems: "center" }}>
+                    <div className="overlay-prod-image">
+                      {pimg(activeProduct) ? (
+                        <Image
+                          src={pimg(activeProduct)!}
+                          alt={activeProduct.name}
+                          fill
+                          sizes="60px"
+                          style={{ objectFit: "cover" }}
+                        />
                       ) : (
-                        <span>{activeProduct.basePrice.toLocaleString()}원</span>
+                        "💄"
                       )}
                     </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div className="overlay-prod-label">방송에서 소개 중인 제품</div>
+                      <div className="overlay-prod-name">{activeProduct.name}</div>
+                      <div className="overlay-prod-price">
+                        {activeProduct.salePrice ? (
+                          <>
+                            <span className="sale-p">
+                              {activeProduct.salePrice.toLocaleString()}원
+                            </span>
+                            <span className="base-p">
+                              {activeProduct.basePrice.toLocaleString()}원
+                            </span>
+                          </>
+                        ) : (
+                          <span>{activeProduct.basePrice.toLocaleString()}원</span>
+                        )}
+                      </div>
+                    </div>
                   </div>
+                  <button
+                    onClick={() => window.open(`/products/${activeProduct.slug}`, "_blank")}
+                    className="overlay-buy-btn"
+                  >
+                    구매하기
+                  </button>
                 </div>
-                <button
-                  onClick={() => window.open(`/products/${activeProduct.slug}`, "_blank")}
-                  className="overlay-buy-btn"
-                >
-                  구매하기
-                </button>
               </div>
             )}
 
@@ -417,10 +419,15 @@ export default function LiveRoomClient({ initialStream, initialChats }: LiveRoom
           text-shadow: 0 2px 4px rgba(0,0,0,0.5);
         }
 
-        .featured-product-overlay-card {
+        .floating-live-product-wrap {
           position: absolute;
           bottom: 1.5rem;
           left: 1.5rem;
+          z-index: 10;
+          animation: cardFloat 4s ease-in-out infinite;
+        }
+
+        .featured-product-overlay-card {
           background: rgba(15, 23, 42, 0.85);
           backdrop-filter: blur(12px);
           border: 1px solid rgba(255, 255, 255, 0.1);
@@ -432,7 +439,6 @@ export default function LiveRoomClient({ initialStream, initialChats }: LiveRoom
           align-items: center;
           animation: slideUpIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
           box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3);
-          z-index: 10;
         }
 
         .overlay-prod-image {
@@ -672,6 +678,12 @@ export default function LiveRoomClient({ initialStream, initialChats }: LiveRoom
           to { transform: translateY(0); opacity: 1; }
         }
 
+        @keyframes cardFloat {
+          0% { transform: translateY(0px); }
+          50% { transform: translateY(-8px); }
+          100% { transform: translateY(0px); }
+        }
+
         @media (max-width: 768px) {
           .liveroom-container {
             flex-direction: column;
@@ -684,8 +696,13 @@ export default function LiveRoomClient({ initialStream, initialChats }: LiveRoom
           .chat-messages-box {
             height: 250px;
           }
-          .featured-product-overlay-card {
+          .floating-live-product-wrap {
             width: calc(100% - 3rem);
+            left: 1.5rem;
+            bottom: 1.5rem;
+          }
+          .featured-product-overlay-card {
+            width: 100%;
           }
         }
       `}</style>

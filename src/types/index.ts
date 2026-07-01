@@ -232,3 +232,55 @@ export interface PaginatedResponse<T> {
   limit: number;
   hasMore: boolean;
 }
+
+// ── 라이브커머스 타입 ────────────────────────────────────
+
+export interface LiveStream {
+  id: string;
+  title: string;
+  description: string | null;
+  streamerName: string;
+  status: "upcoming" | "live" | "ended";
+  coverImageUrl: string | null;
+  streamUrl: string | null;
+  replayUrl: string | null;
+  activeProductId: string | null;
+  viewerCount: number;
+  createdAt: string;
+  startedAt: string | null;
+  endedAt: string | null;
+  // 조인용
+  products?: Product[];
+  activeProduct?: Product;
+}
+
+export interface LiveStreamProduct {
+  id: string;
+  streamId: string;
+  productId: string;
+  sortOrder: number;
+}
+
+export interface LiveStreamChat {
+  id: string;
+  streamId: string;
+  masterUserId: string;
+  nickname: string;
+  message: string;
+  createdAt: string;
+}
+
+export interface ProductVideo {
+  id: string;
+  productId: string;
+  streamId: string | null;
+  title: string;
+  videoUrl: string;
+  thumbnailUrl: string | null;
+  sourceType: "live_replay" | "manual";
+  durationSec: number | null;
+  sortOrder: number;
+  isActive: boolean;
+  createdAt: string;
+}
+

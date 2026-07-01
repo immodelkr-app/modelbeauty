@@ -16,6 +16,7 @@ const NAV = [
   { href: "/admin/products", label: "상품 관리", icon: "🛍️" },
   { href: "/admin/categories", label: "카테고리", icon: "🗂️" },
   { href: "/admin/orders", label: "주문 관리", icon: "📦" },
+  { href: "/admin/live", label: "라이브 관리", icon: "🎥" },
 ] as const;
 
 function AdminSidebar({ pathname }: { pathname: string }) {
@@ -94,6 +95,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       "/admin/products": "상품 관리",
       "/admin/categories": "카테고리",
       "/admin/orders": "주문 관리",
+      "/admin/live": "라이브 관리",
     };
     setPageTitle(
       Object.entries(titles).find(([k]) =>

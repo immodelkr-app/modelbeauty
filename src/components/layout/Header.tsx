@@ -15,7 +15,9 @@ const NAV_ITEMS = [
   { href: "/products?category=body", label: "바디" },
   { href: "/products?category=hair", label: "헤어" },
   { href: "/products?featured=true", label: "베스트" },
+  { href: "/live", label: "📺 라이브" },
 ];
+
 
 export default function Header() {
   return (

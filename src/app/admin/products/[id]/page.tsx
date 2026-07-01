@@ -5,6 +5,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import ProductForm, { type ProductFormData } from "@/components/admin/ProductForm";
+import ProductVideosManager from "@/components/admin/ProductVideosManager";
 
 export default function EditProductPage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter();
@@ -70,6 +71,7 @@ export default function EditProductPage({ params }: { params: Promise<{ id: stri
           onSuccess={() => router.push("/admin/products")}
         />
       )}
+      {productId && <ProductVideosManager productId={productId} />}
     </>
   );
 }

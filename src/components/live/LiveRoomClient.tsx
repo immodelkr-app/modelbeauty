@@ -296,8 +296,12 @@ export default function LiveRoomClient({ initialStream, initialChats }: LiveRoom
           <div className="chat-messages-box">
             {chats.map((c) => (
               <div key={c.id} className="chat-msg-line">
-                <span className="chat-user-nick">{c.nickname}</span>
-                <span className="chat-user-text">{c.message}</span>
+                <span className={`chat-user-nick${c.nickname === "모델뷰티" ? " admin-official" : ""}`}>
+                  {c.nickname === "모델뷰티" ? "📢 모델뷰티" : c.nickname}
+                </span>
+                <span className={`chat-user-text${c.nickname === "모델뷰티" ? " admin-official" : ""}`}>
+                  {c.message}
+                </span>
               </div>
             ))}
             <div ref={chatEndRef} />
@@ -600,7 +604,7 @@ export default function LiveRoomClient({ initialStream, initialChats }: LiveRoom
           word-break: break-all;
         }
 
-        .chat-user-nick {
+         .chat-user-nick {
           font-weight: 700;
           color: #cbd5e1;
           margin-right: 6px;
@@ -608,9 +612,19 @@ export default function LiveRoomClient({ initialStream, initialChats }: LiveRoom
           padding: 2px 6px;
           border-radius: 4px;
         }
+        .chat-user-nick.admin-official {
+          color: #ec4899 !important; /* var(--mb-pink-500) */
+          background: rgba(236, 72, 153, 0.15) !important;
+          border: 1px solid rgba(236, 72, 153, 0.3);
+          font-weight: 900;
+        }
 
         .chat-user-text {
           color: #f1f5f9;
+        }
+        .chat-user-text.admin-official {
+          color: #fbcfe8 !important; /* var(--mb-pink-100) / pink-200 */
+          font-weight: 700;
         }
 
         .chat-input-bar {

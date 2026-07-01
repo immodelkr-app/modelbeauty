@@ -5,6 +5,7 @@
 
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { syncMasterUser } from "@/lib/core-auth";
+import { isAdmin } from "@/lib/auth-admin";
 
 export async function GET(
   _request: Request,
@@ -65,11 +66,14 @@ export async function POST(
       return Response.json({ success: false, error: "로그인이 필요합니다." }, { status: 401 });
     }
 
-    // ── 유저 정보 동기화 ──────────────────────────────────────
+    // ── 유저 정보 동기화 및 관리자 판별 ──────────────────────────
     let masterUserId = user.id;
     let nickname = user.user_metadata?.name ?? "사용자";
 
-    if (user.phone) {
+    const admin = await isAdmin();
+    if (admin) {
+      nickname = "모델뷰티";
+    } else if (user.phone) {
       try {
         const masterUser = await syncMasterUser({
           phoneNumber: user.phone,

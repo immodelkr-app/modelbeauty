@@ -52,6 +52,7 @@ export default function AdminLiveControlPage({ params }: { params: Promise<{ id:
   
   // 제어 상태 폼
   const [replayUrl, setReplayUrl] = useState("");
+  const [adminMessage, setAdminMessage] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
   // ── 데이터 로드 ──────────────────────────────────────────
@@ -237,6 +238,30 @@ export default function AdminLiveControlPage({ params }: { params: Promise<{ id:
     }
   };
 
+  // ── 어드민 실시간 답변 채팅 전송 ────────────────────────────
+  const handleSendAdminChat = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!adminMessage.trim()) return;
+
+    const chatContent = adminMessage.trim();
+    setAdminMessage("");
+
+    try {
+      const res = await fetch(`/api/live/${streamId}/chat`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: chatContent }),
+      });
+      const { success, error } = await res.json();
+      if (!success) {
+        alert(error ?? "채팅 전송에 실패했습니다.");
+      }
+    } catch (e) {
+      console.error(e);
+      alert("채팅 전송 중 오류가 발생했습니다.");
+    }
+  };
+
   if (loading) {
     return <div style={{ padding: "3rem", textAlign: "center", color: "#9ca3af" }}>로딩 중...</div>;
   }
@@ -416,12 +441,27 @@ export default function AdminLiveControlPage({ params }: { params: Promise<{ id:
               ) : (
                 chats.map((c) => (
                   <div key={c.id} className="chat-log-item">
-                    <span className="chat-log-name">{c.nickname}:</span>
+                    <span className={`chat-log-name${c.nickname === "모델뷰티" ? " admin-official" : ""}`}>
+                      {c.nickname}:
+                    </span>
                     <span className="chat-log-msg">{c.message}</span>
                   </div>
                 ))
               )}
             </div>
+
+            {/* 어드민 실시간 답변 전송 */}
+            <form onSubmit={handleSendAdminChat} className="admin-chat-form">
+              <input
+                className="admin-chat-input"
+                value={adminMessage}
+                onChange={(e) => setAdminMessage(e.target.value)}
+                placeholder="모델뷰티 이름으로 답변 메시지 전송..."
+              />
+              <button type="submit" className="admin-chat-send-btn">
+                전송
+              </button>
+            </form>
           </div>
         </div>
       </div>
@@ -540,6 +580,50 @@ export default function AdminLiveControlPage({ params }: { params: Promise<{ id:
 
         .chat-log-msg {
           color: #1f2937;
+        }
+
+        .chat-log-name.admin-official {
+          color: #db2777;
+          background: #fdf2f8;
+          padding: 2px 6px;
+          border-radius: 4px;
+          font-weight: 800;
+          border: 1px solid #fbcfe8;
+        }
+
+        .admin-chat-form {
+          display: flex;
+          gap: 0.5rem;
+          margin-top: 1rem;
+        }
+
+        .admin-chat-input {
+          flex: 1;
+          border: 1px solid #e5e7eb;
+          border-radius: 8px;
+          padding: 0.5rem 0.75rem;
+          font-size: 0.8125rem;
+          background: #fff;
+          color: #171717;
+        }
+        .admin-chat-input:focus {
+          outline: none;
+          border-color: #db2777;
+        }
+
+        .admin-chat-send-btn {
+          background: #db2777;
+          border: none;
+          color: #fff;
+          padding: 0.5rem 1rem;
+          border-radius: 8px;
+          font-size: 0.8125rem;
+          font-weight: 700;
+          cursor: pointer;
+          transition: background 0.2s;
+        }
+        .admin-chat-send-btn:hover {
+          background: #be185d;
         }
 
         @keyframes adminPulse {

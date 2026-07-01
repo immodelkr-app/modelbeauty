@@ -5,8 +5,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import Header from "@/components/layout/Header";
-import Footer from "@/components/layout/Footer";
 import LiveRoomClient from "@/components/live/LiveRoomClient";
 
 interface Props {
@@ -126,12 +124,8 @@ export default async function LiveStreamDetailPage({ params }: Props) {
   if (!stream) notFound();
 
   return (
-    <div className="shop-layout">
-      <Header />
-      <main className="shop-main" style={{ background: "#0f172a" }}>
-        <LiveRoomClient initialStream={stream} initialChats={chats} />
-      </main>
-      <Footer />
+    <div style={{ background: "#0f172a" }}>
+      <LiveRoomClient initialStream={stream} initialChats={chats} />
     </div>
   );
 }

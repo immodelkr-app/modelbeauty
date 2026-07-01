@@ -6,8 +6,6 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import Image from "next/image";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import Header from "@/components/layout/Header";
-import Footer from "@/components/layout/Footer";
 
 export const metadata: Metadata = {
   title: "라이브 쇼핑 | 모델뷰티",
@@ -97,9 +95,7 @@ export default async function LiveShoppingPage() {
   const replayStreams = streams.filter((s) => s.status === "ended");
 
   return (
-    <div className="shop-layout">
-      <Header />
-      <main className="shop-main" style={{ minHeight: "80vh", background: "var(--mb-gray-50)", paddingBottom: "4rem" }}>
+    <div style={{ minHeight: "80vh", background: "var(--mb-gray-50)", paddingBottom: "4rem" }}>
         
         {/* 히어로 배너 */}
         <section className="live-hero">
@@ -288,8 +284,6 @@ export default async function LiveShoppingPage() {
             )}
           </section>
         </div>
-      </main>
-      <Footer />
-    </div>
+      </div>
   );
 }

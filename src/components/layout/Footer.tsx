@@ -63,10 +63,16 @@ export default function Footer() {
 
       {/* 하단 */}
       <div className="shop-footer-bottom">
-        <p className="shop-footer-copy">
-          © {new Date().getFullYear()} Model Beauty. All rights reserved.
+        <p className="shop-footer-copy" style={{ lineHeight: "1.7", color: "var(--mb-gray-500)" }}>
+          상호명: 글로벌아임 | 대표자: 김대희 | 사업자등록번호: 365-22-00947
           <br />
-          사업자등록번호: 000-00-00000 | 통신판매업신고: 제0000-서울-0000호
+          통신판매업신고번호: 제 2021-서울강남-05756 호 | 이메일: immodelkr@gmail.com
+          <br />
+          주소: 서울특별시 강남구 도곡로17길 16, 102동 303호(역삼동, 마이플레이스)
+          <br />
+          <span style={{ fontSize: "0.75rem", display: "inline-block", marginTop: "0.5rem" }}>
+            © {new Date().getFullYear()} Model Beauty. All rights reserved.
+          </span>
         </p>
         <div style={{ display: "flex", gap: "1rem", flexWrap: "wrap" }}>
           {POLICY_LINKS.map((link) => (

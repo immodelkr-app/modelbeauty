@@ -32,10 +32,12 @@ export async function POST(request: NextRequest) {
     // ── 솔라피 문자 발송 실행 ─────────────────────────────────
     const messageService = new SolapiMessageService(API_KEY, API_SECRET);
     
-    // 국가번호 +82 형식을 국내 번호(010...)로 보정
-    let toPhone = user.phone;
-    if (toPhone.startsWith("+82")) {
-      toPhone = "0" + toPhone.slice(3);
+    // 국가번호 +82, 82 형식을 국내 번호(010...)로 보정
+    let toPhone = user.phone.replace(/\D/g, ""); // 숫자만 추출
+    if (toPhone.startsWith("8210")) {
+      toPhone = "0" + toPhone.slice(2);
+    } else if (toPhone.startsWith("10")) {
+      toPhone = "0" + toPhone;
     }
 
     const response = await messageService.send({

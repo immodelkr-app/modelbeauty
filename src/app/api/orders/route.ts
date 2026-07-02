@@ -48,7 +48,12 @@ export async function POST(request: NextRequest) {
       0
     );
     const shippingFee = subtotal >= SHIPPING_FREE_THRESHOLD ? 0 : SHIPPING_FEE;
-    const pointDiscount = Math.min(usedPointAmount, subtotal);
+    // 포인트 할인 검증 (조건 A: 10,000원 이상 구매 시, 최대 30%까지만 포인트 결제 허용, 최소 1,000P)
+    let pointDiscount = 0;
+    if (subtotal >= 10000 && usedPointAmount >= 1000) {
+      const maxPointsAllowed = Math.floor(subtotal * 0.3);
+      pointDiscount = Math.min(usedPointAmount, maxPointsAllowed);
+    }
     const totalAmount = Math.max(0, subtotal + shippingFee - pointDiscount - couponDiscount);
 
     const orderNumber = generateOrderNumber();

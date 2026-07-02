@@ -101,7 +101,7 @@ export default async function LiveShoppingPage() {
         <section className="live-hero">
           <div className="live-hero-inner">
             <span className="live-hero-badge">MODEL BEAUTY LIVE</span>
-            <h1 className="live-hero-title">실시간으로 소통하는<br />뷰티 라이브 쇼핑</h1>
+            <h1 className="live-hero-title">모델뷰티 크루들의<br />라이브 쇼핑</h1>
             <p className="live-hero-desc">엄선된 인기 뷰티 상품을 특별 혜택가로 만나보세요.</p>
           </div>
         </section>

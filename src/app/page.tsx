@@ -204,7 +204,7 @@ export default async function HomePage() {
               </h1>
 
               <p className="hero-desc">
-                현역 패션 모델들이 무대와 일상에서 직접 사용해보고<br />
+                모델들이 일상에서 직접 사용해보고<br />
                 깐깐하게 검증한 최고의 제품만 셀렉합니다.
               </p>
 
@@ -227,7 +227,7 @@ export default async function HomePage() {
                     </svg>
                   </Link>
                 ) : (
-                  <Link href="/products" className="hero-cta-primary">
+                  <Link href="/live" className="hero-cta-primary">
                     지금 쇼핑하기
                     <svg
                       width="18"

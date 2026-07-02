@@ -9,7 +9,8 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import ProductGallery from "@/components/products/ProductGallery";
 import ProductOptions from "@/components/products/ProductOptions";
 import ProductCard from "@/components/products/ProductCard";
-import type { Product, ProductOption, ProductVariant } from "@/types";
+import ProductDetailTabs from "@/components/products/ProductDetailTabs";
+import type { Product, ProductOption, ProductVariant, ProductVideo } from "@/types";
 
 const APP_URL = "https://www.modelbeauty.kr";
 
@@ -206,6 +207,32 @@ function calcDiscountRate(base: number, sale: number): number {
   return Math.round(((base - sale) / base) * 100);
 }
 
+async function getProductVideos(productId: string): Promise<ProductVideo[]> {
+  const supabase = await createSupabaseServerClient();
+  const { data, error } = await supabase
+    .from("product_videos")
+    .select("*")
+    .eq("product_id", productId)
+    .eq("is_active", true)
+    .order("sort_order", { ascending: true })
+    .order("created_at", { ascending: false });
+
+  if (error || !data) return [];
+  return data.map((v) => ({
+    id: v.id,
+    productId: v.product_id,
+    streamId: v.stream_id,
+    title: v.title,
+    videoUrl: v.video_url,
+    thumbnailUrl: v.thumbnail_url,
+    sourceType: v.source_type,
+    durationSec: v.duration_sec,
+    sortOrder: v.sort_order,
+    isActive: v.is_active,
+    createdAt: v.created_at,
+  }));
+}
+
 // ── 페이지 컴포넌트 ───────────────────────────────────────
 
 export default async function ProductDetailPage({
@@ -218,8 +245,9 @@ export default async function ProductDetailPage({
   const product = await getProduct(slug);
   if (!product) notFound();
 
-  const [{ options, variants }, relatedProducts] = await Promise.all([
+  const [{ options, variants }, videos, relatedProducts] = await Promise.all([
     getProductOptions(product.id),
+    getProductVideos(product.id),
     getRelatedProducts(product.categoryId ?? null, product.id),
   ]);
 
@@ -385,15 +413,8 @@ export default async function ProductDetailPage({
         </div>
       </div>
 
-      {/* 상세 설명 탭 */}
-      {product.content && (
-        <div className="product-content-section">
-          <div className="product-content-tabs">
-            <button className="product-content-tab active">상품 상세</button>
-          </div>
-          <div className="product-content-body">{product.content}</div>
-        </div>
-      )}
+      {/* 상세 설명 및 라이브 영상 탭 */}
+      <ProductDetailTabs content={product.content} videos={videos} />
 
       {/* 연관 상품 */}
       {relatedProducts.length > 0 && (

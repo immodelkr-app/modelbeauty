@@ -167,9 +167,9 @@ export default async function HomePage() {
               </div>
 
               <h1 className="hero-title">
-                뷰티의 시작,
+                모델뷰티의 시작,
                 <br />
-                <span className="hero-title-accent">Model Beauty</span>
+                <span className="hero-title-accent">MODEL BEAUTY</span>
               </h1>
 
               <p className="hero-desc">

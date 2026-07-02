@@ -48,10 +48,35 @@ export default function CheckoutPage() {
   // Toss 위젯 인스턴스
   const tossWidgetRef = useRef<unknown>(null);
 
+  // 포인트 및 쿠폰 관련 상태
+  const [coupons, setCoupons] = useState<any[]>([]);
+  const [selectedCoupon, setSelectedCoupon] = useState<any | null>(null);
+  const [pointInput, setPointInput] = useState("");
+  const [appliedPoints, setAppliedPoints] = useState(0);
+
   // 금액 계산
   const subtotal = items.reduce((s, i) => s + i.subtotal, 0);
   const shippingFee = subtotal >= SHIPPING_FREE_THRESHOLD ? 0 : SHIPPING_FEE;
-  const finalTotal = subtotal + shippingFee;
+
+  // 쿠폰 할인 계산
+  let couponDiscount = 0;
+  if (selectedCoupon) {
+    if (selectedCoupon.discountType === "fixed") {
+      couponDiscount = selectedCoupon.discountValue;
+    } else if (selectedCoupon.discountType === "percent") {
+      couponDiscount = Math.floor(subtotal * (selectedCoupon.discountValue / 100));
+      if (selectedCoupon.maxDiscountAmount) {
+        couponDiscount = Math.min(couponDiscount, selectedCoupon.maxDiscountAmount);
+      }
+    }
+  }
+
+  // 포인트 할인 계산
+  const maxAvailablePoints = masterUser?.integratedPoints ?? 0;
+  const maxPointsToUse = Math.max(0, subtotal - couponDiscount);
+  const actualPointDiscount = Math.min(appliedPoints, maxPointsToUse);
+
+  const finalTotal = Math.max(0, subtotal + shippingFee - actualPointDiscount - couponDiscount);
   const estimatedPoints = Math.floor(finalTotal * POINT_REWARD_RATE);
 
   // 비로그인 처리
@@ -68,12 +93,25 @@ export default function CheckoutPage() {
     }
   }, [authLoading, items.length, router]);
 
-  // masterUser 이름 폼에 자동 입력
+  // masterUser 이름 폼에 자동 입력 및 쿠폰 조회
   useEffect(() => {
     if (masterUser?.name && !form.recipientName) {
       setForm((f) => ({ ...f, recipientName: masterUser.name ?? "" }));
     }
   }, [masterUser]);
+
+  useEffect(() => {
+    if (isLoggedIn) {
+      fetch("/api/coupons")
+        .then((r) => r.json())
+        .then((data) => {
+          if (data.success) {
+            setCoupons(data.coupons || []);
+          }
+        })
+        .catch((e) => console.error("쿠폰 정보 로딩 실패:", e));
+    }
+  }, [isLoggedIn]);
 
   const handleInput = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     setForm((f) => ({ ...f, [e.target.name]: e.target.value }));
@@ -119,6 +157,10 @@ export default function CheckoutPage() {
           items: orderItems,
           ...form,
           recipientPhone: form.recipientPhone.replace(/-/g, ""),
+          usedPointAmount: actualPointDiscount,
+          usedCouponId: selectedCoupon?.userCouponId ?? null,
+          usedCouponCode: selectedCoupon?.code ?? null,
+          couponDiscount: couponDiscount,
         }),
       });
 
@@ -335,6 +377,114 @@ export default function CheckoutPage() {
               </div>
             </section>
 
+            {/* 쿠폰 및 포인트 사용 */}
+            <section style={{ background: "#fff", borderRadius: "16px", padding: "1.25rem", border: "1px solid var(--mb-gray-100)" }}>
+              <h2 style={{ fontSize: "1rem", fontWeight: 700, margin: "0 0 1.25rem", color: "var(--mb-gray-900)" }}>
+                쿠폰 / 포인트 할인
+              </h2>
+              
+              {/* 쿠폰 선택 */}
+              <div style={{ marginBottom: "1.25rem" }}>
+                <label style={labelStyle}>쿠폰 선택</label>
+                {coupons.length === 0 ? (
+                  <select disabled style={{ ...inputStyle, background: "var(--mb-gray-50)", color: "var(--mb-gray-400)" }}>
+                    <option>사용 가능한 쿠폰이 없습니다.</option>
+                  </select>
+                ) : (
+                  <select
+                    value={selectedCoupon?.userCouponId || ""}
+                    onChange={(e) => {
+                      const cid = e.target.value;
+                      const selected = coupons.find((c) => c.userCouponId === cid);
+                      setSelectedCoupon(selected || null);
+                    }}
+                    style={inputStyle}
+                  >
+                    <option value="">쿠폰 선택 안 함</option>
+                    {coupons.map((c) => (
+                      <option key={c.userCouponId} value={c.userCouponId}>
+                        {c.name} ({c.discountType === "fixed" ? `${c.discountValue.toLocaleString()}원` : `${c.discountValue}%`} 할인)
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </div>
+
+              {/* 포인트 입력 */}
+              <div>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.375rem" }}>
+                  <label style={{ ...labelStyle, margin: 0 }}>포인트 사용 (1,000P 이상 사용 가능)</label>
+                  <span style={{ fontSize: "0.8125rem", color: "var(--mb-gray-500)" }}>
+                    보유: {maxAvailablePoints.toLocaleString()}P
+                  </span>
+                </div>
+                <div style={{ display: "flex", gap: "0.5rem" }}>
+                  <input
+                    type="number"
+                    value={pointInput}
+                    onChange={(e) => setPointInput(e.target.value)}
+                    placeholder="0"
+                    style={{ ...inputStyle, flex: 1 }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const pts = parseInt(pointInput) || 0;
+                      if (pts > maxAvailablePoints) {
+                        alert("보유하신 포인트보다 큰 금액은 사용할 수 없습니다.");
+                        return;
+                      }
+                      if (pts > 0 && pts < 1000) {
+                        alert("포인트는 최소 1,000P 이상 사용 가능합니다.");
+                        return;
+                      }
+                      setAppliedPoints(pts);
+                    }}
+                    style={{
+                      padding: "0.5rem 1rem",
+                      borderRadius: "10px",
+                      border: "1px solid var(--mb-gray-300)",
+                      background: "#fff",
+                      fontSize: "0.875rem",
+                      fontWeight: 600,
+                      cursor: "pointer",
+                    }}
+                  >
+                    적용
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (maxAvailablePoints < 1000) {
+                        alert("포인트는 최소 1,000P 이상부터 사용 가능합니다.");
+                        return;
+                      }
+                      const allPoints = Math.min(maxAvailablePoints, maxPointsToUse);
+                      setPointInput(allPoints.toString());
+                      setAppliedPoints(allPoints);
+                    }}
+                    style={{
+                      padding: "0.5rem 1rem",
+                      borderRadius: "10px",
+                      border: "none",
+                      background: "var(--mb-gray-100)",
+                      color: "var(--mb-gray-700)",
+                      fontSize: "0.875rem",
+                      fontWeight: 600,
+                      cursor: "pointer",
+                    }}
+                  >
+                    전액 사용
+                  </button>
+                </div>
+                {appliedPoints > 0 && (
+                  <p style={{ color: "var(--mb-pink-600)", fontSize: "0.8125rem", margin: "0.5rem 0 0 0", fontWeight: 600 }}>
+                    ✓ {appliedPoints.toLocaleString()}P 할인이 적용되었습니다.
+                  </p>
+                )}
+              </div>
+            </section>
+
             {/* 결제 금액 요약 */}
             <section style={{ background: "#fff", borderRadius: "16px", padding: "1.25rem", border: "1px solid var(--mb-gray-100)" }}>
               <h2 style={{ fontSize: "1rem", fontWeight: 700, margin: "0 0 1rem", color: "var(--mb-gray-900)" }}>
@@ -348,6 +498,16 @@ export default function CheckoutPage() {
                   <span>배송비</span>
                   <span>{shippingFee === 0 ? <span style={{ color: "var(--mb-pink-500)" }}>무료</span> : fmt(shippingFee)}</span>
                 </div>
+                {couponDiscount > 0 && (
+                  <div style={{ display: "flex", justifyContent: "space-between", color: "var(--mb-pink-600)" }}>
+                    <span>쿠폰 할인</span><span>-{fmt(couponDiscount)}</span>
+                  </div>
+                )}
+                {actualPointDiscount > 0 && (
+                  <div style={{ display: "flex", justifyContent: "space-between", color: "var(--mb-pink-600)" }}>
+                    <span>포인트 사용</span><span>-{actualPointDiscount.toLocaleString()}P</span>
+                  </div>
+                )}
                 <div style={{ height: "1px", background: "var(--mb-gray-100)", margin: "0.5rem 0" }} />
                 <div style={{ display: "flex", justifyContent: "space-between", fontWeight: 800, fontSize: "1rem", color: "var(--mb-gray-900)" }}>
                   <span>총 결제금액</span><span style={{ color: "var(--mb-pink-600)" }}>{fmt(finalTotal)}</span>

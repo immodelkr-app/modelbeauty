@@ -5,6 +5,7 @@
 
 import { requireAdmin } from "@/lib/auth-admin";
 import { createSupabaseAdmin } from "@/lib/supabase/server";
+import { rewardPoints, restoreCoupon } from "@/lib/core-auth";
 
 const VALID_STATUSES = [
   "pending", "paid", "preparing", "shipping",
@@ -77,6 +78,72 @@ export async function PATCH(
       .single();
 
     if (error) throw error;
+
+    // ── im-core-auth 연동 (포인트 적립 및 복원, 쿠폰 복원) ──────────────────
+    if (data) {
+      const orderId = data.id;
+
+      // 1. 구매 확정 (confirmed) -> 포인트 적립 (결제액의 1%)
+      if (status === "confirmed" && current?.status !== "confirmed") {
+        const { data: order } = await admin
+          .from("orders")
+          .select("master_user_id, total_amount, order_number")
+          .eq("id", orderId)
+          .single();
+
+        if (order && order.total_amount > 0) {
+          const rewardAmount = Math.floor(order.total_amount * 0.01); // 1% 적립
+          if (rewardAmount > 0) {
+            try {
+              await rewardPoints({
+                masterUserId: order.master_user_id,
+                amount: rewardAmount,
+                description: `구매 확정 포인트 적립 (${order.order_number})`,
+              });
+            } catch (err) {
+              console.error("[PATCH /api/admin/orders/[id]] 포인트 적립 실패:", err);
+            }
+          }
+        }
+      }
+
+      // 2. 주문 취소 또는 환불 완료 (cancelled / refunded) -> 포인트 반환 및 쿠폰 복원
+      if (
+        (status === "cancelled" || status === "refunded") &&
+        current?.status !== "cancelled" &&
+        current?.status !== "refunded"
+      ) {
+        const { data: order } = await admin
+          .from("orders")
+          .select("master_user_id, order_number, used_point_amount, used_coupon_id")
+          .eq("id", orderId)
+          .single();
+
+        if (order) {
+          // 포인트 반환
+          if (order.used_point_amount > 0) {
+            try {
+              await rewardPoints({
+                masterUserId: order.master_user_id,
+                amount: order.used_point_amount,
+                description: `주문 취소/환불 포인트 반환 (${order.order_number})`,
+              });
+            } catch (err) {
+              console.error("[PATCH /api/admin/orders/[id]] 포인트 환불 실패:", err);
+            }
+          }
+
+          // 쿠폰 복원
+          if (order.used_coupon_id) {
+            try {
+              await restoreCoupon(order.used_coupon_id);
+            } catch (err) {
+              console.error("[PATCH /api/admin/orders/[id]] 쿠폰 복원 실패:", err);
+            }
+          }
+        }
+      }
+    }
 
     // 상태 이력 기록
     await admin.from("order_status_history").insert({

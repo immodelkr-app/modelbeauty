@@ -3808,7 +3808,7 @@ html, body {
   }
 
   .hero-image-card {
-    max-width: 290px !important; /* 모바일에서 메인 이미지 가로폭을 살짝 축소하여 여유 확보 */
+    max-width: min(350px, 85vw) !important; /* 모바일 가독성 및 카드 인지성을 높이기 위해 가로 크기 확대 */
     aspect-ratio: 4/5;
   }
 

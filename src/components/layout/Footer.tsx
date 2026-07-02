@@ -68,7 +68,9 @@ export default function Footer() {
           <br />
           통신판매업신고번호: 제 2021-서울강남-05756 호 | 이메일: immodelkr@gmail.com
           <br />
-          주소: 서울특별시 강남구 도곡로17길 16, 102동 303호(역삼동, 마이플레이스)
+          사업자 주소: 서울특별시 강남구 도곡로17길 16, 102동 303호(역삼동, 마이플레이스)
+          <br />
+          운영/반품 주소: 서울특별시 영등포구 영중로 159, 7층 (모델뷰티)
           <br />
           <span style={{ fontSize: "0.75rem", display: "inline-block", marginTop: "0.5rem" }}>
             © {new Date().getFullYear()} Model Beauty. All rights reserved.

@@ -204,8 +204,8 @@ export default async function HomePage() {
               </h1>
 
               <p className="hero-desc">
-                피부과 전문의와 함께 엄선한 뷰티 제품들.<br />
-                당신의 피부가 빛나는 순간을 위한 특별한 선택.
+                현역 패션 모델들이 무대와 일상에서 직접 사용해보고<br />
+                깐깐하게 검증한 최고의 제품만 셀렉합니다.
               </p>
 
               <div className="hero-actions">
@@ -518,7 +518,7 @@ export default async function HomePage() {
                 lineHeight: 1.7,
               }}
             >
-              피부과 전문의가 추천하는 엄선된 뷰티 제품들을 만나보세요.
+              현역 패션 모델들이 깐깐하게 검증한 최고의 뷰티 제품들을 만나보세요.
             </p>
             <Link href="/products" className="hero-cta-primary">
               상품 둘러보기 →
@@ -547,7 +547,7 @@ export default async function HomePage() {
               {
                 icon: "🧪",
                 title: "성분 검증",
-                desc: "피부과 전문의와 함께 엄선한 안전한 성분만을 사용합니다.",
+                desc: "현역 패션 모델들이 직접 써보고 검증한 최고의 성분만을 사용합니다.",
               },
               {
                 icon: "🌿",

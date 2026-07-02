@@ -73,6 +73,7 @@ export default function HeaderAuthSection() {
         {/* 포인트 표시 */}
         <Link
           href="/points"
+          className="header-points-btn"
           style={{
             display: "flex",
             alignItems: "center",
@@ -97,7 +98,7 @@ export default function HeaderAuthSection() {
 
         {/* 로그아웃 */}
         <button
-          className="shop-icon-btn"
+          className="shop-icon-btn header-logout-btn"
           onClick={handleLogout}
           aria-label="로그아웃"
           title="로그아웃"

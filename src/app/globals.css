@@ -3833,4 +3833,33 @@ html, body {
   .hero-stat-value {
     font-size: 1.375rem;
   }
+
+  /* 모바일/앱 헤더 최적화 */
+  .shop-logo-text {
+    font-size: 1.1rem;
+  }
+
+  .shop-header-inner {
+    padding: 0 1rem;
+    gap: 0.75rem;
+  }
+
+  .shop-header-actions {
+    gap: 0.25rem;
+  }
+
+  /* 회원가입 버튼 숨기기 (로그인을 통해 진입 가능하므로 공간 절약) */
+  .shop-login-btn {
+    display: none !important;
+  }
+
+  /* 헤더 내 포인트 표시 숨기기 (마이페이지에서 확인 가능하므로 모바일 헤더 간소화) */
+  .header-points-btn {
+    display: none !important;
+  }
+
+  /* 헤더 내 로그아웃 버튼 숨기기 (마이페이지에서 로그아웃 가능하므로 모바일 헤더 간소화) */
+  .header-logout-btn {
+    display: none !important;
+  }
 }

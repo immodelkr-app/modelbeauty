@@ -8,6 +8,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { syncMasterUser, updateMasterUser } from "@/lib/core-auth";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export async function POST(request: NextRequest) {
   try {
@@ -18,6 +19,17 @@ export async function POST(request: NextRequest) {
     // masterUserId + name 만 올 때는 im-core-auth에서 유저 정보만 업데이트
     if (masterUserId && name !== undefined && !phoneNumber) {
       const masterUser = await updateMasterUser(masterUserId, { name });
+      
+      // 로컬 Supabase 유저의 metadata name도 함께 업데이트하여 동기화 일치
+      try {
+        const supabase = await createSupabaseServerClient();
+        await supabase.auth.updateUser({
+          data: { name }
+        });
+      } catch (supabaseMetaError) {
+        console.warn("[/api/auth/sync] Supabase user metadata 업데이트 실패 (세션 없음 등):", supabaseMetaError);
+      }
+
       return NextResponse.json({ success: true, ...masterUser });
     }
 

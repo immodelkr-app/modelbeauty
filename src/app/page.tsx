@@ -251,11 +251,11 @@ export default async function HomePage() {
 
               <div className="hero-stats">
                 {[
-                  { value: "2,000+", label: "엄선된 상품" },
-                  { value: "98%", label: "고객 만족도" },
-                  { value: "50,000+", label: "누적 회원" },
+                  { value: "모델 실사용 검증", label: "깐깐하게 직접 써보고 셀렉한 프리미엄 제품" },
+                  { value: "아임모델 전용", label: "패션·광고 모델 회원만을 위한 특별한 가격과 혜택" },
+                  { value: "통합 포인트 결제", label: "MOCA 및 IMFF 앱 활동 적립금 사용 가능" },
                 ].map((stat) => (
-                  <div key={stat.label}>
+                  <div key={stat.value} style={{ flex: 1 }}>
                     <div className="hero-stat-value">{stat.value}</div>
                     <div className="hero-stat-label">{stat.label}</div>
                   </div>

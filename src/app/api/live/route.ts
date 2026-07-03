@@ -6,6 +6,7 @@
 import { requireAdmin } from "@/lib/auth-admin";
 import { createSupabaseServerClient, createSupabaseAdmin } from "@/lib/supabase/server";
 import type { NextRequest } from "next/server";
+import { IvsClient, CreateChannelCommand } from "@aws-sdk/client-ivs";
 
 export async function GET(request: NextRequest) {
   try {
@@ -74,6 +75,9 @@ export async function GET(request: NextRequest) {
         startedAt: stream.started_at,
         endedAt: stream.ended_at,
         products,
+        ingestEndpoint: stream.ingest_endpoint || null,
+        streamKey: stream.stream_key || null,
+        channelArn: stream.channel_arn || null,
       };
     });
 
@@ -105,6 +109,47 @@ export async function POST(request: Request) {
       return Response.json({ success: false, error: "제목과 스트리머 이름은 필수입니다." }, { status: 400 });
     }
 
+    let finalStreamUrl = streamUrl;
+    let ingestEndpoint = null;
+    let streamKey = null;
+    let channelArn = null;
+
+    // AWS IVS 채널 자동 생성 로직 (스트리밍 주소가 명시적으로 들어오지 않고, AWS 키가 존재할 때)
+    const hasAwsKeys = process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY;
+    if (hasAwsKeys && !finalStreamUrl) {
+      try {
+        const ivs = new IvsClient({
+          region: process.env.AWS_REGION || "ap-northeast-2",
+          credentials: {
+            accessKeyId: process.env.AWS_ACCESS_KEY_ID!,
+            secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY!,
+          },
+        });
+
+        const command = new CreateChannelCommand({
+          name: `modelbeauty-${Date.now()}`,
+          latencyMode: "LOW", // 라이브 쇼핑에 맞는 초저지연 모드
+          type: "BASIC",      // 요금 절감을 위한 원본 전송 BASIC 타입
+        });
+
+        const ivsResponse = await ivs.send(command);
+        if (ivsResponse.channel && ivsResponse.streamKey) {
+          finalStreamUrl = ivsResponse.channel.playbackUrl || null;
+          ingestEndpoint = ivsResponse.channel.ingestEndpoint 
+            ? `rtmps://${ivsResponse.channel.ingestEndpoint}:443/app/` 
+            : null;
+          streamKey = ivsResponse.streamKey.value || null;
+          channelArn = ivsResponse.channel.arn || null;
+        }
+      } catch (awsErr: any) {
+        console.error("[AWS IVS CreateChannel Error]:", awsErr);
+        return Response.json({ 
+          success: false, 
+          error: `AWS IVS 방송 송출 채널을 자동 생성하지 못했습니다. 상세: ${awsErr.message ?? awsErr}` 
+        }, { status: 500 });
+      }
+    }
+
     const admin = createSupabaseAdmin();
 
     // 1. 라이브 방송 생성
@@ -116,8 +161,11 @@ export async function POST(request: Request) {
         streamer_name: streamerName,
         status,
         cover_image_url: coverImageUrl || null,
-        stream_url: streamUrl || null,
+        stream_url: finalStreamUrl || null,
         replay_url: replayUrl || null,
+        ingest_endpoint: ingestEndpoint,
+        stream_key: streamKey,
+        channel_arn: channelArn,
         started_at: status === "live" ? new Date().toISOString() : null,
       })
       .select()
@@ -154,6 +202,9 @@ export async function POST(request: Request) {
         coverImageUrl: stream.cover_image_url,
         streamUrl: stream.stream_url,
         replayUrl: stream.replay_url,
+        ingestEndpoint: stream.ingest_endpoint,
+        streamKey: stream.stream_key,
+        channelArn: stream.channel_arn,
         viewerCount: stream.viewer_count,
         createdAt: stream.created_at,
         startedAt: stream.started_at,

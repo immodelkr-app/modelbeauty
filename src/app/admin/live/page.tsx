@@ -344,12 +344,12 @@ export default function AdminLivePage() {
 
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
                   <div className="admin-field">
-                    <label className="admin-label">스트리밍 주소(HLS/Dash/Loop)</label>
+                    <label className="admin-label">스트리밍 주소 (비워두면 AWS IVS 자동 생성)</label>
                     <input
                       className="admin-input"
                       value={streamUrl}
                       onChange={(e) => setStreamUrl(e.target.value)}
-                      placeholder="예) https://example.com/stream.m3u8 (비워두면 루프 비디오)"
+                      placeholder="비워두면 방송 송출 정보 자동 발급 (직접 입력도 가능)"
                     />
                   </div>
                   <div className="admin-field">

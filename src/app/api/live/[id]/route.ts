@@ -68,6 +68,9 @@ export async function GET(
       startedAt: stream.started_at,
       endedAt: stream.ended_at,
       products,
+      ingestEndpoint: stream.ingest_endpoint || null,
+      streamKey: stream.stream_key || null,
+      channelArn: stream.channel_arn || null,
     };
 
     return Response.json({ success: true, data: streamData });

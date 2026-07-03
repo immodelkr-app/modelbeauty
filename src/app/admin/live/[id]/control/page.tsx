@@ -28,6 +28,8 @@ interface LiveStream {
   coverImageUrl: string | null;
   streamUrl: string | null;
   replayUrl: string | null;
+  ingestEndpoint: string | null;
+  streamKey: string | null;
   activeProductId: string | null;
   viewerCount: number;
   createdAt: string;
@@ -140,6 +142,8 @@ export default function AdminLiveControlPage({ params }: { params: Promise<{ id:
               activeProductId: payload.new.active_product_id,
               viewerCount: payload.new.viewer_count,
               replayUrl: payload.new.replay_url,
+              ingestEndpoint: payload.new.ingest_endpoint,
+              streamKey: payload.new.stream_key,
               startedAt: payload.new.started_at,
               endedAt: payload.new.ended_at,
             };
@@ -339,6 +343,77 @@ export default function AdminLiveControlPage({ params }: { params: Promise<{ id:
               )}
             </div>
           </div>
+
+          {/* 송출 정보 카드 (AWS IVS 정보가 있을 때 노출) */}
+          {stream.ingestEndpoint && stream.streamKey && (
+            <div className="admin-card control-card" style={{ marginTop: "1.5rem" }}>
+              <h2 className="admin-card-title">🔑 실시간 송출 설정 정보 (PRISM/OBS 입력용)</h2>
+              <p style={{ fontSize: "0.8125rem", color: "#6b7280", margin: "0.5rem 0 1rem" }}>
+                스마트폰의 <strong>PRISM Live Studio</strong> 앱 또는 PC의 <strong>OBS Studio</strong> 설정에서 아래의 주소와 스트림 키를 각각 입력하신 후 송출을 시작해 주세요.
+              </p>
+              <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+                <div className="admin-field">
+                  <label className="admin-label" style={{ fontWeight: 700 }}>스트림 URL (RTMP 주소)</label>
+                  <div style={{ display: "flex", gap: "0.5rem" }}>
+                    <input
+                      className="admin-input"
+                      readOnly
+                      value={stream.ingestEndpoint}
+                      style={{ background: "#f3f4f6", cursor: "text" }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        navigator.clipboard.writeText(stream.ingestEndpoint || "");
+                        alert("스트림 URL이 클립보드에 복사되었습니다.");
+                      }}
+                      className="admin-btn admin-btn-secondary"
+                      style={{ flexShrink: 0 }}
+                    >
+                      복사
+                    </button>
+                  </div>
+                </div>
+                <div className="admin-field">
+                  <label className="admin-label" style={{ fontWeight: 700 }}>스트림 키 (Stream Key)</label>
+                  <div style={{ display: "flex", gap: "0.5rem" }}>
+                    <input
+                      type="password"
+                      className="admin-input"
+                      readOnly
+                      value={stream.streamKey}
+                      style={{ background: "#f3f4f6", cursor: "text" }}
+                      id="stream-key-input"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const input = document.getElementById("stream-key-input") as HTMLInputElement;
+                        if (input) {
+                          input.type = input.type === "password" ? "text" : "password";
+                        }
+                      }}
+                      className="admin-btn admin-btn-secondary"
+                      style={{ flexShrink: 0 }}
+                    >
+                      보기
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        navigator.clipboard.writeText(stream.streamKey || "");
+                        alert("스트림 키가 클립보드에 복사되었습니다.");
+                      }}
+                      className="admin-btn admin-btn-secondary"
+                      style={{ flexShrink: 0 }}
+                    >
+                      복사
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* 다시보기 주소 관리 카드 */}
           <div className="admin-card control-card" style={{ marginTop: "1.5rem" }}>

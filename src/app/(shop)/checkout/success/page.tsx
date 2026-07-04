@@ -8,6 +8,8 @@
 import { useEffect, useState, useRef } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useCartStore } from "@/store/cart.store";
+import { useAuthStore } from "@/store/auth.store";
+import { updateMasterUser } from "@/lib/core-auth";
 import { Suspense } from "react";
 import Link from "next/link";
 
@@ -17,6 +19,7 @@ function SuccessContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const { clearCart } = useCartStore();
+  const { masterUser, setMasterUser } = useAuthStore();
 
   const [status, setStatus] = useState<Status>("loading");
   const [orderNumber, setOrderNumber] = useState("");
@@ -57,6 +60,30 @@ function SuccessContent() {
           setAmount(amt);
           setStatus("success");
           clearCart(); // 장바구니 비우기
+
+          // 기본 주소로 저장 처리
+          const savedAddrRaw = sessionStorage.getItem("save_address_on_success");
+          if (savedAddrRaw && masterUser?.masterUserId) {
+            try {
+              const savedAddr = JSON.parse(savedAddrRaw);
+              updateMasterUser(masterUser.masterUserId, {
+                shipping_recipient: savedAddr.recipient,
+                shipping_phone: savedAddr.phone,
+                shipping_zipcode: savedAddr.zipcode,
+                shipping_address: savedAddr.address,
+                shipping_detail: savedAddr.detail,
+              }).then((updatedMaster) => {
+                setMasterUser(updatedMaster);
+                console.log("[SuccessContent] 기본 주소 동기화 완료");
+              }).catch((e) => {
+                console.error("[SuccessContent] 기본 주소 API 호출 실패:", e);
+              });
+            } catch (err) {
+              console.error("[SuccessContent] 기본 주소 파싱 오류:", err);
+            } finally {
+              sessionStorage.removeItem("save_address_on_success");
+            }
+          }
         } else {
           setStatus("error");
           setErrorMsg(data.error || "결제 승인에 실패했습니다.");

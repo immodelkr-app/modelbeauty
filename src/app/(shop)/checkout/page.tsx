@@ -38,6 +38,7 @@ export default function CheckoutPage() {
 
   const [step, setStep] = useState<CheckoutStep>("address");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [saveAsDefault, setSaveAsDefault] = useState(false);
   const [error, setError] = useState("");
   const [orderId, setOrderId] = useState("");
   const [totalAmount, setTotalAmount] = useState(0);
@@ -94,12 +95,7 @@ export default function CheckoutPage() {
     }
   }, [authLoading, items.length, router]);
 
-  // masterUser 이름 폼에 자동 입력 및 쿠폰 조회
-  useEffect(() => {
-    if (masterUser?.name && !form.recipientName) {
-      setForm((f) => ({ ...f, recipientName: masterUser.name ?? "" }));
-    }
-  }, [masterUser]);
+  // masterUser 이름 폼에 자동 입력 및 쿠폰 조회 제거 (하단으로 이동)
 
   useEffect(() => {
     if (isLoggedIn) {
@@ -124,6 +120,57 @@ export default function CheckoutPage() {
     if (d.length <= 3) return d;
     if (d.length <= 7) return `${d.slice(0, 3)}-${d.slice(3)}`;
     return `${d.slice(0, 3)}-${d.slice(3, 7)}-${d.slice(7)}`;
+  };
+
+  // masterUser 정보 로드 시 배송지 폼에 자동 입력
+  useEffect(() => {
+    if (masterUser) {
+      setForm((f) => ({
+        ...f,
+        recipientName: f.recipientName || masterUser.shipping_recipient || masterUser.name || "",
+        recipientPhone: f.recipientPhone || formatPhone(masterUser.shipping_phone || masterUser.phoneNumber || ""),
+        addressZipcode: f.addressZipcode || masterUser.shipping_zipcode || "",
+        addressMain: f.addressMain || masterUser.shipping_address || "",
+        addressDetail: f.addressDetail || masterUser.shipping_detail || "",
+      }));
+    }
+  }, [masterUser]);
+
+  const handleAddressSearch = () => {
+    const scriptId = "daum-postcode-script";
+    const existingScript = document.getElementById(scriptId);
+
+    const openPostcode = () => {
+      if ((window as any).daum && (window as any).daum.Postcode) {
+        new (window as any).daum.Postcode({
+          oncomplete: (data: any) => {
+            let fullAddress = data.address;
+            let extraAddress = "";
+            if (data.addressType === "R") {
+              if (data.bname !== "") extraAddress += data.bname;
+              if (data.buildingName !== "") extraAddress += (extraAddress !== "" ? `, ${data.buildingName}` : data.buildingName);
+              fullAddress += (extraAddress !== "" ? ` (${extraAddress})` : "");
+            }
+            setForm((f) => ({
+              ...f,
+              addressZipcode: data.zonecode,
+              addressMain: fullAddress,
+            }));
+          },
+        }).open();
+      }
+    };
+
+    if (!existingScript) {
+      const script = document.createElement("script");
+      script.id = scriptId;
+      script.src = "//t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js";
+      script.async = true;
+      script.onload = openPostcode;
+      document.head.appendChild(script);
+    } else {
+      openPostcode();
+    }
   };
 
   // Step 1 완료 → 주문 생성 → Step 2 결제위젯
@@ -176,6 +223,18 @@ export default function CheckoutPage() {
       setOrderNumber(data.orderNumber);
       setTotalAmount(data.totalAmount);
       setStep("payment");
+
+      if (saveAsDefault) {
+        sessionStorage.setItem("save_address_on_success", JSON.stringify({
+          zipcode: form.addressZipcode,
+          address: form.addressMain,
+          detail: form.addressDetail,
+          recipient: form.recipientName,
+          phone: form.recipientPhone
+        }));
+      } else {
+        sessionStorage.removeItem("save_address_on_success");
+      }
 
       // 결제위젯 초기화 (DOM이 렌더된 후)
       setTimeout(() => initTossWidget(data.orderId, data.orderNumber, data.totalAmount), 300);
@@ -358,10 +417,17 @@ export default function CheckoutPage() {
                 </div>
                 <div>
                   <label style={labelStyle}>주소 *</label>
-                  <input name="addressZipcode" value={form.addressZipcode} onChange={handleInput}
-                    placeholder="우편번호" required style={{ ...inputStyle, marginBottom: "0.5rem" }} />
-                  <input name="addressMain" value={form.addressMain} onChange={handleInput}
-                    placeholder="기본 주소" required style={{ ...inputStyle, marginBottom: "0.5rem" }} />
+                  <div style={{ display: "flex", gap: "0.5rem", marginBottom: "0.5rem" }}>
+                    <input name="addressZipcode" value={form.addressZipcode} readOnly onClick={handleAddressSearch}
+                      placeholder="우편번호" required style={{ ...inputStyle, flex: 1, margin: 0, background: "var(--mb-gray-50)", cursor: "pointer" }} />
+                    <button type="button" onClick={handleAddressSearch}
+                      style={{
+                        background: "var(--mb-gray-800)", color: "#fff", border: "none", borderRadius: "10px",
+                        padding: "0 1rem", fontSize: "0.8125rem", fontWeight: 600, cursor: "pointer"
+                      }}>검색</button>
+                  </div>
+                  <input name="addressMain" value={form.addressMain} readOnly onClick={handleAddressSearch}
+                    placeholder="기본 주소" required style={{ ...inputStyle, marginBottom: "0.5rem", background: "var(--mb-gray-50)", cursor: "pointer" }} />
                   <input name="addressDetail" value={form.addressDetail} onChange={handleInput}
                     placeholder="상세 주소 (선택)" style={inputStyle} />
                 </div>
@@ -375,6 +441,18 @@ export default function CheckoutPage() {
                     <option value="부재 시 연락 부탁드려요">부재 시 연락 부탁드려요</option>
                     <option value="직접 수령할게요">직접 수령할게요</option>
                   </select>
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginTop: "0.25rem" }}>
+                  <input
+                    type="checkbox"
+                    id="saveAsDefault"
+                    checked={saveAsDefault}
+                    onChange={(e) => setSaveAsDefault(e.target.checked)}
+                    style={{ cursor: "pointer" }}
+                  />
+                  <label htmlFor="saveAsDefault" style={{ fontSize: "0.875rem", color: "var(--mb-gray-700)", cursor: "pointer", fontWeight: 500 }}>
+                    입력한 주소를 기본 주소로 저장
+                  </label>
                 </div>
               </div>
             </section>

@@ -90,7 +90,14 @@ export async function getMasterUserByPhone(
  */
 export async function updateMasterUser(
   masterUserId: string,
-  params: { name?: string }
+  params: {
+    name?: string;
+    shipping_recipient?: string | null;
+    shipping_phone?: string | null;
+    shipping_zipcode?: string | null;
+    shipping_address?: string | null;
+    shipping_detail?: string | null;
+  }
 ): Promise<MasterUser> {
   const res = await coreAuthFetch(`/api/auth/user/${masterUserId}`, {
     method: "PATCH",

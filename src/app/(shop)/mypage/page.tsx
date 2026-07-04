@@ -46,6 +46,109 @@ export default function MypagePage() {
   const [isSavingNickname, setIsSavingNickname] = useState(false);
   const [nicknameError, setNicknameError] = useState("");
 
+  // 주소 수정 상태
+  const [isEditingAddress, setIsEditingAddress] = useState(false);
+  const [addressState, setAddressState] = useState({
+    zipcode: masterUser?.shipping_zipcode ?? "",
+    address: masterUser?.shipping_address ?? "",
+    detail: masterUser?.shipping_detail ?? "",
+  });
+  const [addressError, setAddressError] = useState("");
+  const [isSavingAddress, setIsSavingAddress] = useState(false);
+
+  useEffect(() => {
+    if (masterUser) {
+      setAddressState({
+        zipcode: masterUser.shipping_zipcode ?? "",
+        address: masterUser.shipping_address ?? "",
+        detail: masterUser.shipping_detail ?? "",
+      });
+    }
+  }, [masterUser]);
+
+  const handleAddressSearch = () => {
+    const scriptId = "daum-postcode-script";
+    const existingScript = document.getElementById(scriptId);
+
+    const openPostcode = () => {
+      if ((window as any).daum && (window as any).daum.Postcode) {
+        new (window as any).daum.Postcode({
+          oncomplete: (data: any) => {
+            let fullAddress = data.address;
+            let extraAddress = "";
+            if (data.addressType === "R") {
+              if (data.bname !== "") extraAddress += data.bname;
+              if (data.buildingName !== "") extraAddress += (extraAddress !== "" ? `, ${data.buildingName}` : data.buildingName);
+              fullAddress += (extraAddress !== "" ? ` (${extraAddress})` : "");
+            }
+            setAddressState((prev) => ({
+              ...prev,
+              address: fullAddress,
+              zipcode: data.zonecode,
+            }));
+          },
+        }).open();
+      }
+    };
+
+    if (!existingScript) {
+      const script = document.createElement("script");
+      script.id = scriptId;
+      script.src = "//t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js";
+      script.async = true;
+      script.onload = openPostcode;
+      document.head.appendChild(script);
+    } else {
+      openPostcode();
+    }
+  };
+
+  const handleAddressSave = async () => {
+    if (!addressState.address.trim()) {
+      setAddressError("주소는 필수 입력 항목입니다.");
+      return;
+    }
+
+    setIsSavingAddress(true);
+    setAddressError("");
+
+    try {
+      const res = await fetch("/api/auth/sync", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          masterUserId: masterUser?.masterUserId,
+          shipping_recipient: masterUser?.name,
+          shipping_phone: masterUser?.phoneNumber,
+          shipping_zipcode: addressState.zipcode,
+          shipping_address: addressState.address,
+          shipping_detail: addressState.detail,
+        }),
+      });
+
+      if (res.ok) {
+        const updated = await res.json();
+        if (masterUser) {
+          setMasterUser({
+            ...masterUser,
+            shipping_zipcode: updated.shipping_zipcode,
+            shipping_address: updated.shipping_address,
+            shipping_detail: updated.shipping_detail,
+            shipping_recipient: updated.shipping_recipient,
+            shipping_phone: updated.shipping_phone,
+          });
+        }
+        setIsEditingAddress(false);
+      } else {
+        setAddressError("주소 저장에 실패했습니다.");
+      }
+    } catch {
+      setAddressError("네트워크 오류가 발생했습니다.");
+    } finally {
+      setIsSavingAddress(false);
+    }
+  };
+
   useEffect(() => {
     fetch("/api/mypage/orders?page=1")
       .then((r) => r.json())
@@ -252,6 +355,141 @@ export default function MypagePage() {
             <div className="mypage-summary-label">{item.label}</div>
           </Link>
         ))}
+      </div>
+
+      {/* 내 주소 설정 카드 */}
+      <div style={{
+        background: "#fff",
+        borderRadius: "20px",
+        padding: "1.5rem",
+        boxShadow: "0 4px 20px rgba(0, 0, 0, 0.05)",
+        border: "1px solid var(--mb-gray-100)",
+        marginBottom: "2rem"
+      }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}>
+          <h2 style={{ fontSize: "1.0625rem", fontWeight: 800, color: "var(--mb-gray-900)", margin: 0 }}>
+            내 주소 설정 <span style={{ color: "var(--mb-pink-500)", fontSize: "0.8rem", fontWeight: 600 }}>(필수)</span>
+          </h2>
+          {!isEditingAddress && (
+            <button
+              onClick={() => setIsEditingAddress(true)}
+              style={{
+                background: "var(--mb-pink-500)", color: "#fff",
+                border: "none", borderRadius: "8px",
+                padding: "0.375rem 0.75rem", fontSize: "0.8125rem",
+                fontWeight: 600, cursor: "pointer"
+              }}
+            >수정</button>
+          )}
+        </div>
+
+        {isEditingAddress ? (
+          <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+            <div style={{ display: "flex", gap: "0.5rem" }}>
+              <input
+                type="text"
+                placeholder="우편번호"
+                value={addressState.zipcode}
+                readOnly
+                onClick={handleAddressSearch}
+                style={{
+                  flex: "1",
+                  border: "1px solid var(--mb-gray-300)",
+                  borderRadius: "8px", padding: "0.5rem",
+                  fontSize: "0.875rem", outline: "none",
+                  background: "var(--mb-gray-50)", cursor: "pointer"
+                }}
+              />
+              <button
+                type="button"
+                onClick={handleAddressSearch}
+                style={{
+                  background: "var(--mb-gray-800)", color: "#fff",
+                  border: "none", borderRadius: "8px",
+                  padding: "0.5rem 1rem", fontSize: "0.8125rem",
+                  fontWeight: 600, cursor: "pointer"
+                }}
+              >우편번호 검색</button>
+            </div>
+            <input
+              type="text"
+              placeholder="기본 주소"
+              value={addressState.address}
+              readOnly
+              onClick={handleAddressSearch}
+              style={{
+                border: "1px solid var(--mb-gray-300)",
+                borderRadius: "8px", padding: "0.5rem",
+                fontSize: "0.875rem", outline: "none",
+                background: "var(--mb-gray-50)", cursor: "pointer"
+              }}
+            />
+            <input
+              type="text"
+              placeholder="상세 주소"
+              value={addressState.detail}
+              onChange={(e) => setAddressState(prev => ({ ...prev, detail: e.target.value }))}
+              style={{
+                border: "1px solid var(--mb-gray-300)",
+                borderRadius: "8px", padding: "0.5rem",
+                fontSize: "0.875rem", outline: "none"
+              }}
+            />
+            {addressError && <p style={{ color: "#ef4444", fontSize: "0.8125rem", margin: 0 }}>{addressError}</p>}
+            <div style={{ display: "flex", gap: "0.5rem", marginTop: "0.5rem" }}>
+              <button
+                onClick={handleAddressSave}
+                disabled={isSavingAddress}
+                style={{
+                  background: "var(--mb-pink-500)", color: "#fff",
+                  border: "none", borderRadius: "8px",
+                  padding: "0.5rem 1rem", fontSize: "0.875rem",
+                  fontWeight: 600, cursor: "pointer", flex: 1
+                }}
+              >{isSavingAddress ? "저장 중..." : "저장"}</button>
+              <button
+                onClick={() => {
+                  setIsEditingAddress(false);
+                  if (masterUser) {
+                    setAddressState({
+                      zipcode: masterUser.shipping_zipcode ?? "",
+                      address: masterUser.shipping_address ?? "",
+                      detail: masterUser.shipping_detail ?? "",
+                    });
+                  }
+                }}
+                style={{
+                  background: "#fff", color: "var(--mb-gray-600)",
+                  border: "1px solid var(--mb-gray-300)", borderRadius: "8px",
+                  padding: "0.5rem 1rem", fontSize: "0.875rem",
+                  fontWeight: 600, cursor: "pointer"
+                }}
+              >취소</button>
+            </div>
+          </div>
+        ) : (
+          <div>
+            {addressState.address ? (
+              <div style={{ fontSize: "0.875rem", color: "var(--mb-gray-700)", lineHeight: 1.6 }}>
+                <p style={{ margin: "0 0 0.25rem 0" }}><span style={{ fontWeight: 600, color: "var(--mb-gray-500)" }}>[우편번호]</span> {addressState.zipcode}</p>
+                <p style={{ margin: 0 }}><span style={{ fontWeight: 600, color: "var(--mb-gray-500)" }}>[주소]</span> {addressState.address} {addressState.detail}</p>
+              </div>
+            ) : (
+              <div style={{ textAlign: "center", padding: "1rem 0" }}>
+                <p style={{ color: "var(--mb-gray-400)", fontSize: "0.875rem", margin: "0 0 0.75rem 0" }}>등록된 주소가 없습니다. 필수 정보이오니 등록해주세요.</p>
+                <button
+                  onClick={() => setIsEditingAddress(true)}
+                  style={{
+                    background: "transparent", color: "var(--mb-pink-500)",
+                    border: "1px solid var(--mb-pink-500)", borderRadius: "8px",
+                    padding: "0.375rem 0.75rem", fontSize: "0.8125rem",
+                    fontWeight: 600, cursor: "pointer"
+                  }}
+                >주소 등록</button>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* 최근 주문 */}

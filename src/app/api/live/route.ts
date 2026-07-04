@@ -131,6 +131,7 @@ export async function POST(request: Request) {
     // AWS IVS 채널 자동 생성 로직 (스트리밍 주소가 명시적으로 들어오지 않고, AWS 키가 존재할 때)
     const awsAccessKeyId = cleanEnvValue(process.env.AWS_ACCESS_KEY_ID);
     const awsSecretAccessKey = cleanEnvValue(process.env.AWS_SECRET_ACCESS_KEY);
+    const awsSessionToken = cleanEnvValue(process.env.AWS_SESSION_TOKEN);
     const awsRegion = cleanEnvValue(process.env.AWS_REGION) || "ap-northeast-2";
 
     const hasAwsKeys = !!(awsAccessKeyId && awsSecretAccessKey);
@@ -141,6 +142,7 @@ export async function POST(request: Request) {
           credentials: {
             accessKeyId: awsAccessKeyId!,
             secretAccessKey: awsSecretAccessKey!,
+            sessionToken: awsSessionToken,
           },
         });
 

@@ -33,6 +33,7 @@ export default function AdminLivePage() {
   const [streams, setStreams] = useState<LiveStreamRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
   // 폼 상태
   const [title, setTitle] = useState("");
@@ -55,6 +56,7 @@ export default function AdminLivePage() {
       const { data, success } = await res.json();
       if (success) {
         setStreams(data ?? []);
+        setSelectedIds([]); // 로드 성공 시 선택 상태 초기화
       }
     } catch (e) {
       console.error(e);
@@ -84,6 +86,35 @@ export default function AdminLivePage() {
     fetchStreams();
     fetchProducts();
   }, [fetchStreams, fetchProducts]);
+
+  const handleDeleteSelected = async () => {
+    if (selectedIds.length === 0) return;
+    const isConfirmed = confirm(
+      `선택한 ${selectedIds.length}개의 라이브 방송을 완전히 삭제하시겠습니까?\n삭제된 방송의 채팅 내역 및 상품 매핑 정보는 즉시 함께 영구 삭제됩니다.`
+    );
+    if (!isConfirmed) return;
+
+    setSubmitting(true);
+    try {
+      const res = await fetch("/api/live", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids: selectedIds }),
+      });
+      const result = await res.json();
+      if (result.success) {
+        alert("선택한 방송이 삭제되었습니다.");
+        fetchStreams();
+      } else {
+        alert(result.error ?? "삭제에 실패했습니다.");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("삭제 요청 중 네트워크 오류가 발생했습니다.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -172,12 +203,29 @@ export default function AdminLivePage() {
             ({streams.length}개 방송)
           </span>
         </h1>
-        <button
-          onClick={() => setShowModal(true)}
-          className="admin-btn admin-btn-primary"
-        >
-          ＋ 라이브 방송 등록
-        </button>
+        <div style={{ display: "flex", gap: "0.75rem" }}>
+          {selectedIds.length > 0 && (
+            <button
+              onClick={handleDeleteSelected}
+              className="admin-btn"
+              disabled={submitting}
+              style={{
+                background: "#ef4444",
+                color: "#fff",
+                border: "none",
+                fontWeight: 700,
+              }}
+            >
+              🗑️ 선택 삭제 ({selectedIds.length}개)
+            </button>
+          )}
+          <button
+            onClick={() => setShowModal(true)}
+            className="admin-btn admin-btn-primary"
+          >
+            ＋ 라이브 방송 등록
+          </button>
+        </div>
       </div>
 
       <div className="admin-card">
@@ -196,6 +244,20 @@ export default function AdminLivePage() {
             <table className="admin-table">
               <thead>
                 <tr>
+                  <th style={{ width: "40px", textAlign: "center" }}>
+                    <input
+                      type="checkbox"
+                      checked={streams.length > 0 && selectedIds.length === streams.length}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setSelectedIds(streams.map((s) => s.id));
+                        } else {
+                          setSelectedIds([]);
+                        }
+                      }}
+                      style={{ cursor: "pointer" }}
+                    />
+                  </th>
                   <th>방송 커버</th>
                   <th>방송 정보</th>
                   <th>스트리머</th>
@@ -208,6 +270,20 @@ export default function AdminLivePage() {
               <tbody>
                 {streams.map((stream) => (
                   <tr key={stream.id}>
+                    <td style={{ textAlign: "center" }}>
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.includes(stream.id)}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setSelectedIds((prev) => [...prev, stream.id]);
+                          } else {
+                            setSelectedIds((prev) => prev.filter((id) => id !== stream.id));
+                          }
+                        }}
+                        style={{ cursor: "pointer" }}
+                      />
+                    </td>
                     <td>
                       <div className="admin-table-thumb" style={{ width: "80px", height: "45px", position: "relative" }}>
                         {stream.coverImageUrl ? (

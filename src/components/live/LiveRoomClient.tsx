@@ -191,6 +191,8 @@ export default function LiveRoomClient({ initialStream, initialChats }: LiveRoom
       ? stream.streamUrl || MOCK_BEAUTY_VIDEO_URL
       : stream.replayUrl || MOCK_BEAUTY_VIDEO_URL;
 
+  const embed = getEmbedUrl(videoUrl || "");
+
   return (
     <div className="liveroom-root">
       <div className="liveroom-container">
@@ -198,15 +200,25 @@ export default function LiveRoomClient({ initialStream, initialChats }: LiveRoom
         {/* 왼쪽: 비디오 스트리밍 영역 */}
         <div className="liveroom-video-pane">
           <div className="video-player-wrapper">
-            <video
-              src={videoUrl}
-              autoPlay
-              muted
-              loop
-              playsInline
-              controls
-              className="live-video-element"
-            />
+            {embed.type !== "direct" ? (
+              <iframe
+                src={embed.url}
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                allowFullScreen
+                className="live-video-element"
+                style={{ width: "100%", height: "100%", border: "none" }}
+              />
+            ) : (
+              <video
+                src={videoUrl}
+                autoPlay
+                muted
+                loop
+                playsInline
+                controls
+                className="live-video-element"
+              />
+            )}
 
             {/* 비디오 위의 메타 오버레이 */}
             <div className="video-overlay-top">
@@ -728,4 +740,20 @@ export default function LiveRoomClient({ initialStream, initialChats }: LiveRoom
 function pimg(prod: Product) {
   const imgs = prod.images ?? [];
   return imgs[0]?.url ?? null;
+}
+
+function getEmbedUrl(url: string): { type: "youtube" | "vimeo" | "direct"; url: string } {
+  if (!url) return { type: "direct", url: "" };
+
+  const ytMatch = url.match(/(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/i);
+  if (ytMatch && ytMatch[1]) {
+    return { type: "youtube", url: `https://www.youtube.com/embed/${ytMatch[1]}` };
+  }
+
+  const vimeoMatch = url.match(/(?:vimeo\.com\/|player\.vimeo\.com\/video\/)(\d+)/i);
+  if (vimeoMatch && vimeoMatch[1]) {
+    return { type: "vimeo", url: `https://player.vimeo.com/video/${vimeoMatch[1]}` };
+  }
+
+  return { type: "direct", url };
 }

@@ -137,12 +137,16 @@ export async function POST(request: Request) {
     const hasAwsKeys = !!(awsAccessKeyId && awsSecretAccessKey);
     if (hasAwsKeys && !finalStreamUrl) {
       try {
+        console.log("[AWS IVS] Attempting channel creation. Region:", awsRegion, 
+          "| KeyId prefix:", awsAccessKeyId?.slice(0, 8),
+          "| HasSessionToken:", !!awsSessionToken);
+
         const ivs = new IvsClient({
           region: awsRegion,
           credentials: {
             accessKeyId: awsAccessKeyId!,
             secretAccessKey: awsSecretAccessKey!,
-            sessionToken: awsSessionToken,
+            ...(awsSessionToken ? { sessionToken: awsSessionToken } : {}),
           },
         });
 
@@ -160,13 +164,23 @@ export async function POST(request: Request) {
             : null;
           streamKey = ivsResponse.streamKey.value || null;
           channelArn = ivsResponse.channel.arn || null;
+          console.log("[AWS IVS] Channel created successfully. ARN:", channelArn);
         }
       } catch (awsErr: any) {
-        console.error("[AWS IVS CreateChannel Error]:", awsErr);
-        return Response.json({ 
-          success: false, 
-          error: `AWS IVS 방송 송출 채널을 자동 생성하지 못했습니다. 상세: ${awsErr.message ?? awsErr}` 
-        }, { status: 500 });
+        console.error("[AWS IVS CreateChannel Error]:", awsErr.message);
+        // 임시 자격 증명 만료 / 세션 토큰 누락 등의 인증 오류 → 방송 등록은 정상 완료하되 IVS 채널만 미발급으로 처리
+        const isAuthError = awsErr.name === "InvalidSignatureException" 
+          || awsErr.name === "UnrecognizedClientException"
+          || awsErr.message?.includes("security token")
+          || awsErr.message?.includes("InvalidClientTokenId")
+          || awsErr.message?.includes("token");
+        if (isAuthError) {
+          // 인증 오류는 방송 등록 자체를 막지 않음 — IVS 없이 등록 계속 진행
+          console.warn("[AWS IVS] Auth error detected. Proceeding without IVS channel. Please update AWS credentials (including AWS_SESSION_TOKEN) in Vercel environment variables.");
+        } else {
+          // 그 외 예외 (네트워크 오류, 권한 없음 등)도 방송 등록은 계속 진행
+          console.warn("[AWS IVS] Unexpected error. Proceeding without IVS channel:", awsErr.message);
+        }
       }
     }
 
@@ -228,6 +242,7 @@ export async function POST(request: Request) {
         viewerCount: stream.viewer_count,
         createdAt: stream.created_at,
         startedAt: stream.started_at,
+        ivsAutoCreated: !!channelArn, // IVS 채널 자동 발급 성공 여부
       },
     });
   } catch (err: any) {

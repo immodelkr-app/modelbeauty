@@ -118,6 +118,17 @@ export default function AdminLivePage() {
         setReplayUrl("");
         setSelectedProductIds([]);
         fetchStreams();
+        // IVS 채널 자동 발급 실패 시 안내 메시지 (방송 등록 자체는 성공)
+        if (!result.data?.ivsAutoCreated && !streamUrl) {
+          alert(
+            "✅ 방송이 등록되었습니다.\n\n⚠️ AWS IVS 채널 자동 발급은 실패하였습니다.\n" +
+            "Vercel 환경 변수에 아래 3가지가 모두 최신 값으로 등록되어 있는지 확인해 주세요:\n" +
+            "• AWS_ACCESS_KEY_ID\n" +
+            "• AWS_SECRET_ACCESS_KEY\n" +
+            "• AWS_SESSION_TOKEN (임시 자격 증명 사용 시 필수, 2~3시간마다 갱신 필요)\n\n" +
+            "스트림 키는 나중에 제어실에서 직접 입력할 수 있습니다."
+          );
+        }
       } else {
         alert(result.error ?? "생성에 실패했습니다.");
       }

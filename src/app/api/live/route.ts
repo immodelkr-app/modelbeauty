@@ -88,6 +88,20 @@ export async function GET(request: NextRequest) {
   }
 }
 
+function cleanEnvValue(val: string | undefined): string | undefined {
+  if (!val) return undefined;
+  let cleaned = val.trim();
+  if (
+    (cleaned.startsWith('"') && cleaned.endsWith('"')) ||
+    (cleaned.startsWith("'") && cleaned.endsWith("'"))
+  ) {
+    cleaned = cleaned.slice(1, -1).trim();
+  }
+  // Remove zero-width spaces, BOMs, and other control/non-printable characters
+  cleaned = cleaned.replace(/[\u200B-\u200D\uFEFF\u0000-\u001F]/g, "");
+  return cleaned;
+}
+
 export async function POST(request: Request) {
   const notAllowed = await requireAdmin();
   if (notAllowed) return notAllowed;
@@ -115,14 +129,18 @@ export async function POST(request: Request) {
     let channelArn = null;
 
     // AWS IVS 채널 자동 생성 로직 (스트리밍 주소가 명시적으로 들어오지 않고, AWS 키가 존재할 때)
-    const hasAwsKeys = process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY;
+    const awsAccessKeyId = cleanEnvValue(process.env.AWS_ACCESS_KEY_ID);
+    const awsSecretAccessKey = cleanEnvValue(process.env.AWS_SECRET_ACCESS_KEY);
+    const awsRegion = cleanEnvValue(process.env.AWS_REGION) || "ap-northeast-2";
+
+    const hasAwsKeys = !!(awsAccessKeyId && awsSecretAccessKey);
     if (hasAwsKeys && !finalStreamUrl) {
       try {
         const ivs = new IvsClient({
-          region: (process.env.AWS_REGION || "ap-northeast-2").trim(),
+          region: awsRegion,
           credentials: {
-            accessKeyId: process.env.AWS_ACCESS_KEY_ID!.trim(),
-            secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY!.trim(),
+            accessKeyId: awsAccessKeyId!,
+            secretAccessKey: awsSecretAccessKey!,
           },
         });
 

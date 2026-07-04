@@ -195,7 +195,7 @@ export default function LiveRoomClient({ initialStream, initialChats }: LiveRoom
     heart.innerHTML = "❤️";
     
     // 무작위 위치 및 크기 설정
-    const randomLeft = Math.random() * 60 + 20; // 20% ~ 80%
+    const randomLeft = Math.random() * 50 + 25; // 25% ~ 75% (짤림 방지 중앙 분산)
     const randomSize = Math.random() * 1.5 + 1; // 1rem ~ 2.5rem
     const randomRotate = Math.random() * 40 - 20; // -20deg ~ 20deg
 
@@ -792,9 +792,9 @@ export default function LiveRoomClient({ initialStream, initialChats }: LiveRoom
         .hearts-container {
           position: absolute;
           bottom: 1.5rem;
-          right: 1.5rem;
-          width: 60px;
-          height: 300px;
+          right: 0.5rem;
+          width: 120px;
+          height: 380px;
           pointer-events: none;
           overflow: hidden;
           z-index: 9;
@@ -943,7 +943,7 @@ export default function LiveRoomClient({ initialStream, initialChats }: LiveRoom
             opacity: 0.8;
           }
           100% {
-            transform: translateY(-260px) scale(1.2);
+            transform: translateY(-350px) scale(1.2);
             opacity: 0;
           }
         }

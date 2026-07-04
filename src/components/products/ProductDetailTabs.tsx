@@ -26,6 +26,24 @@ interface ProductDetailTabsProps {
   videos: ProductVideo[];
 }
 
+function getEmbedUrl(url: string): { type: "youtube" | "vimeo" | "direct"; url: string } {
+  if (!url) return { type: "direct", url: "" };
+
+  // YouTube url matches (including shorts, embeds, and standard watch URLs)
+  const ytMatch = url.match(/(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/i);
+  if (ytMatch && ytMatch[1]) {
+    return { type: "youtube", url: `https://www.youtube.com/embed/${ytMatch[1]}` };
+  }
+
+  // Vimeo url matches
+  const vimeoMatch = url.match(/(?:vimeo\.com\/|player\.vimeo\.com\/video\/)(\d+)/i);
+  if (vimeoMatch && vimeoMatch[1]) {
+    return { type: "vimeo", url: `https://player.vimeo.com/video/${vimeoMatch[1]}` };
+  }
+
+  return { type: "direct", url };
+}
+
 export default function ProductDetailTabs({ content, videos }: ProductDetailTabsProps) {
   const [activeTab, setActiveTab] = useState<"detail" | "video">("detail");
   const [activeVideoUrl, setActiveVideoUrl] = useState<string | null>(null);
@@ -36,6 +54,7 @@ export default function ProductDetailTabs({ content, videos }: ProductDetailTabs
   };
 
   const hasVideos = videos.length > 0;
+  const embed = getEmbedUrl(activeVideoUrl || "");
 
   return (
     <div className="product-content-section" style={{ marginTop: "3rem" }}>
@@ -118,13 +137,22 @@ export default function ProductDetailTabs({ content, videos }: ProductDetailTabs
                   boxShadow: "var(--shadow-lg)",
                 }}
               >
-                <video
-                  src={activeVideoUrl}
-                  controls
-                  autoPlay
-                  playsInline
-                  style={{ width: "100%", height: "100%", objectFit: "contain" }}
-                />
+                {embed.type !== "direct" ? (
+                  <iframe
+                    src={embed.url}
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                    allowFullScreen
+                    style={{ width: "100%", height: "100%", border: "none" }}
+                  />
+                ) : (
+                  <video
+                    src={activeVideoUrl}
+                    controls
+                    autoPlay
+                    playsInline
+                    style={{ width: "100%", height: "100%", objectFit: "contain" }}
+                  />
+                )}
                 <button
                   onClick={() => setActiveVideoUrl(null)}
                   style={{

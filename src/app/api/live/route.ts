@@ -89,6 +89,20 @@ export async function GET(request: NextRequest) {
   }
 }
 
+function cleanEnvValue(val: string | undefined): string | undefined {
+  if (!val) return undefined;
+  let cleaned = val.trim();
+  if (
+    (cleaned.startsWith('"') && cleaned.endsWith('"')) ||
+    (cleaned.startsWith("'") && cleaned.endsWith("'"))
+  ) {
+    cleaned = cleaned.slice(1, -1).trim();
+  }
+  // Remove zero-width spaces, BOMs, and other control/non-printable characters
+  cleaned = cleaned.replace(/[\u200B-\u200D\uFEFF\u0000-\u001F]/g, "");
+  return cleaned || undefined;
+}
+
 export async function POST(request: Request) {
   const notAllowed = await requireAdmin();
   if (notAllowed) return notAllowed;
@@ -117,14 +131,24 @@ export async function POST(request: Request) {
     let channelArn = null;
 
     // AWS IVS 채널 자동 생성 로직 (스트리밍 주소가 명시적으로 들어오지 않고, AWS 키가 존재할 때)
-    const hasAwsKeys = process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY;
+    const awsAccessKeyId = cleanEnvValue(process.env.AWS_ACCESS_KEY_ID);
+    const awsSecretAccessKey = cleanEnvValue(process.env.AWS_SECRET_ACCESS_KEY);
+    const awsSessionToken = cleanEnvValue(process.env.AWS_SESSION_TOKEN);
+    const awsRegion = cleanEnvValue(process.env.AWS_REGION) || "ap-northeast-2";
+
+    const hasAwsKeys = !!(awsAccessKeyId && awsSecretAccessKey);
     if (hasAwsKeys && !finalStreamUrl) {
       try {
+        console.log("[AWS IVS] Attempting channel creation. Region:", awsRegion, 
+          "| KeyId prefix:", awsAccessKeyId?.slice(0, 8),
+          "| HasSessionToken:", !!awsSessionToken);
+
         const ivs = new IvsClient({
-          region: (process.env.AWS_REGION || "ap-northeast-2").trim(),
+          region: awsRegion,
           credentials: {
-            accessKeyId: process.env.AWS_ACCESS_KEY_ID!.trim(),
-            secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY!.trim(),
+            accessKeyId: awsAccessKeyId!,
+            secretAccessKey: awsSecretAccessKey!,
+            ...(awsSessionToken ? { sessionToken: awsSessionToken } : {}),
           },
         });
 
@@ -142,13 +166,23 @@ export async function POST(request: Request) {
             : null;
           streamKey = ivsResponse.streamKey.value || null;
           channelArn = ivsResponse.channel.arn || null;
+          console.log("[AWS IVS] Channel created successfully. ARN:", channelArn);
         }
       } catch (awsErr: any) {
-        console.error("[AWS IVS CreateChannel Error]:", awsErr);
-        return Response.json({ 
-          success: false, 
-          error: `AWS IVS 방송 송출 채널을 자동 생성하지 못했습니다. 상세: ${awsErr.message ?? awsErr}` 
-        }, { status: 500 });
+        console.error("[AWS IVS CreateChannel Error]:", awsErr.message);
+        // 임시 자격 증명 만료 / 세션 토큰 누락 등의 인증 오류 → 방송 등록은 정상 완료하되 IVS 채널만 미발급으로 처리
+        const isAuthError = awsErr.name === "InvalidSignatureException" 
+          || awsErr.name === "UnrecognizedClientException"
+          || awsErr.message?.includes("security token")
+          || awsErr.message?.includes("InvalidClientTokenId")
+          || awsErr.message?.includes("token");
+        if (isAuthError) {
+          // 인증 오류는 방송 등록 자체를 막지 않음 — IVS 없이 등록 계속 진행
+          console.warn("[AWS IVS] Auth error detected. Proceeding without IVS channel. Please update AWS credentials (including AWS_SESSION_TOKEN) in Vercel environment variables.");
+        } else {
+          // 그 외 예외 (네트워크 오류, 권한 없음 등)도 방송 등록은 계속 진행
+          console.warn("[AWS IVS] Unexpected error. Proceeding without IVS channel:", awsErr.message);
+        }
       }
     }
 
@@ -212,6 +246,7 @@ export async function POST(request: Request) {
         createdAt: stream.created_at,
         startedAt: stream.started_at,
         scheduledAt: stream.scheduled_at || null,
+        ivsAutoCreated: !!channelArn, // IVS 채널 자동 발급 성공 여부
       },
     });
   } catch (err: any) {

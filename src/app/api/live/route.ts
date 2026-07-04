@@ -99,7 +99,7 @@ function cleanEnvValue(val: string | undefined): string | undefined {
   }
   // Remove zero-width spaces, BOMs, and other control/non-printable characters
   cleaned = cleaned.replace(/[\u200B-\u200D\uFEFF\u0000-\u001F]/g, "");
-  return cleaned;
+  return cleaned || undefined;
 }
 
 export async function POST(request: Request) {

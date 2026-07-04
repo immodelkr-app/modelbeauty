@@ -281,9 +281,27 @@ export default function AdminLiveControlPage({ params }: { params: Promise<{ id:
             {stream.title} ({stream.streamerName})
           </p>
         </div>
-        <Link href="/admin/live" className="admin-btn admin-btn-secondary">
-          ← 목록으로
-        </Link>
+        <div style={{ display: "flex", gap: "0.5rem" }}>
+          <button
+            onClick={() => {
+              const publicUrl = `${window.location.origin}/live/${streamId}`;
+              navigator.clipboard.writeText(publicUrl);
+              alert("시청자 방송 초대 링크가 클립보드에 복사되었습니다!\n" + publicUrl);
+            }}
+            className="admin-btn admin-btn-primary"
+            style={{
+              background: "linear-gradient(135deg, #ec4899 0%, #db2777 100%)",
+              color: "#fff",
+              border: "none",
+              fontWeight: 700,
+            }}
+          >
+            🔗 초대 링크 복사
+          </button>
+          <Link href="/admin/live" className="admin-btn admin-btn-secondary">
+            ← 목록으로
+          </Link>
+        </div>
       </div>
 
       <div className="control-layout">

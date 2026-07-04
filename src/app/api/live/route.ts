@@ -74,6 +74,7 @@ export async function GET(request: NextRequest) {
         createdAt: stream.created_at,
         startedAt: stream.started_at,
         endedAt: stream.ended_at,
+        scheduledAt: stream.scheduled_at || null,
         products,
         ingestEndpoint: stream.ingest_endpoint || null,
         streamKey: stream.stream_key || null,
@@ -102,6 +103,7 @@ export async function POST(request: Request) {
       coverImageUrl,
       streamUrl,
       replayUrl,
+      scheduledAt,
       productIds = [],
     } = body;
 
@@ -167,6 +169,7 @@ export async function POST(request: Request) {
         stream_key: streamKey,
         channel_arn: channelArn,
         started_at: status === "live" ? new Date().toISOString() : null,
+        scheduled_at: scheduledAt || null,
       })
       .select()
       .single();
@@ -208,6 +211,7 @@ export async function POST(request: Request) {
         viewerCount: stream.viewer_count,
         createdAt: stream.created_at,
         startedAt: stream.started_at,
+        scheduledAt: stream.scheduled_at || null,
       },
     });
   } catch (err: any) {

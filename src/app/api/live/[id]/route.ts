@@ -67,6 +67,7 @@ export async function GET(
       createdAt: stream.created_at,
       startedAt: stream.started_at,
       endedAt: stream.ended_at,
+      scheduledAt: stream.scheduled_at || null,
       products,
       ingestEndpoint: stream.ingest_endpoint || null,
       streamKey: stream.stream_key || null,
@@ -98,6 +99,7 @@ export async function PATCH(
       coverImageUrl,
       streamUrl,
       replayUrl,
+      scheduledAt,
       productIds, // 변경할 상품 매핑 배열
     } = body;
 
@@ -118,6 +120,7 @@ export async function PATCH(
     if (coverImageUrl !== undefined) updatePayload.cover_image_url = coverImageUrl;
     if (streamUrl !== undefined) updatePayload.stream_url = streamUrl;
     if (replayUrl !== undefined) updatePayload.replay_url = replayUrl;
+    if (scheduledAt !== undefined) updatePayload.scheduled_at = scheduledAt || null;
 
     // 1. 라이브 방송 정보 업데이트
     if (Object.keys(updatePayload).length > 0) {

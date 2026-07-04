@@ -20,6 +20,7 @@ interface LiveStreamRow {
   viewerCount: number;
   createdAt: string;
   startedAt: string | null;
+  scheduledAt: string | null;
   products: { id: string; name: string }[];
 }
 
@@ -40,6 +41,7 @@ export default function AdminLivePage() {
   const [coverImageUrl, setCoverImageUrl] = useState("");
   const [streamUrl, setStreamUrl] = useState("");
   const [replayUrl, setReplayUrl] = useState("");
+  const [scheduledAt, setScheduledAt] = useState("");
   const [selectedProductIds, setSelectedProductIds] = useState<string[]>([]);
   
   // 전체 상품 옵션 리스트
@@ -102,6 +104,7 @@ export default function AdminLivePage() {
           coverImageUrl: coverImageUrl || null,
           streamUrl: streamUrl || null,
           replayUrl: replayUrl || null,
+          scheduledAt: scheduledAt || null,
           productIds: selectedProductIds,
         }),
       });
@@ -116,6 +119,7 @@ export default function AdminLivePage() {
         setCoverImageUrl("");
         setStreamUrl("");
         setReplayUrl("");
+        setScheduledAt("");
         setSelectedProductIds([]);
         fetchStreams();
       } else {
@@ -340,6 +344,20 @@ export default function AdminLivePage() {
                       placeholder="https://example.com/cover.jpg"
                     />
                   </div>
+                </div>
+
+                <div className="admin-field">
+                  <label className="admin-label">📅 방송 예정 일시</label>
+                  <input
+                    className="admin-input"
+                    type="datetime-local"
+                    value={scheduledAt}
+                    onChange={(e) => setScheduledAt(e.target.value)}
+                    style={{ colorScheme: "light" }}
+                  />
+                  <p style={{ fontSize: "0.75rem", color: "#9ca3af", marginTop: "4px" }}>
+                    설정 시 프론트 편성표 및 시청자 대기 화면에 카운트다운 타이머가 표시됩니다.
+                  </p>
                 </div>
 
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>

@@ -34,6 +34,7 @@ interface LiveStream {
   createdAt: string;
   startedAt: string | null;
   endedAt: string | null;
+  scheduledAt: string | null;
   products: Product[];
 }
 
@@ -62,6 +63,28 @@ export default function LiveRoomClient({ initialStream, initialChats }: LiveRoom
 
   const chatEndRef = useRef<HTMLDivElement>(null);
   const heartsContainerRef = useRef<HTMLDivElement>(null);
+
+  // ── 대기 화면 카운트다운 타이머 ────────────────────────────────
+  const [countdown, setCountdown] = useState<{ days: number; hours: number; mins: number; secs: number } | null>(null);
+
+  useEffect(() => {
+    if (stream.status !== "upcoming" || !stream.scheduledAt) {
+      setCountdown(null);
+      return;
+    }
+    const tick = () => {
+      const diff = new Date(stream.scheduledAt!).getTime() - Date.now();
+      if (diff <= 0) { setCountdown(null); return; }
+      const days = Math.floor(diff / 86400000);
+      const hours = Math.floor((diff % 86400000) / 3600000);
+      const mins = Math.floor((diff % 3600000) / 60000);
+      const secs = Math.floor((diff % 60000) / 1000);
+      setCountdown({ days, hours, mins, secs });
+    };
+    tick();
+    const timer = setInterval(tick, 1000);
+    return () => clearInterval(timer);
+  }, [stream.status, stream.scheduledAt]);
 
   // ── 진행 중인 전시 상품 찾기 ──────────────────────────────
   useEffect(() => {
@@ -190,6 +213,222 @@ export default function LiveRoomClient({ initialStream, initialChats }: LiveRoom
     stream.status === "live"
       ? stream.streamUrl || MOCK_BEAUTY_VIDEO_URL
       : stream.replayUrl || MOCK_BEAUTY_VIDEO_URL;
+
+  // upcoming 상태라면 대기 화면을 놀려줌
+  if (stream.status === "upcoming") {
+    return (
+      <div className="liveroom-root">
+        <div className="upcoming-waiting-room">
+          <div className="waiting-glow-bg" />
+          <div className="waiting-card">
+            <div className="waiting-badge">COMING SOON</div>
+            <h2 className="waiting-host">{stream.streamerName}의 라이브 쇼핑</h2>
+            <h1 className="waiting-title">{stream.title}</h1>
+            {stream.description && <p className="waiting-desc">{stream.description}</p>}
+
+            {countdown ? (
+              <div className="countdown-wrapper">
+                <p className="countdown-label">방송 시작까지</p>
+                <div className="countdown-tiles">
+                  {countdown.days > 0 && (
+                    <div className="countdown-tile">
+                      <span className="countdown-num">{String(countdown.days).padStart(2,"0")}</span>
+                      <span className="countdown-unit">일</span>
+                    </div>
+                  )}
+                  <div className="countdown-tile">
+                    <span className="countdown-num">{String(countdown.hours).padStart(2,"0")}</span>
+                    <span className="countdown-unit">시간</span>
+                  </div>
+                  <div className="countdown-sep">:</div>
+                  <div className="countdown-tile">
+                    <span className="countdown-num">{String(countdown.mins).padStart(2,"0")}</span>
+                    <span className="countdown-unit">분</span>
+                  </div>
+                  <div className="countdown-sep">:</div>
+                  <div className="countdown-tile">
+                    <span className="countdown-num">{String(countdown.secs).padStart(2,"0")}</span>
+                    <span className="countdown-unit">초</span>
+                  </div>
+                </div>
+              </div>
+            ) : stream.scheduledAt ? (
+              <p className="waiting-time-info">
+                {new Date(stream.scheduledAt).toLocaleString("ko-KR", { month: "long", day: "numeric", hour: "2-digit", minute: "2-digit" })} 예정
+              </p>
+            ) : (
+              <p className="waiting-time-info">일정 미정 — 먹 눈요를 보내주세요!</p>
+            )}
+
+            {stream.products.length > 0 && (
+              <div className="waiting-products">
+                <p className="waiting-products-label">게시예정 특가 상품</p>
+                <div className="waiting-product-list">
+                  {stream.products.slice(0, 3).map((p) => (
+                    <div key={p.id} className="waiting-prod-pill">
+                      <span>{p.name}</span>
+                      {p.salePrice && (
+                        <span className="waiting-prod-price">{p.salePrice.toLocaleString()}원</span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <style>{`
+          .upcoming-waiting-room {
+            min-height: 100vh;
+            background: linear-gradient(145deg, #0f0524 0%, #1e0a3c 40%, #0f172a 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            overflow: hidden;
+            padding: 2rem;
+          }
+          .waiting-glow-bg {
+            position: absolute;
+            width: 600px;
+            height: 600px;
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(219,39,119,0.18) 0%, transparent 70%);
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%,-50%);
+            pointer-events: none;
+          }
+          .waiting-card {
+            position: relative;
+            z-index: 1;
+            max-width: 560px;
+            width: 100%;
+            text-align: center;
+            padding: 3rem 2.5rem;
+            border-radius: 24px;
+            background: rgba(255,255,255,0.04);
+            border: 1px solid rgba(255,255,255,0.1);
+            backdrop-filter: blur(16px);
+            box-shadow: 0 25px 60px rgba(0,0,0,0.4);
+          }
+          .waiting-badge {
+            display: inline-block;
+            background: linear-gradient(135deg, #db2777 0%, #7c3aed 100%);
+            color: #fff;
+            font-size: 0.6875rem;
+            font-weight: 900;
+            letter-spacing: 0.15em;
+            padding: 5px 16px;
+            border-radius: 9999px;
+            margin-bottom: 1.25rem;
+          }
+          .waiting-host {
+            font-size: 0.875rem;
+            color: rgba(255,255,255,0.5);
+            font-weight: 500;
+            margin-bottom: 0.5rem;
+          }
+          .waiting-title {
+            font-size: 1.625rem;
+            font-weight: 900;
+            color: #fff;
+            line-height: 1.3;
+            margin-bottom: 0.75rem;
+          }
+          .waiting-desc {
+            font-size: 0.9rem;
+            color: rgba(255,255,255,0.55);
+            margin-bottom: 1.5rem;
+          }
+          .countdown-wrapper {
+            margin: 1.75rem 0;
+          }
+          .countdown-label {
+            font-size: 0.75rem;
+            color: rgba(255,255,255,0.4);
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            margin-bottom: 0.75rem;
+          }
+          .countdown-tiles {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+          }
+          .countdown-tile {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background: rgba(255,255,255,0.08);
+            border: 1px solid rgba(255,255,255,0.12);
+            border-radius: 12px;
+            padding: 0.75rem 1rem;
+            min-width: 64px;
+          }
+          .countdown-num {
+            font-size: 2rem;
+            font-weight: 900;
+            color: #fff;
+            line-height: 1;
+            font-variant-numeric: tabular-nums;
+          }
+          .countdown-unit {
+            font-size: 0.6875rem;
+            color: rgba(255,255,255,0.4);
+            margin-top: 4px;
+          }
+          .countdown-sep {
+            font-size: 1.75rem;
+            font-weight: 900;
+            color: rgba(255,255,255,0.3);
+            margin-bottom: 16px;
+          }
+          .waiting-time-info {
+            font-size: 0.9375rem;
+            color: rgba(255,255,255,0.55);
+            margin: 1.5rem 0;
+          }
+          .waiting-products {
+            margin-top: 2rem;
+            padding-top: 1.5rem;
+            border-top: 1px solid rgba(255,255,255,0.08);
+          }
+          .waiting-products-label {
+            font-size: 0.75rem;
+            color: rgba(255,255,255,0.4);
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            margin-bottom: 0.75rem;
+          }
+          .waiting-product-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            justify-content: center;
+          }
+          .waiting-prod-pill {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            background: rgba(219,39,119,0.15);
+            border: 1px solid rgba(219,39,119,0.3);
+            border-radius: 9999px;
+            padding: 6px 14px;
+            font-size: 0.8125rem;
+            color: #fbcfe8;
+            font-weight: 600;
+          }
+          .waiting-prod-price {
+            color: #f9a8d4;
+            font-weight: 800;
+          }
+        `}</style>
+      </div>
+    );
+  }
 
   return (
     <div className="liveroom-root">

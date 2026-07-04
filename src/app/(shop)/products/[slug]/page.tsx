@@ -237,10 +237,13 @@ async function getProductVideos(productId: string): Promise<ProductVideo[]> {
 
 export default async function ProductDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ slug: string }>;
+  searchParams: Promise<{ stream_id?: string }>;
 }) {
   const { slug } = await params;
+  const { stream_id } = await searchParams;
 
   const product = await getProduct(slug);
   if (!product) notFound();
@@ -304,6 +307,13 @@ export default async function ProductDetailPage({
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(productJsonLd) }}
       />
+      {stream_id && (
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `sessionStorage.setItem("last_live_stream_id", ${JSON.stringify(stream_id)});`
+          }}
+        />
+      )}
       <div className="product-detail">
         {/* 브레드크럼 */}
         <nav className="product-detail-breadcrumb" aria-label="페이지 위치">

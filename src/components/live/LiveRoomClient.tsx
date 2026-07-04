@@ -262,7 +262,7 @@ export default function LiveRoomClient({ initialStream, initialChats }: LiveRoom
                     </div>
                   </div>
                   <button
-                    onClick={() => window.open(`/products/${activeProduct.slug}`, "_blank")}
+                    onClick={() => window.open(`/products/${activeProduct.slug}?stream_id=${stream.id}`, "_blank")}
                     className="overlay-buy-btn"
                   >
                     구매하기

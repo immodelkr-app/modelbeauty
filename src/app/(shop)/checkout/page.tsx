@@ -162,6 +162,7 @@ export default function CheckoutPage() {
           usedCouponId: selectedCoupon?.userCouponId ?? null,
           usedCouponCode: selectedCoupon?.code ?? null,
           couponDiscount: couponDiscount,
+          liveStreamId: typeof window !== "undefined" ? sessionStorage.getItem("last_live_stream_id") : null,
         }),
       });
 

@@ -69,10 +69,40 @@ export async function POST(
     // ── 유저 정보 동기화 및 관리자 판별 ──────────────────────────
     let masterUserId = user.id;
     let nickname = user.user_metadata?.name ?? "사용자";
+    let isCrew = false;
+    let crewNickname = "";
 
     const admin = await isAdmin();
+
+    if (!admin && user.phone) {
+      try {
+        const cleanUserPhone = user.phone.replace(/[^0-9]/g, ""); // e.g. "821012345678" or "01012345678"
+        const formattedUserPhone = cleanUserPhone.startsWith("8210") 
+          ? "010" + cleanUserPhone.substring(4) 
+          : cleanUserPhone; // e.g. "01012345678"
+
+        const { data: allCrews } = await supabase
+          .from("live_crews")
+          .select("nickname, phone");
+
+        const matchedCrew = (allCrews ?? []).find(c => {
+          const cleanCrewPhone = c.phone.replace(/[^0-9]/g, "");
+          return cleanCrewPhone === formattedUserPhone || cleanCrewPhone === cleanUserPhone;
+        });
+
+        if (matchedCrew) {
+          isCrew = true;
+          crewNickname = matchedCrew.nickname;
+        }
+      } catch (crewCheckError) {
+        console.warn("[POST /api/live/[id]/chat] live_crews check failed:", crewCheckError);
+      }
+    }
+
     if (admin) {
       nickname = "모델뷰티";
+    } else if (isCrew) {
+      nickname = `🎤 ${crewNickname}`;
     } else if (user.phone) {
       try {
         const masterUser = await syncMasterUser({

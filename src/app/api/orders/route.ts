@@ -35,6 +35,7 @@ export async function POST(request: NextRequest) {
       usedCouponId = null,
       usedCouponCode = null,
       couponDiscount = 0,
+      liveStreamId = null,
     } = body;
 
     if (!items?.length || !recipientName || !recipientPhone || !addressZipcode || !addressMain) {
@@ -81,6 +82,7 @@ export async function POST(request: NextRequest) {
         used_coupon_id: usedCouponId,
         used_coupon_code: usedCouponCode,
         status: "pending",
+        live_stream_id: liveStreamId || null,
       })
       .select("id, order_number, total_amount")
       .single();

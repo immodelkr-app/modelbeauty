@@ -248,7 +248,7 @@ function LoginForm() {
   };
 
   // ── 이메일 로그인 ──────────────────────────────────────────
-  const [loginMode, setLoginMode] = useState<"phone" | "email">("phone");
+  const [loginMode, setLoginMode] = useState<"phone" | "email">("email");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
@@ -349,21 +349,6 @@ function LoginForm() {
         }}>
           <button
             type="button"
-            onClick={() => { setLoginMode("phone"); setError(""); }}
-            style={{
-              flex: 1,
-              padding: "0.75rem",
-              fontSize: "0.875rem",
-              fontWeight: 600,
-              border: "none",
-              cursor: "pointer",
-              background: loginMode === "phone" ? "linear-gradient(135deg,#db2777,#9333ea)" : "transparent",
-              color: loginMode === "phone" ? "#fff" : "#9ca3af",
-              transition: "all 0.2s",
-            }}
-          >📱 휴대폰 인증</button>
-          <button
-            type="button"
             onClick={() => { setLoginMode("email"); setError(""); }}
             style={{
               flex: 1,
@@ -377,6 +362,21 @@ function LoginForm() {
               transition: "all 0.2s",
             }}
           >✉️ 이메일 로그인</button>
+          <button
+            type="button"
+            onClick={() => { setLoginMode("phone"); setError(""); }}
+            style={{
+              flex: 1,
+              padding: "0.75rem",
+              fontSize: "0.875rem",
+              fontWeight: 600,
+              border: "none",
+              cursor: "pointer",
+              background: loginMode === "phone" ? "linear-gradient(135deg,#db2777,#9333ea)" : "transparent",
+              color: loginMode === "phone" ? "#fff" : "#9ca3af",
+              transition: "all 0.2s",
+            }}
+          >⚡ 휴대폰 간편 로그인/가입</button>
         </div>
       )}
 
@@ -438,7 +438,7 @@ function LoginForm() {
                   fontWeight: 700, cursor: "pointer", padding: 0, textDecoration: "underline"
                 }}
               >
-                휴대폰 번호로 로그인하기
+                휴대폰 번호로 간편 가입/로그인하기
               </button>
             </div>
           </div>
@@ -532,21 +532,21 @@ function LoginForm() {
                     10초 회원가입하기
                   </button>
                 </div>
-                <div style={{ fontSize: "0.8125rem", marginTop: "0.25rem" }}>
-                  관리자이신가요?{" "}
+                 <div style={{ fontSize: "0.8125rem", marginTop: "0.25rem" }}>
+                  이메일 계정으로 로그인하시겠습니까?{" "}
                   <button
                     type="button"
                     onClick={() => {
                       setError("");
                       setLoginMode("email");
-                      router.push("/login?mode=admin");
+                      router.push("/login");
                     }}
                     style={{
                       background: "none", border: "none", color: "var(--mb-gray-500)",
                       fontWeight: 700, cursor: "pointer", padding: 0, textDecoration: "underline"
                     }}
                   >
-                    어드민 로그인 바로가기
+                    이메일 로그인 바로가기
                   </button>
                 </div>
               </div>

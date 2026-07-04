@@ -250,10 +250,18 @@ export default function AdminProductsPage() {
                   <tr key={p.id}>
                     <td>
                       <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
-                        <div className="admin-table-thumb" style={{ position: "relative", width: "44px", height: "44px" }}>
-                          {p.thumbnail
-                            ? <Image src={p.thumbnail} alt={p.name} fill sizes="44px" style={{ objectFit: "cover", borderRadius: "4px" }} />
-                            : <div style={{ width: "100%", height: "100%", background: "#f3f4f6", display: "flex", alignItems: "center", justifyContent: "center", borderRadius: "4px", fontSize: "1.2rem" }}>💄</div>}
+                        <div className="admin-table-thumb" style={{ position: "relative" }}>
+                          {p.thumbnail ? (
+                            <Image
+                              src={p.thumbnail}
+                              alt={p.name}
+                              width={44}
+                              height={44}
+                              style={{ objectFit: "cover" }}
+                            />
+                          ) : (
+                            "💄"
+                          )}
                         </div>
                         <div>
                           <div style={{ fontWeight: 600, color: "#111827" }}>{p.name}</div>

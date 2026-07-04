@@ -119,10 +119,10 @@ export async function POST(request: Request) {
     if (hasAwsKeys && !finalStreamUrl) {
       try {
         const ivs = new IvsClient({
-          region: process.env.AWS_REGION || "ap-northeast-2",
+          region: (process.env.AWS_REGION || "ap-northeast-2").trim(),
           credentials: {
-            accessKeyId: process.env.AWS_ACCESS_KEY_ID!,
-            secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY!,
+            accessKeyId: process.env.AWS_ACCESS_KEY_ID!.trim(),
+            secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY!.trim(),
           },
         });
 

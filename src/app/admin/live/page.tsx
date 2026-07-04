@@ -20,6 +20,7 @@ interface LiveStreamRow {
   viewerCount: number;
   createdAt: string;
   startedAt: string | null;
+  scheduledAt: string | null;
   products: { id: string; name: string }[];
 }
 
@@ -32,6 +33,7 @@ export default function AdminLivePage() {
   const [streams, setStreams] = useState<LiveStreamRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
   // 폼 상태
   const [title, setTitle] = useState("");
@@ -40,6 +42,7 @@ export default function AdminLivePage() {
   const [coverImageUrl, setCoverImageUrl] = useState("");
   const [streamUrl, setStreamUrl] = useState("");
   const [replayUrl, setReplayUrl] = useState("");
+  const [scheduledAt, setScheduledAt] = useState("");
   const [selectedProductIds, setSelectedProductIds] = useState<string[]>([]);
   
   // 전체 상품 옵션 리스트
@@ -53,6 +56,7 @@ export default function AdminLivePage() {
       const { data, success } = await res.json();
       if (success) {
         setStreams(data ?? []);
+        setSelectedIds([]); // 로드 성공 시 선택 상태 초기화
       }
     } catch (e) {
       console.error(e);
@@ -83,6 +87,35 @@ export default function AdminLivePage() {
     fetchProducts();
   }, [fetchStreams, fetchProducts]);
 
+  const handleDeleteSelected = async () => {
+    if (selectedIds.length === 0) return;
+    const isConfirmed = confirm(
+      `선택한 ${selectedIds.length}개의 라이브 방송을 완전히 삭제하시겠습니까?\n삭제된 방송의 채팅 내역 및 상품 매핑 정보는 즉시 함께 영구 삭제됩니다.`
+    );
+    if (!isConfirmed) return;
+
+    setSubmitting(true);
+    try {
+      const res = await fetch("/api/live", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids: selectedIds }),
+      });
+      const result = await res.json();
+      if (result.success) {
+        alert("선택한 방송이 삭제되었습니다.");
+        fetchStreams();
+      } else {
+        alert(result.error ?? "삭제에 실패했습니다.");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("삭제 요청 중 네트워크 오류가 발생했습니다.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title || !streamerName) {
@@ -102,6 +135,7 @@ export default function AdminLivePage() {
           coverImageUrl: coverImageUrl || null,
           streamUrl: streamUrl || null,
           replayUrl: replayUrl || null,
+          scheduledAt: scheduledAt || null,
           productIds: selectedProductIds,
         }),
       });
@@ -116,6 +150,7 @@ export default function AdminLivePage() {
         setCoverImageUrl("");
         setStreamUrl("");
         setReplayUrl("");
+        setScheduledAt("");
         setSelectedProductIds([]);
         fetchStreams();
         // IVS 채널 자동 발급 실패 시 안내 메시지 (방송 등록 자체는 성공)
@@ -168,12 +203,29 @@ export default function AdminLivePage() {
             ({streams.length}개 방송)
           </span>
         </h1>
-        <button
-          onClick={() => setShowModal(true)}
-          className="admin-btn admin-btn-primary"
-        >
-          ＋ 라이브 방송 등록
-        </button>
+        <div style={{ display: "flex", gap: "0.75rem" }}>
+          {selectedIds.length > 0 && (
+            <button
+              onClick={handleDeleteSelected}
+              className="admin-btn"
+              disabled={submitting}
+              style={{
+                background: "#ef4444",
+                color: "#fff",
+                border: "none",
+                fontWeight: 700,
+              }}
+            >
+              🗑️ 선택 삭제 ({selectedIds.length}개)
+            </button>
+          )}
+          <button
+            onClick={() => setShowModal(true)}
+            className="admin-btn admin-btn-primary"
+          >
+            ＋ 라이브 방송 등록
+          </button>
+        </div>
       </div>
 
       <div className="admin-card">
@@ -192,6 +244,20 @@ export default function AdminLivePage() {
             <table className="admin-table">
               <thead>
                 <tr>
+                  <th style={{ width: "40px", textAlign: "center" }}>
+                    <input
+                      type="checkbox"
+                      checked={streams.length > 0 && selectedIds.length === streams.length}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setSelectedIds(streams.map((s) => s.id));
+                        } else {
+                          setSelectedIds([]);
+                        }
+                      }}
+                      style={{ cursor: "pointer" }}
+                    />
+                  </th>
                   <th>방송 커버</th>
                   <th>방송 정보</th>
                   <th>스트리머</th>
@@ -204,6 +270,20 @@ export default function AdminLivePage() {
               <tbody>
                 {streams.map((stream) => (
                   <tr key={stream.id}>
+                    <td style={{ textAlign: "center" }}>
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.includes(stream.id)}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setSelectedIds((prev) => [...prev, stream.id]);
+                          } else {
+                            setSelectedIds((prev) => prev.filter((id) => id !== stream.id));
+                          }
+                        }}
+                        style={{ cursor: "pointer" }}
+                      />
+                    </td>
                     <td>
                       <div className="admin-table-thumb" style={{ width: "80px", height: "45px", position: "relative" }}>
                         {stream.coverImageUrl ? (
@@ -351,6 +431,20 @@ export default function AdminLivePage() {
                       placeholder="https://example.com/cover.jpg"
                     />
                   </div>
+                </div>
+
+                <div className="admin-field">
+                  <label className="admin-label">📅 방송 예정 일시</label>
+                  <input
+                    className="admin-input"
+                    type="datetime-local"
+                    value={scheduledAt}
+                    onChange={(e) => setScheduledAt(e.target.value)}
+                    style={{ colorScheme: "light" }}
+                  />
+                  <p style={{ fontSize: "0.75rem", color: "#9ca3af", marginTop: "4px" }}>
+                    설정 시 프론트 편성표 및 시청자 대기 화면에 카운트다운 타이머가 표시됩니다.
+                  </p>
                 </div>
 
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>

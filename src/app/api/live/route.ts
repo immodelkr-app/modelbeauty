@@ -74,6 +74,7 @@ export async function GET(request: NextRequest) {
         createdAt: stream.created_at,
         startedAt: stream.started_at,
         endedAt: stream.ended_at,
+        scheduledAt: stream.scheduled_at || null,
         products,
         ingestEndpoint: stream.ingest_endpoint || null,
         streamKey: stream.stream_key || null,
@@ -116,6 +117,7 @@ export async function POST(request: Request) {
       coverImageUrl,
       streamUrl,
       replayUrl,
+      scheduledAt,
       productIds = [],
     } = body;
 
@@ -201,6 +203,7 @@ export async function POST(request: Request) {
         stream_key: streamKey,
         channel_arn: channelArn,
         started_at: status === "live" ? new Date().toISOString() : null,
+        scheduled_at: scheduledAt || null,
       })
       .select()
       .single();
@@ -242,6 +245,7 @@ export async function POST(request: Request) {
         viewerCount: stream.viewer_count,
         createdAt: stream.created_at,
         startedAt: stream.started_at,
+        scheduledAt: stream.scheduled_at || null,
         ivsAutoCreated: !!channelArn, // IVS 채널 자동 발급 성공 여부
       },
     });
@@ -250,3 +254,31 @@ export async function POST(request: Request) {
     return Response.json({ success: false, error: err.message ?? "서버 오류" }, { status: 500 });
   }
 }
+
+export async function DELETE(request: Request) {
+  const notAllowed = await requireAdmin();
+  if (notAllowed) return notAllowed;
+
+  try {
+    const body = await request.json();
+    const { ids } = body;
+
+    if (!ids || !Array.isArray(ids) || ids.length === 0) {
+      return Response.json({ success: false, error: "삭제할 방송 ID 목록이 올바르지 않습니다." }, { status: 400 });
+    }
+
+    const admin = createSupabaseAdmin();
+    const { error } = await admin
+      .from("live_streams")
+      .delete()
+      .in("id", ids);
+
+    if (error) throw error;
+
+    return Response.json({ success: true, message: "성공적으로 삭제되었습니다." });
+  } catch (err: any) {
+    console.error("[DELETE /api/live] Error:", err);
+    return Response.json({ success: false, error: err.message ?? "서버 오류" }, { status: 500 });
+  }
+}
+

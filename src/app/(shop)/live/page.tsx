@@ -30,6 +30,7 @@ interface StreamItem {
   coverImageUrl: string | null;
   viewerCount: number;
   startedAt: string | null;
+  scheduledAt: string | null;
   products: MappedProduct[];
 }
 
@@ -82,6 +83,7 @@ async function getLiveStreams(): Promise<StreamItem[]> {
       coverImageUrl: stream.cover_image_url,
       viewerCount: stream.viewer_count,
       startedAt: stream.started_at,
+      scheduledAt: stream.scheduled_at || null,
       products,
     };
   });
@@ -209,16 +211,32 @@ export default async function LiveShoppingPage() {
             ) : (
               <div className="upcoming-list">
                 {upcomingStreams.map((stream) => {
-                  const date = stream.startedAt ? new Date(stream.startedAt) : new Date();
+                  const schedDate = stream.scheduledAt ? new Date(stream.scheduledAt) : null;
+                  const now = new Date();
+                  const diffDays = schedDate ? Math.ceil((schedDate.getTime() - now.getTime()) / 86400000) : null;
+                  const dDayLabel = diffDays === null
+                    ? null
+                    : diffDays <= 0
+                    ? "🔴 오늘"
+                    : diffDays === 1
+                    ? "D-1"
+                    : `D-${diffDays}`;
                   return (
                     <div key={stream.id} className="upcoming-item">
                       <div className="upcoming-time-box">
-                        <div className="upcoming-date">
-                          {date.toLocaleDateString("ko-KR", { month: "short", day: "numeric" })}
-                        </div>
-                        <div className="upcoming-time">
-                          {date.toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit", hour12: false })}
-                        </div>
+                        {schedDate ? (
+                          <>
+                            {dDayLabel && <div className="upcoming-dday">{dDayLabel}</div>}
+                            <div className="upcoming-date">
+                              {schedDate.toLocaleDateString("ko-KR", { month: "short", day: "numeric" })}
+                            </div>
+                            <div className="upcoming-time">
+                              {schedDate.toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit", hour12: false })}
+                            </div>
+                          </>
+                        ) : (
+                          <div className="upcoming-date" style={{ color: "var(--mb-gray-400)", fontSize: "0.75rem" }}>일정 미정</div>
+                        )}
                       </div>
                       <div className="upcoming-info">
                         <div className="upcoming-streamer">{stream.streamerName}</div>

@@ -35,6 +35,7 @@ interface LiveStream {
   createdAt: string;
   startedAt: string | null;
   endedAt: string | null;
+  scheduledAt: string | null;
   products: Product[];
 }
 
@@ -56,6 +57,10 @@ export default function AdminLiveControlPage({ params }: { params: Promise<{ id:
   const [replayUrl, setReplayUrl] = useState("");
   const [adminMessage, setAdminMessage] = useState("");
   const [submitting, setSubmitting] = useState(false);
+
+  // 5분 전 경고 배너 상태
+  const [showAlertBanner, setShowAlertBanner] = useState(false);
+  const [minsLeft, setMinsLeft] = useState<number | null>(null);
 
   // ── 데이터 로드 ──────────────────────────────────────────
   const fetchStreamData = useCallback(async () => {
@@ -92,6 +97,67 @@ export default function AdminLiveControlPage({ params }: { params: Promise<{ id:
     fetchStreamData();
     fetchChats();
   }, [fetchStreamData, fetchChats]);
+
+  // ── 5분 전 커운트다운 타이머 및 웹 알림 유도 ─────────────────
+  useEffect(() => {
+    if (!stream?.scheduledAt || stream.status !== "upcoming") return;
+
+    // 브라우저 알림 권한 요청
+    if (typeof Notification !== "undefined" && Notification.permission === "default") {
+      Notification.requestPermission();
+    }
+
+    let notificationSent = false;
+
+    const interval = setInterval(() => {
+      const now = Date.now();
+      const scheduledTime = new Date(stream.scheduledAt!).getTime();
+      const diffMs = scheduledTime - now;
+      const diffMins = diffMs / 1000 / 60;
+
+      // 방송이 시작되었거나 예정 시각이 지났으면 타이머 중지
+      if (diffMins <= 0) {
+        setShowAlertBanner(false);
+        setMinsLeft(null);
+        clearInterval(interval);
+        return;
+      }
+
+      setMinsLeft(Math.floor(diffMins));
+
+      if (diffMins <= 5) {
+        setShowAlertBanner(true);
+
+        // 브라우저 웹 푸시 알림 (한 번만 전송)
+        if (!notificationSent && typeof Notification !== "undefined" && Notification.permission === "granted") {
+          notificationSent = true;
+          new Notification("방송 시작 5분 전! 프리즘 라이브 대기해 주세요", {
+            body: `[${stream.title}] 지금 PRISM Live Studio 앱을 켜고 송출 URL과 키를 설정해 주세요.`,
+            icon: "/favicon.ico",
+            tag: `live-alert-${stream.id}`,
+          });
+          // 알림음 재생
+          try {
+            const ctx = new AudioContext();
+            const oscillator = ctx.createOscillator();
+            const gain = ctx.createGain();
+            oscillator.connect(gain);
+            gain.connect(ctx.destination);
+            oscillator.frequency.value = 880;
+            oscillator.type = "sine";
+            gain.gain.setValueAtTime(0.3, ctx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.8);
+            oscillator.start(ctx.currentTime);
+            oscillator.stop(ctx.currentTime + 0.8);
+          } catch {/* AudioContext not available */}
+        }
+      } else {
+        setShowAlertBanner(false);
+      }
+    }, 10000); // 10초마다 체크
+
+    return () => clearInterval(interval);
+  }, [stream?.scheduledAt, stream?.status, stream?.id, stream?.title]);
 
   // ── Supabase 실시간 구독 연동 ────────────────────────────
   useEffect(() => {
@@ -274,6 +340,18 @@ export default function AdminLiveControlPage({ params }: { params: Promise<{ id:
 
   return (
     <>
+      {/* 하엸 개시 5분 전 주의 배너 */}
+      {showAlertBanner && stream.status === "upcoming" && (
+        <div className="control-alert-banner">
+          <span className="control-alert-icon">🚨</span>
+          <div className="control-alert-text">
+            <strong>방송 시작 {minsLeft}분 전입니다!</strong>
+            {" "}지금 바로 <strong>PRISM Live Studio 앱</strong>을 켜고 아래의 스트림 URL과 키를 입력한 연결 후 송출 대기 화면으로 전환해 주세요.
+          </div>
+          <button onClick={() => setShowAlertBanner(false)} className="control-alert-close">✕</button>
+        </div>
+      )}
+
       <div className="admin-section-header">
         <div>
           <h1 className="admin-section-title">🎙️ 라이브 방송 제어실</h1>
@@ -391,6 +469,10 @@ export default function AdminLiveControlPage({ params }: { params: Promise<{ id:
                       복사
                     </button>
                   </div>
+                  <p style={{ fontSize: "0.75rem", color: "#6b7280", marginTop: "4px" }}>
+                    💡 <strong>연결 실패 시 팁:</strong> 프리즘 앱에서 송출 에러가 나는 경우, 주소의 맨 앞 <code>rtmps://</code>를 <code>rtmp://</code>로 변경하고 포트 <code>:443</code>을 제외한 상태로 입력해 보세요. <br />
+                    (예: <code>rtmp://{stream.ingestEndpoint?.replace("rtmps://", "").replace(":443/", "/")}</code>)
+                  </p>
                 </div>
                 <div className="admin-field">
                   <label className="admin-label" style={{ fontWeight: 700 }}>스트림 키 (Stream Key)</label>
@@ -456,6 +538,21 @@ export default function AdminLiveControlPage({ params }: { params: Promise<{ id:
                 저장 및 자동 연결 적용
               </button>
             </form>
+          </div>
+
+          {/* PRISM Live 퀴 가이드 카드 */}
+          <div className="admin-card control-card prism-guide-card" style={{ marginTop: "1.5rem" }}>
+            <h2 className="admin-card-title">📱 PRISM Live 연동 5단계 퀴 가이드</h2>
+            <p style={{ fontSize: "0.8125rem", color: "#6b7280", margin: "0.5rem 0 1rem" }}>
+              방송 시작 <strong>5분 전</strong>에 아래 절차를 완료하고 송출 대기 상태를 유지하세요.
+            </p>
+            <ol className="prism-guide-steps">
+              <li><span className="guide-step-num">1</span><span>스마트폰에서 <strong>PRISM Live Studio</strong> 앱을 실행합니다.</span></li>
+              <li><span className="guide-step-num">2</span><span>오른쪽 위 ⚙️ 설정 → <strong>송출 설정</strong> → <strong>RTMP/Custom</strong> 선택</span></li>
+              <li><span className="guide-step-num">3</span><span>위의 「스트림 URL」을 복사하여 「서버 주소」에 입력 (연결 오류 시 <code>rtmps://</code> ➔ <code>rtmp://</code>로 수정 및 <code>:443</code> 제거)</span></li>
+              <li><span className="guide-step-num">4</span><span>위의 「스트림 키」를 복사하여 「스트림 키」에 입력</span></li>
+              <li><span className="guide-step-num">5</span><span>「방송 시작」 터치 후 온에어 주화면을 확인, 위의 <strong>송출 시작</strong> 클릭</span></li>
+            </ol>
           </div>
         </div>
 
@@ -722,6 +819,87 @@ export default function AdminLiveControlPage({ params }: { params: Promise<{ id:
         @keyframes adminPulse {
           0%, 100% { transform: scale(1); opacity: 1; }
           50% { transform: scale(1.1); opacity: 0.4; }
+        }
+
+        /* 5분 전 경고 배너 */
+        .control-alert-banner {
+          display: flex;
+          align-items: center;
+          gap: 1rem;
+          background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
+          color: #fff;
+          padding: 1rem 1.5rem;
+          border-radius: 12px;
+          margin-bottom: 1.25rem;
+          animation: alertPulse 2s infinite ease-in-out;
+          box-shadow: 0 4px 20px rgba(220,38,38,0.35);
+        }
+        .control-alert-icon {
+          font-size: 1.75rem;
+          flex-shrink: 0;
+        }
+        .control-alert-text {
+          flex: 1;
+          font-size: 0.9375rem;
+          line-height: 1.5;
+        }
+        .control-alert-close {
+          background: rgba(255,255,255,0.2);
+          border: none;
+          color: #fff;
+          width: 28px;
+          height: 28px;
+          border-radius: 50%;
+          cursor: pointer;
+          font-size: 0.875rem;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          flex-shrink: 0;
+          transition: background 0.15s;
+        }
+        .control-alert-close:hover {
+          background: rgba(255,255,255,0.35);
+        }
+        @keyframes alertPulse {
+          0%, 100% { opacity: 1; box-shadow: 0 4px 20px rgba(220,38,38,0.35); }
+          50% { opacity: 0.88; box-shadow: 0 4px 30px rgba(220,38,38,0.55); }
+        }
+
+        /* PRISM 퀴 가이드 커드 */
+        .prism-guide-card {
+          background: linear-gradient(135deg, #f8f0ff 0%, #fdf4ff 100%);
+          border: 1.5px solid #e9d5ff;
+        }
+        .prism-guide-steps {
+          list-style: none;
+          padding: 0;
+          margin: 0;
+          display: flex;
+          flex-direction: column;
+          gap: 0.625rem;
+        }
+        .prism-guide-steps li {
+          display: flex;
+          align-items: flex-start;
+          gap: 0.625rem;
+          font-size: 0.8125rem;
+          color: #374151;
+          line-height: 1.5;
+        }
+        .guide-step-num {
+          background: #7c3aed;
+          color: #fff;
+          font-size: 0.6875rem;
+          font-weight: 700;
+          min-width: 20px;
+          height: 20px;
+          border-radius: 50%;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          flex-shrink: 0;
+          margin-top: 2px;
         }
 
         @media (max-width: 1024px) {

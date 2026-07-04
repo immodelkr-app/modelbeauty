@@ -81,6 +81,7 @@ async function getStreamData(id: string) {
     createdAt: stream.created_at,
     startedAt: stream.started_at,
     endedAt: stream.ended_at,
+    scheduledAt: stream.scheduled_at || null,
     products,
   };
 }

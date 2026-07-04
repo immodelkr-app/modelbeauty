@@ -3595,6 +3595,18 @@ body {
   margin-top: 2px;
 }
 
+.upcoming-dday {
+  display: inline-block;
+  background: linear-gradient(135deg, #db2777 0%, #9333ea 100%);
+  color: #fff;
+  font-size: 0.6875rem;
+  font-weight: 800;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  margin-bottom: 4px;
+  letter-spacing: 0.04em;
+}
+
 .upcoming-info {
   flex: 1;
 }

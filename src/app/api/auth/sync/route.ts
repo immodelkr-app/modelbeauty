@@ -13,12 +13,28 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { phoneNumber, localUserId, name, masterUserId } = body;
+    const {
+      phoneNumber,
+      localUserId,
+      name,
+      masterUserId,
+      shipping_recipient,
+      shipping_phone,
+      shipping_zipcode,
+      shipping_address,
+      shipping_detail,
+    } = body;
 
-    // ── 닉네임 단독 업데이트 (Step 3: 닉네임 설정) ──────────────
-    // masterUserId + name 만 올 때는 im-core-auth에서 유저 정보만 업데이트
-    if (masterUserId && name !== undefined && !phoneNumber) {
-      const masterUser = await updateMasterUser(masterUserId, { name });
+    // ── 유저 정보 및 기본 배송지 업데이트 ──────────────
+    if (masterUserId && !phoneNumber && (name !== undefined || shipping_recipient !== undefined || shipping_phone !== undefined || shipping_zipcode !== undefined || shipping_address !== undefined || shipping_detail !== undefined)) {
+      const masterUser = await updateMasterUser(masterUserId, {
+        name,
+        shipping_recipient,
+        shipping_phone,
+        shipping_zipcode,
+        shipping_address,
+        shipping_detail,
+      });
       
       // 로컬 Supabase 유저의 metadata name도 함께 업데이트하여 동기화 일치
       try {

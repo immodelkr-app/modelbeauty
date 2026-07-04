@@ -13,6 +13,11 @@ export interface MasterUser {
   name: string | null;
   integratedPoints: number;
   linkedApps: AppName[];
+  shipping_recipient?: string | null;
+  shipping_phone?: string | null;
+  shipping_zipcode?: string | null;
+  shipping_address?: string | null;
+  shipping_detail?: string | null;
 }
 
 /** im-core-auth 포인트 잔액 응답 */

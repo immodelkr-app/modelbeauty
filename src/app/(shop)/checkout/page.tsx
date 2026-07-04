@@ -25,6 +25,7 @@ export default function CheckoutPage() {
   const router = useRouter();
   const { items, clearCart } = useCartStore();
   const { masterUser, isLoggedIn, isLoading: authLoading } = useAuthStore();
+  const [saveAsDefault, setSaveAsDefault] = useState(false);
 
   // 배송지 폼
   const [form, setForm] = useState({
@@ -95,9 +96,17 @@ export default function CheckoutPage() {
   }, [authLoading, items.length, router]);
 
   // masterUser 이름 폼에 자동 입력 및 쿠폰 조회
+  // masterUser 이름 및 기본 배송지 정보 폼에 자동 입력
   useEffect(() => {
-    if (masterUser?.name && !form.recipientName) {
-      setForm((f) => ({ ...f, recipientName: masterUser.name ?? "" }));
+    if (masterUser) {
+      setForm((f) => ({
+        ...f,
+        recipientName: f.recipientName || masterUser.shipping_recipient || masterUser.name || "",
+        recipientPhone: f.recipientPhone || masterUser.shipping_phone || "",
+        addressZipcode: f.addressZipcode || masterUser.shipping_zipcode || "",
+        addressMain: f.addressMain || masterUser.shipping_address || "",
+        addressDetail: f.addressDetail || masterUser.shipping_detail || "",
+      }));
     }
   }, [masterUser]);
 
@@ -138,6 +147,32 @@ export default function CheckoutPage() {
 
     setIsSubmitting(true);
     try {
+      // 만약 "기본 배송지로 저장" 체크박스가 체크되어 있다면 im-core-auth에 업데이트 수행!
+      if (saveAsDefault && masterUser?.masterUserId) {
+        await fetch("/api/auth/sync", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            masterUserId: masterUser.masterUserId,
+            shipping_recipient: form.recipientName,
+            shipping_phone: form.recipientPhone,
+            shipping_zipcode: form.addressZipcode,
+            shipping_address: form.addressMain,
+            shipping_detail: form.addressDetail,
+          }),
+        });
+
+        // 로컬 auth state/store의 masterUser 정보도 즉시 갱신
+        const updatedUser = {
+          ...masterUser,
+          shipping_recipient: form.recipientName,
+          shipping_phone: form.recipientPhone,
+          shipping_zipcode: form.addressZipcode,
+          shipping_address: form.addressMain,
+          shipping_detail: form.addressDetail,
+        };
+        useAuthStore.getState().setMasterUser(updatedUser);
+      }
       // 주문 생성
       const orderItems = items.map((item) => {
         return {
@@ -363,6 +398,20 @@ export default function CheckoutPage() {
                     placeholder="기본 주소" required style={{ ...inputStyle, marginBottom: "0.5rem" }} />
                   <input name="addressDetail" value={form.addressDetail} onChange={handleInput}
                     placeholder="상세 주소 (선택)" style={inputStyle} />
+                  {isLoggedIn && (
+                    <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginTop: "0.625rem" }}>
+                      <input
+                        type="checkbox"
+                        id="saveAsDefault"
+                        checked={saveAsDefault}
+                        onChange={(e) => setSaveAsDefault(e.target.checked)}
+                        style={{ width: "16px", height: "16px", cursor: "pointer", accentColor: "var(--mb-pink-500)" }}
+                      />
+                      <label htmlFor="saveAsDefault" style={{ fontSize: "0.8125rem", color: "var(--mb-gray-600)", cursor: "pointer", userSelect: "none", fontWeight: 600 }}>
+                        기본 배송지로 저장
+                      </label>
+                    </div>
+                  )}
                 </div>
                 <div>
                   <label style={labelStyle}>배송 메모</label>

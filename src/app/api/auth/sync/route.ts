@@ -77,3 +77,42 @@ export async function POST(request: NextRequest) {
     );
   }
 }
+
+export async function PATCH(request: NextRequest) {
+  try {
+    const body = await request.json();
+    const {
+      masterUserId,
+      shipping_recipient,
+      shipping_phone,
+      shipping_zipcode,
+      shipping_address,
+      shipping_detail,
+    } = body;
+
+    if (!masterUserId) {
+      return NextResponse.json(
+        { error: "masterUserId는 필수입니다." },
+        { status: 400 }
+      );
+    }
+
+    const masterUser = await updateMasterUser(masterUserId, {
+      shipping_recipient,
+      shipping_phone,
+      shipping_zipcode,
+      shipping_address,
+      shipping_detail,
+    });
+
+    return NextResponse.json({ success: true, ...masterUser });
+  } catch (error) {
+    console.error("[/api/auth/sync PATCH]", error);
+    const message = error instanceof Error ? error.message : "서버 오류";
+    return NextResponse.json(
+      { error: message },
+      { status: 500 }
+    );
+  }
+}
+

@@ -49,6 +49,8 @@ export default function MypagePage() {
   // 주소 수정 상태
   const [isEditingAddress, setIsEditingAddress] = useState(false);
   const [addressState, setAddressState] = useState({
+    recipient: masterUser?.shipping_recipient ?? masterUser?.name ?? "",
+    phone: masterUser?.shipping_phone ?? masterUser?.phoneNumber ?? "",
     zipcode: masterUser?.shipping_zipcode ?? "",
     address: masterUser?.shipping_address ?? "",
     detail: masterUser?.shipping_detail ?? "",
@@ -56,15 +58,25 @@ export default function MypagePage() {
   const [addressError, setAddressError] = useState("");
   const [isSavingAddress, setIsSavingAddress] = useState(false);
 
+  const formatPhone = (v: string) => {
+    const d = v.replace(/\D/g, "").slice(0, 11);
+    if (d.length <= 3) return d;
+    if (d.length <= 7) return `${d.slice(0, 3)}-${d.slice(3)}`;
+    return `${d.slice(0, 3)}-${d.slice(3, 7)}-${d.slice(7)}`;
+  };
+
   useEffect(() => {
     if (masterUser) {
       setAddressState({
+        recipient: masterUser.shipping_recipient ?? masterUser.name ?? "",
+        phone: masterUser.shipping_phone ?? masterUser.phoneNumber ?? "",
         zipcode: masterUser.shipping_zipcode ?? "",
         address: masterUser.shipping_address ?? "",
         detail: masterUser.shipping_detail ?? "",
       });
     }
   }, [masterUser]);
+
 
   const handleAddressSearch = () => {
     const scriptId = "daum-postcode-script";
@@ -104,7 +116,15 @@ export default function MypagePage() {
   };
 
   const handleAddressSave = async () => {
-    if (!addressState.address.trim()) {
+    if (!addressState.recipient.trim()) {
+      setAddressError("수령인은 필수 입력 항목입니다.");
+      return;
+    }
+    if (!addressState.phone.trim()) {
+      setAddressError("연락처는 필수 입력 항목입니다.");
+      return;
+    }
+    if (!addressState.zipcode.trim() || !addressState.address.trim()) {
       setAddressError("주소는 필수 입력 항목입니다.");
       return;
     }
@@ -118,8 +138,8 @@ export default function MypagePage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           masterUserId: masterUser?.masterUserId,
-          shipping_recipient: masterUser?.name,
-          shipping_phone: masterUser?.phoneNumber,
+          shipping_recipient: addressState.recipient,
+          shipping_phone: addressState.phone.replace(/-/g, ""),
           shipping_zipcode: addressState.zipcode,
           shipping_address: addressState.address,
           shipping_detail: addressState.detail,
@@ -388,6 +408,32 @@ export default function MypagePage() {
             <div style={{ display: "flex", gap: "0.5rem" }}>
               <input
                 type="text"
+                placeholder="수령인 *"
+                value={addressState.recipient}
+                onChange={(e) => setAddressState(prev => ({ ...prev, recipient: e.target.value }))}
+                style={{
+                  flex: "1",
+                  border: "1px solid var(--mb-gray-300)",
+                  borderRadius: "8px", padding: "0.5rem",
+                  fontSize: "0.875rem", outline: "none"
+                }}
+              />
+              <input
+                type="text"
+                placeholder="연락처 * (010-0000-0000)"
+                value={addressState.phone}
+                onChange={(e) => setAddressState(prev => ({ ...prev, phone: formatPhone(e.target.value) }))}
+                style={{
+                  flex: "1",
+                  border: "1px solid var(--mb-gray-300)",
+                  borderRadius: "8px", padding: "0.5rem",
+                  fontSize: "0.875rem", outline: "none"
+                }}
+              />
+            </div>
+            <div style={{ display: "flex", gap: "0.5rem" }}>
+              <input
+                type="text"
                 placeholder="우편번호"
                 value={addressState.zipcode}
                 readOnly
@@ -452,6 +498,8 @@ export default function MypagePage() {
                   setIsEditingAddress(false);
                   if (masterUser) {
                     setAddressState({
+                      recipient: masterUser.shipping_recipient ?? masterUser.name ?? "",
+                      phone: masterUser.shipping_phone ?? masterUser.phoneNumber ?? "",
                       zipcode: masterUser.shipping_zipcode ?? "",
                       address: masterUser.shipping_address ?? "",
                       detail: masterUser.shipping_detail ?? "",
@@ -471,6 +519,7 @@ export default function MypagePage() {
           <div>
             {addressState.address ? (
               <div style={{ fontSize: "0.875rem", color: "var(--mb-gray-700)", lineHeight: 1.6 }}>
+                <p style={{ margin: "0 0 0.25rem 0" }}><span style={{ fontWeight: 600, color: "var(--mb-gray-500)" }}>[수령인]</span> {addressState.recipient} ({formatPhone(addressState.phone)})</p>
                 <p style={{ margin: "0 0 0.25rem 0" }}><span style={{ fontWeight: 600, color: "var(--mb-gray-500)" }}>[우편번호]</span> {addressState.zipcode}</p>
                 <p style={{ margin: 0 }}><span style={{ fontWeight: 600, color: "var(--mb-gray-500)" }}>[주소]</span> {addressState.address} {addressState.detail}</p>
               </div>

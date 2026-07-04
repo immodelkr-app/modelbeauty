@@ -61,6 +61,9 @@ export default function LiveRoomClient({ initialStream, initialChats }: LiveRoom
   const { isLoggedIn, masterUser } = useAuthStore();
   const [activeProduct, setActiveProduct] = useState<Product | null>(null);
 
+  // 음소거 관련 상태 (브라우저 자동재생 음소거 정책 우회용)
+  const [isMuted, setIsMuted] = useState(true);
+
   const chatEndRef = useRef<HTMLDivElement>(null);
   const heartsContainerRef = useRef<HTMLDivElement>(null);
 
@@ -439,7 +442,7 @@ export default function LiveRoomClient({ initialStream, initialChats }: LiveRoom
         {/* 왼쪽: 비디오 스트리밍 영역 */}
         <div className="liveroom-video-pane">
           <div className="video-player-wrapper">
-            {embed.type !== "direct" ? (
+             {embed.type !== "direct" ? (
               <iframe
                 src={embed.url}
                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
@@ -451,12 +454,24 @@ export default function LiveRoomClient({ initialStream, initialChats }: LiveRoom
               <video
                 src={videoUrl}
                 autoPlay
-                muted
+                muted={isMuted}
                 loop
                 playsInline
                 controls
                 className="live-video-element"
               />
+            )}
+
+            {/* 음소거 해제 플로팅 버튼 */}
+            {isMuted && embed.type === "direct" && (
+              <button
+                onClick={() => setIsMuted(false)}
+                className="unmute-overlay-btn"
+                title="소리 켜기"
+              >
+                <span className="unmute-icon">🔇</span>
+                <span className="unmute-text">화면을 클릭하여 소리 켜기</span>
+              </button>
             )}
 
             {/* 비디오 위의 메타 오버레이 */}
@@ -968,6 +983,48 @@ export default function LiveRoomClient({ initialStream, initialChats }: LiveRoom
           }
           .featured-product-overlay-card {
             width: 100%;
+          }
+        }
+
+        /* 음소거 해제 오버레이 버튼 */
+        .unmute-overlay-btn {
+          position: absolute;
+          top: 50%;
+          left: 50%;
+          transform: translate(-50%, -50%);
+          background: rgba(15, 23, 42, 0.85);
+          border: 1.5px solid rgba(255, 255, 255, 0.15);
+          color: #fff;
+          padding: 0.875rem 1.5rem;
+          border-radius: 9999px;
+          display: flex;
+          align-items: center;
+          gap: 0.625rem;
+          cursor: pointer;
+          z-index: 10;
+          box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+          transition: background 0.2s, transform 0.2s;
+          animation: pulseUnmute 2s infinite ease-in-out;
+        }
+        .unmute-overlay-btn:hover {
+          background: rgba(15, 23, 42, 0.95);
+          transform: translate(-50%, -50%) scale(1.05);
+        }
+        .unmute-icon {
+          font-size: 1.25rem;
+        }
+        .unmute-text {
+          font-size: 0.875rem;
+          font-weight: 700;
+          letter-spacing: -0.01em;
+        }
+        @keyframes pulseUnmute {
+          0%, 100% {
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+          }
+          50% {
+            box-shadow: 0 10px 35px rgba(219, 39, 119, 0.4);
+            border-color: rgba(219, 39, 119, 0.6);
           }
         }
       `}</style>

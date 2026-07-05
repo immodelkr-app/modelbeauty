@@ -219,9 +219,9 @@ export default async function HomePage() {
             {/* 텍스트 */}
             <div>
               {activeStream ? (
-                <div className="hero-badge" aria-label="실시간 라이브 쇼핑 방송 중" style={{ background: "rgba(239, 68, 68, 0.1)", color: "#ef4444", borderColor: "rgba(239, 68, 68, 0.2)" }}>
-                  <span className="hero-badge-dot" style={{ background: "#ef4444" }} aria-hidden="true" />
-                  🔴 LIVE 방송 진행 중
+                <div className="hero-badge" aria-label="실시간 라이브 쇼핑 방송 중" style={{ background: "rgba(124, 58, 237, 0.08)", color: "#7c3aed", borderColor: "rgba(124, 58, 237, 0.2)" }}>
+                  <span className="hero-badge-dot" style={{ background: "#7c3aed" }} aria-hidden="true" />
+                  🟣 LIVE 방송 진행 중
                 </div>
               ) : (
                 <div className="hero-badge" aria-label="새로운 소식">
@@ -243,8 +243,8 @@ export default async function HomePage() {
 
               <div className="hero-actions">
                 {activeStream ? (
-                  <Link href={`/live/${activeStream.id}`} className="hero-cta-primary" style={{ background: "#ef4444", borderColor: "#ef4444" }}>
-                    🔴 실시간 방송 입장하기
+                  <Link href={`/live/${activeStream.id}`} className="hero-cta-primary" style={{ background: "#7c3aed", borderColor: "#7c3aed", boxShadow: "0 10px 25px rgba(124, 58, 237, 0.25)" }}>
+                    🟣 실시간 방송 입장하기
                     <svg
                       width="18"
                       height="18"

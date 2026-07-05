@@ -3,7 +3,19 @@
 // V2 API — 결제위젯 기반
 // ============================================================
 
-const TOSS_SECRET_KEY = process.env.TOSS_SECRET_KEY!;
+const sanitizeEnv = (val: string | undefined) => {
+  if (!val) return "";
+  let cleaned = val.trim();
+  if (
+    (cleaned.startsWith('"') && cleaned.endsWith('"')) ||
+    (cleaned.startsWith("'") && cleaned.endsWith("'"))
+  ) {
+    cleaned = cleaned.slice(1, -1).trim();
+  }
+  return cleaned.replace(/[\u200B-\u200D\uFEFF\u0000-\u001F]/g, "");
+};
+
+const TOSS_SECRET_KEY = sanitizeEnv(process.env.TOSS_SECRET_KEY);
 const TOSS_API_BASE = "https://api.tosspayments.com/v1";
 
 /**

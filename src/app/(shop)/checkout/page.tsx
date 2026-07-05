@@ -249,9 +249,11 @@ export default function CheckoutPage() {
   const initTossWidget = async (oid: string, oNum: string, amount: number) => {
     try {
       const { loadTossPayments } = await import("@tosspayments/tosspayments-sdk");
-      const tossPayments = await loadTossPayments(
-        process.env.NEXT_PUBLIC_TOSS_CLIENT_KEY!
-      );
+      const cleanClientKey = (process.env.NEXT_PUBLIC_TOSS_CLIENT_KEY || "")
+        .trim()
+        .replace(/^["']|["']$/g, "")
+        .replace(/[\u200B-\u200D\uFEFF\u0000-\u001F]/g, "");
+      const tossPayments = await loadTossPayments(cleanClientKey);
 
       const widgets = tossPayments.widgets({
         customerKey: masterUser?.masterUserId ?? "GUEST",

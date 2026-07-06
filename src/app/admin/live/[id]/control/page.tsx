@@ -470,8 +470,7 @@ export default function AdminLiveControlPage({ params }: { params: Promise<{ id:
                     </button>
                   </div>
                   <p style={{ fontSize: "0.75rem", color: "#6b7280", marginTop: "4px" }}>
-                    💡 <strong>연결 실패 시 팁:</strong> 프리즘 앱에서 송출 에러가 나는 경우, 주소의 맨 앞 <code>rtmps://</code>를 <code>rtmp://</code>로 변경하고 포트 <code>:443</code>을 제외한 상태로 입력해 보세요. <br />
-                    (예: <code>rtmp://{stream.ingestEndpoint?.replace("rtmps://", "").replace(":443/", "/")}</code>)
+                    ✅ <strong>프리즘 앱 바로 사용 가능:</strong> 위 주소를 그대로 복사하여 PRISM Live의 「서버 주소」에 붙여넣기 하세요. (<code>rtmp://</code> 형식으로 제공됩니다)
                   </p>
                 </div>
                 <div className="admin-field">
@@ -549,7 +548,7 @@ export default function AdminLiveControlPage({ params }: { params: Promise<{ id:
             <ol className="prism-guide-steps">
               <li><span className="guide-step-num">1</span><span>스마트폰에서 <strong>PRISM Live Studio</strong> 앱을 실행합니다.</span></li>
               <li><span className="guide-step-num">2</span><span>오른쪽 위 ⚙️ 설정 → <strong>송출 설정</strong> → <strong>RTMP/Custom</strong> 선택</span></li>
-              <li><span className="guide-step-num">3</span><span>위의 「스트림 URL」을 복사하여 「서버 주소」에 입력 (연결 오류 시 <code>rtmps://</code> ➔ <code>rtmp://</code>로 수정 및 <code>:443</code> 제거)</span></li>
+              <li><span className="guide-step-num">3</span><span>위의 「스트림 URL」을 복사하여 「서버 주소」에 입력 (이미 <code>rtmp://</code> 형식으로 제공되므로 수정 불필요)</span></li>
               <li><span className="guide-step-num">4</span><span>위의 「스트림 키」를 복사하여 「스트림 키」에 입력</span></li>
               <li><span className="guide-step-num">5</span><span>「방송 시작」 터치 후 온에어 주화면을 확인, 위의 <strong>송출 시작</strong> 클릭</span></li>
             </ol>

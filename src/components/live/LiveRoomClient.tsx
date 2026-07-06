@@ -18,6 +18,13 @@ interface Product {
   salePrice: number | null;
   images: { url: string }[];
   isActive: boolean;
+  description?: string | null;
+}
+
+interface CartToast {
+  id: string;
+  nickname: string;
+  productName: string;
 }
 
 interface LiveStream {
@@ -63,6 +70,15 @@ export default function LiveRoomClient({ initialStream, initialChats }: LiveRoom
 
   // 음소거 관련 상태 (브라우저 자동재생 음소거 정책 우회용)
   const [isMuted, setIsMuted] = useState(true);
+
+  // ── 슬라이드업 상품 패널 상태 ────────────────────────────────
+  const [showProductPanel, setShowProductPanel] = useState(false);
+  const [panelProduct, setPanelProduct] = useState<Product | null>(null);
+  const [panelLoading, setPanelLoading] = useState(false);
+  const [addingToCart, setAddingToCart] = useState(false);
+
+  // ── 장바구니 담기 토스트 상태 ─────────────────────────────────
+  const [cartToasts, setCartToasts] = useState<CartToast[]>([]);
 
   const chatEndRef = useRef<HTMLDivElement>(null);
   const heartsContainerRef = useRef<HTMLDivElement>(null);
@@ -183,6 +199,69 @@ export default function LiveRoomClient({ initialStream, initialChats }: LiveRoom
       }
     } catch (e) {
       console.error(e);
+    }
+  };
+
+  // ── 슬라이드업 패널 열기 ────────────────────────────────────
+  const handleOpenPanel = async (product: Product) => {
+    setShowProductPanel(true);
+    setPanelLoading(true);
+    setPanelProduct(product);
+    // 상품 상세 설명 추가 로드
+    try {
+      const res = await fetch(`/api/products/${product.slug}`);
+      const { data, success } = await res.json();
+      if (success && data) {
+        setPanelProduct((prev) => prev ? { ...prev, description: data.description } : prev);
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setPanelLoading(false);
+    }
+  };
+
+  const handleClosePanel = () => {
+    setShowProductPanel(false);
+    setPanelProduct(null);
+  };
+
+  // ── 장바구니 담기 처리 ────────────────────────────────────────
+  const handleAddToCart = async () => {
+    if (!panelProduct) return;
+    if (!isLoggedIn) return; // 비로그인은 JSX에서 처리
+
+    setAddingToCart(true);
+    try {
+      const res = await fetch("/api/cart", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ productId: panelProduct.id, quantity: 1 }),
+      });
+      const result = await res.json();
+      if (result.success) {
+        // 토스트 추가
+        const toastId = `${Date.now()}-${Math.random()}`;
+        const nickname = masterUser?.name || "고객";
+        const newToast: CartToast = {
+          id: toastId,
+          nickname,
+          productName: panelProduct.name,
+        };
+        setCartToasts((prev) => [...prev, newToast]);
+        // 3초 후 자동 제거
+        setTimeout(() => {
+          setCartToasts((prev) => prev.filter((t) => t.id !== toastId));
+        }, 3500);
+        handleClosePanel();
+      } else {
+        alert(result.error ?? "장바구니 담기에 실패했습니다.");
+      }
+    } catch (e) {
+      console.error(e);
+      alert("네트워크 오류가 발생했습니다.");
+    } finally {
+      setAddingToCart(false);
     }
   };
 
@@ -528,10 +607,10 @@ export default function LiveRoomClient({ initialStream, initialChats }: LiveRoom
                     </div>
                   </div>
                   <button
-                    onClick={() => window.open(`/products/${activeProduct.slug}?stream_id=${stream.id}`, "_blank")}
+                    onClick={() => handleOpenPanel(activeProduct)}
                     className="overlay-buy-btn"
                   >
-                    구매하기
+                    🛍️ 자세히 보기
                   </button>
                 </div>
               </div>
@@ -554,7 +633,17 @@ export default function LiveRoomClient({ initialStream, initialChats }: LiveRoom
         </div>
 
         {/* 오른쪽: 채팅 패널 */}
-        <div className="liveroom-chat-pane">
+        <div className="liveroom-chat-pane" style={{ position: "relative" }}>
+          {/* 장바구니 담기 토스트 */}
+          {cartToasts.length > 0 && (
+            <div className="cart-toast-container">
+              {cartToasts.map((toast) => (
+                <div key={toast.id} className="cart-toast-item">
+                  🛒 <strong>{toast.nickname}</strong>님이 <strong>{toast.productName}</strong>을(를) 장바구니에 담았습니다!
+                </div>
+              ))}
+            </div>
+          )}
           <div className="chat-header">
             <h3>실시간 채팅</h3>
           </div>
@@ -600,6 +689,106 @@ export default function LiveRoomClient({ initialStream, initialChats }: LiveRoom
         </div>
 
       </div>
+
+      {/* 슬라이드업 상품 패널 */}
+      {showProductPanel && (
+        <>
+          {/* 배경 딤 */}
+          <div className="panel-backdrop" onClick={handleClosePanel} />
+          <div className="product-slide-panel">
+            {/* 드래그 핸들 + 닫기 */}
+            <div className="panel-header">
+              <div className="panel-drag-handle" />
+              <button className="panel-close-btn" onClick={handleClosePanel}>✕</button>
+            </div>
+
+            {panelLoading || !panelProduct ? (
+              // 스켈레톤 로딩
+              <div className="panel-skeleton">
+                <div className="skel skel-image" />
+                <div style={{ flex: 1 }}>
+                  <div className="skel skel-title" />
+                  <div className="skel skel-price" />
+                  <div className="skel skel-desc" />
+                </div>
+              </div>
+            ) : (
+              <div className="panel-content">
+                {/* 상품 이미지 + 정보 */}
+                <div className="panel-product-top">
+                  <div className="panel-product-image">
+                    {pimg(panelProduct) ? (
+                      <Image
+                        src={pimg(panelProduct)!}
+                        alt={panelProduct.name}
+                        fill
+                        sizes="120px"
+                        style={{ objectFit: "cover", borderRadius: "12px" }}
+                      />
+                    ) : (
+                      <span style={{ fontSize: "2.5rem" }}>💄</span>
+                    )}
+                  </div>
+                  <div className="panel-product-info">
+                    <div className="panel-label">방송 소개 상품</div>
+                    <div className="panel-product-name">{panelProduct.name}</div>
+                    <div className="panel-product-price">
+                      {panelProduct.salePrice ? (
+                        <>
+                          <span className="panel-sale-price">{panelProduct.salePrice.toLocaleString()}원</span>
+                          <span className="panel-base-price-strike">{panelProduct.basePrice.toLocaleString()}원</span>
+                        </>
+                      ) : (
+                        <span className="panel-sale-price">{panelProduct.basePrice.toLocaleString()}원</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* 상품 설명 */}
+                {panelProduct.description && (
+                  <p className="panel-description">{panelProduct.description}</p>
+                )}
+
+                <p className="panel-size-note">💡 사이즈 및 옵션은 결제 직전 선택하실 수 있습니다.</p>
+
+                {/* CTA 버튼 영역 */}
+                {isLoggedIn ? (
+                  <div className="panel-cta-area">
+                    <button
+                      className="panel-cart-btn"
+                      onClick={handleAddToCart}
+                      disabled={addingToCart}
+                    >
+                      {addingToCart ? "담는 중..." : "❤️ 장바구니 담기"}
+                    </button>
+                    <a
+                      href={`/products/${panelProduct.slug}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="panel-detail-btn"
+                    >
+                      상품 전체 보기 →
+                    </a>
+                  </div>
+                ) : (
+                  // 비로그인 유도 영역
+                  <div className="panel-login-prompt">
+                    <div className="panel-login-icon">🔒</div>
+                    <p className="panel-login-text">방송 중 쇼핑을 위해<br />로그인이 필요합니다</p>
+                    <a
+                      href={`/login?redirect=/live/${stream.id}`}
+                      className="panel-login-btn"
+                    >
+                      로그인하기
+                    </a>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </>
+      )}
 
       {/* 스타일 */}
       <style jsx global>{`
@@ -962,6 +1151,257 @@ export default function LiveRoomClient({ initialStream, initialChats }: LiveRoom
           0% { transform: translateY(0px); }
           50% { transform: translateY(-8px); }
           100% { transform: translateY(0px); }
+        }
+
+        /* ── 슬라이드업 패널 ─────────────────────────────────── */
+        .panel-backdrop {
+          position: fixed;
+          inset: 0;
+          background: rgba(0, 0, 0, 0.6);
+          z-index: 200;
+          backdrop-filter: blur(2px);
+        }
+        .product-slide-panel {
+          position: fixed;
+          bottom: 0;
+          left: 0;
+          right: 0;
+          max-height: 78vh;
+          background: #1e293b;
+          border-radius: 24px 24px 0 0;
+          z-index: 201;
+          box-shadow: 0 -10px 60px rgba(0, 0, 0, 0.6);
+          animation: slideUpPanel 0.32s cubic-bezier(0.32, 0.72, 0, 1);
+          overflow-y: auto;
+          padding-bottom: env(safe-area-inset-bottom, 1.5rem);
+        }
+        @keyframes slideUpPanel {
+          from { transform: translateY(100%); opacity: 0; }
+          to   { transform: translateY(0);   opacity: 1; }
+        }
+        .panel-header {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 1rem 1.5rem 0.5rem;
+          position: relative;
+        }
+        .panel-drag-handle {
+          width: 40px;
+          height: 4px;
+          border-radius: 9999px;
+          background: rgba(255, 255, 255, 0.2);
+        }
+        .panel-close-btn {
+          position: absolute;
+          right: 1.25rem;
+          top: 0.75rem;
+          background: rgba(255, 255, 255, 0.08);
+          border: none;
+          color: #94a3b8;
+          width: 28px;
+          height: 28px;
+          border-radius: 50%;
+          cursor: pointer;
+          font-size: 0.75rem;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          transition: background 0.15s;
+        }
+        .panel-close-btn:hover { background: rgba(255,255,255,0.15); }
+
+        .panel-content {
+          padding: 1rem 1.5rem 2rem;
+        }
+        .panel-product-top {
+          display: flex;
+          gap: 1rem;
+          align-items: flex-start;
+          margin-bottom: 1rem;
+        }
+        .panel-product-image {
+          width: 100px;
+          height: 100px;
+          border-radius: 12px;
+          background: #334155;
+          flex-shrink: 0;
+          position: relative;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          overflow: hidden;
+        }
+        .panel-product-info {
+          flex: 1;
+          min-width: 0;
+        }
+        .panel-label {
+          font-size: 0.6875rem;
+          color: #db2777;
+          font-weight: 700;
+          letter-spacing: 0.05em;
+          text-transform: uppercase;
+          margin-bottom: 0.25rem;
+        }
+        .panel-product-name {
+          font-size: 1.0625rem;
+          font-weight: 800;
+          color: #f1f5f9;
+          line-height: 1.3;
+          margin-bottom: 0.5rem;
+        }
+        .panel-product-price {
+          display: flex;
+          align-items: baseline;
+          gap: 0.5rem;
+        }
+        .panel-sale-price {
+          font-size: 1.25rem;
+          font-weight: 900;
+          color: #f43f5e;
+        }
+        .panel-base-price-strike {
+          font-size: 0.8125rem;
+          color: #64748b;
+          text-decoration: line-through;
+        }
+        .panel-description {
+          font-size: 0.875rem;
+          color: #94a3b8;
+          line-height: 1.6;
+          margin-bottom: 0.75rem;
+          border-top: 1px solid rgba(255,255,255,0.06);
+          padding-top: 0.75rem;
+        }
+        .panel-size-note {
+          font-size: 0.75rem;
+          color: #64748b;
+          background: rgba(255,255,255,0.04);
+          border-radius: 8px;
+          padding: 0.5rem 0.75rem;
+          margin-bottom: 1.25rem;
+        }
+        .panel-cta-area {
+          display: flex;
+          flex-direction: column;
+          gap: 0.625rem;
+        }
+        .panel-cart-btn {
+          width: 100%;
+          padding: 0.9375rem;
+          background: linear-gradient(135deg, #db2777 0%, #7c3aed 100%);
+          color: #fff;
+          font-size: 1rem;
+          font-weight: 800;
+          border: none;
+          border-radius: 14px;
+          cursor: pointer;
+          transition: opacity 0.2s, transform 0.15s;
+          letter-spacing: -0.01em;
+        }
+        .panel-cart-btn:hover { opacity: 0.9; }
+        .panel-cart-btn:active { transform: scale(0.98); }
+        .panel-cart-btn:disabled { opacity: 0.55; cursor: not-allowed; }
+        .panel-detail-btn {
+          display: block;
+          text-align: center;
+          padding: 0.75rem;
+          background: transparent;
+          color: #94a3b8;
+          font-size: 0.875rem;
+          font-weight: 600;
+          border: 1px solid rgba(255,255,255,0.1);
+          border-radius: 12px;
+          text-decoration: none;
+          transition: background 0.15s;
+        }
+        .panel-detail-btn:hover { background: rgba(255,255,255,0.05); }
+
+        /* 비로그인 유도 */
+        .panel-login-prompt {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 0.75rem;
+          padding: 1.5rem;
+          background: rgba(255,255,255,0.03);
+          border-radius: 16px;
+          border: 1px solid rgba(255,255,255,0.07);
+          text-align: center;
+        }
+        .panel-login-icon { font-size: 2rem; }
+        .panel-login-text {
+          font-size: 0.9rem;
+          color: #94a3b8;
+          line-height: 1.6;
+        }
+        .panel-login-btn {
+          padding: 0.75rem 2rem;
+          background: linear-gradient(135deg, #db2777 0%, #7c3aed 100%);
+          color: #fff;
+          font-weight: 700;
+          font-size: 0.9375rem;
+          border-radius: 9999px;
+          text-decoration: none;
+          transition: opacity 0.2s;
+        }
+        .panel-login-btn:hover { opacity: 0.85; }
+
+        /* 스켈레톤 */
+        .panel-skeleton {
+          display: flex;
+          gap: 1rem;
+          padding: 1.25rem 1.5rem 2rem;
+        }
+        .skel {
+          background: linear-gradient(90deg, rgba(255,255,255,0.06) 25%, rgba(255,255,255,0.1) 50%, rgba(255,255,255,0.06) 75%);
+          background-size: 200% 100%;
+          animation: shimmer 1.5s infinite;
+          border-radius: 8px;
+        }
+        .skel-image { width: 100px; height: 100px; flex-shrink: 0; border-radius: 12px; }
+        .skel-title { height: 20px; width: 70%; margin-bottom: 8px; }
+        .skel-price { height: 24px; width: 40%; margin-bottom: 10px; }
+        .skel-desc { height: 14px; width: 90%; }
+        @keyframes shimmer {
+          from { background-position: 200% 0; }
+          to { background-position: -200% 0; }
+        }
+
+        /* ── 채팅창 상단 토스트 ─────────────────────────────────── */
+        .cart-toast-container {
+          position: absolute;
+          top: 0;
+          left: 0;
+          right: 0;
+          z-index: 50;
+          display: flex;
+          flex-direction: column;
+          gap: 4px;
+          padding: 0.5rem 0.75rem 0;
+          pointer-events: none;
+        }
+        .cart-toast-item {
+          background: linear-gradient(135deg, #7c3aed 0%, #db2777 100%);
+          color: #fff;
+          padding: 0.5rem 0.875rem;
+          border-radius: 9999px;
+          font-size: 0.75rem;
+          font-weight: 600;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          box-shadow: 0 4px 15px rgba(124, 58, 237, 0.4);
+          animation: toastIn 0.3s ease-out, toastOut 0.4s ease-in 3.1s forwards;
+        }
+        @keyframes toastIn {
+          from { opacity: 0; transform: translateY(-8px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes toastOut {
+          from { opacity: 1; transform: translateY(0); }
+          to   { opacity: 0; transform: translateY(-8px); }
         }
 
         @media (max-width: 768px) {

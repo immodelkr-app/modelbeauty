@@ -162,7 +162,7 @@ export async function POST(request: Request) {
         if (ivsResponse.channel && ivsResponse.streamKey) {
           finalStreamUrl = ivsResponse.channel.playbackUrl || null;
           ingestEndpoint = ivsResponse.channel.ingestEndpoint 
-            ? `rtmps://${ivsResponse.channel.ingestEndpoint}:443/app/` 
+            ? `rtmp://${ivsResponse.channel.ingestEndpoint}/app/` 
             : null;
           streamKey = ivsResponse.streamKey.value || null;
           channelArn = ivsResponse.channel.arn || null;

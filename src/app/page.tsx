@@ -10,6 +10,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
 import ProductCard from "@/components/products/ProductCard";
+import HeroVideoCard from "@/components/home/HeroVideoCard";
 import type { Category, Product } from "@/types";
 
 export const metadata: Metadata = {
@@ -38,13 +39,23 @@ interface ActiveStream {
   title: string;
   streamerName: string;
   coverImageUrl: string | null;
+  streamUrl: string | null;
   viewerCount: number;
+}
+
+interface LastStream {
+  id: string;
+  title: string;
+  streamerName: string;
+  coverImageUrl: string | null;
+  replayUrl: string | null;
 }
 
 async function getHomeData(): Promise<{
   categories: Category[];
   featured: Product[];
   activeStream: ActiveStream | null;
+  lastStream: LastStream | null;
 }> {
   const supabase = await createSupabaseServerClient();
 
@@ -70,11 +81,24 @@ async function getHomeData(): Promise<{
       .limit(8),
     supabase
       .from("live_streams")
-      .select("id, title, streamer_name, cover_image_url, viewer_count")
+      .select("id, title, streamer_name, cover_image_url, viewer_count, stream_url")
       .eq("status", "live")
       .order("started_at", { ascending: false })
       .limit(1),
   ]);
+
+  // 현재 라이브가 없으면 가장 최근 종료된 리플레이 조회
+  let lastStreamData = null;
+  if (!liveData || liveData.length === 0) {
+    const { data } = await supabase
+      .from("live_streams")
+      .select("id, title, streamer_name, cover_image_url, replay_url")
+      .eq("status", "ended")
+      .not("replay_url", "is", null)
+      .order("ended_at", { ascending: false })
+      .limit(1);
+    lastStreamData = data;
+  }
 
   const categories: Category[] = (catData ?? []).map((c) => ({
     id: c.id,
@@ -112,21 +136,30 @@ async function getHomeData(): Promise<{
     } satisfies Product;
   });
 
-  const activeStream = liveData && liveData.length > 0 ? {
+  const activeStream: ActiveStream | null = liveData && liveData.length > 0 ? {
     id: liveData[0].id,
     title: liveData[0].title,
     streamerName: liveData[0].streamer_name,
     coverImageUrl: liveData[0].cover_image_url,
+    streamUrl: liveData[0].stream_url ?? null,
     viewerCount: liveData[0].viewer_count,
   } : null;
 
-  return { categories, featured, activeStream };
+  const lastStream: LastStream | null = lastStreamData && lastStreamData.length > 0 ? {
+    id: lastStreamData[0].id,
+    title: lastStreamData[0].title,
+    streamerName: lastStreamData[0].streamer_name,
+    coverImageUrl: lastStreamData[0].cover_image_url,
+    replayUrl: lastStreamData[0].replay_url ?? null,
+  } : null;
+
+  return { categories, featured, activeStream, lastStream };
 }
 
 // ── 페이지 컴포넌트 ───────────────────────────────────────
 
 export default async function HomePage() {
-  const { categories, featured, activeStream } = await getHomeData();
+  const { categories, featured, activeStream, lastStream } = await getHomeData();
 
   const APP_URL = "https://www.modelbeauty.kr";
 
@@ -186,9 +219,9 @@ export default async function HomePage() {
             {/* 텍스트 */}
             <div>
               {activeStream ? (
-                <div className="hero-badge" aria-label="실시간 라이브 쇼핑 방송 중" style={{ background: "rgba(239, 68, 68, 0.1)", color: "#ef4444", borderColor: "rgba(239, 68, 68, 0.2)" }}>
-                  <span className="hero-badge-dot" style={{ background: "#ef4444" }} aria-hidden="true" />
-                  🔴 LIVE 방송 진행 중
+                <div className="hero-badge" aria-label="실시간 라이브 쇼핑 방송 중" style={{ background: "rgba(124, 58, 237, 0.08)", color: "#7c3aed", borderColor: "rgba(124, 58, 237, 0.2)" }}>
+                  <span className="hero-badge-dot" style={{ background: "#7c3aed" }} aria-hidden="true" />
+                  🟣 LIVE 방송 진행 중
                 </div>
               ) : (
                 <div className="hero-badge" aria-label="새로운 소식">
@@ -210,8 +243,8 @@ export default async function HomePage() {
 
               <div className="hero-actions">
                 {activeStream ? (
-                  <Link href={`/live/${activeStream.id}`} className="hero-cta-primary" style={{ background: "#ef4444", borderColor: "#ef4444" }}>
-                    🔴 실시간 방송 입장하기
+                  <Link href={`/live/${activeStream.id}`} className="hero-cta-primary" style={{ background: "#7c3aed", borderColor: "#7c3aed", boxShadow: "0 10px 25px rgba(124, 58, 237, 0.25)" }}>
+                    🟣 실시간 방송 입장하기
                     <svg
                       width="18"
                       height="18"
@@ -266,94 +299,11 @@ export default async function HomePage() {
             {/* 비주얼 - 라이브 방송 & 상품 쇼케이스 컨셉 */}
             <div className="hero-image-wrap">
               <div className="hero-image-card" style={{ display: "block", overflow: "visible" }}>
-                {/* 메인 방송 커버 이미지 */}
-                <div style={{ position: "relative", width: "100%", height: "100%", borderRadius: "32px", overflow: "hidden" }}>
-                  <Image
-                    src={activeStream?.coverImageUrl || "/images/live_cover_makeup.png"}
-                    alt={activeStream?.title || "뷰티 라이브 쇼"}
-                    fill
-                    sizes="(max-width: 768px) 100vw, 50vw"
-                    style={{ objectFit: "cover" }}
-                    priority
-                  />
-                  {/* 그라데이션 오버레이 */}
-                  <div style={{
-                    position: "absolute",
-                    inset: 0,
-                    background: "linear-gradient(to top, rgba(0,0,0,0.6) 0%, transparent 60%)"
-                  }} />
-                  
-                  {/* 라이브 상태 배지 */}
-                  <div style={{
-                    position: "absolute",
-                    top: "1.25rem",
-                    left: "1.25rem",
-                    display: "flex",
-                    gap: "0.5rem",
-                    alignItems: "center",
-                    zIndex: 10
-                  }}>
-                    <span className="visual-live-badge" style={{ position: "static", margin: 0, background: activeStream ? "#ef4444" : "var(--mb-pink-500)" }}>
-                      {activeStream ? "ON AIR" : "LIVE"}
-                    </span>
-                    <span style={{
-                      background: "rgba(0,0,0,0.5)",
-                      color: "#fff",
-                      fontSize: "0.75rem",
-                      fontWeight: 600,
-                      padding: "0.25rem 0.625rem",
-                      borderRadius: "100px",
-                      backdropFilter: "blur(4px)"
-                    }}>
-                      👤 {activeStream ? activeStream.viewerCount.toLocaleString() : "3,420"}명
-                    </span>
-                  </div>
-
-                  {/* 중앙 플레이 버튼 */}
-                  <Link
-                    href={activeStream ? `/live/${activeStream.id}` : "/live"}
-                    className="play-btn-glow"
-                    style={{
-                      position: "absolute",
-                      top: "50%",
-                      left: "50%",
-                      transform: "translate(-50%, -50%)",
-                      width: "64px",
-                      height: "64px",
-                      borderRadius: "50%",
-                      background: "rgba(255,255,255,0.9)",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      color: activeStream ? "#ef4444" : "var(--mb-pink-500)",
-                      boxShadow: "0 10px 25px rgba(0,0,0,0.15)",
-                      zIndex: 10,
-                      transition: "transform 0.2s, background-color 0.2s"
-                    }}
-                    aria-label="라이브 보러가기"
-                  >
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-                      <path d="M8 5v14l11-7z" />
-                    </svg>
-                  </Link>
-
-                  {/* 방송 제목 텍스트 */}
-                  <div style={{
-                    position: "absolute",
-                    bottom: "1.5rem",
-                    left: "1.5rem",
-                    right: "1.5rem",
-                    color: "#fff",
-                    zIndex: 10
-                  }}>
-                    <p style={{ fontSize: "0.8125rem", color: "rgba(255,255,255,0.8)", marginBottom: "0.25rem" }}>
-                      {activeStream ? `스트리머 ${activeStream.streamerName}의` : "스트리머 지아(Jia)의"}
-                    </p>
-                    <h3 style={{ fontSize: "1.125rem", fontWeight: 700, lineHeight: 1.3, margin: 0, textShadow: "0 2px 4px rgba(0,0,0,0.3)" }}>
-                      {activeStream ? activeStream.title : "벨벳 립스틱 전색상 단독 특가 쇼!"}
-                    </h3>
-                  </div>
-                </div>
+                {/* 메인 방송 영상 / 커버 카드 */}
+                <HeroVideoCard
+                  activeStream={activeStream}
+                  lastStream={lastStream}
+                />
 
                 {/* 플로팅 추천 상품 카드 1 */}
                 <div className="floating-product-card float-card-1" style={{

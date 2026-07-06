@@ -7,7 +7,6 @@
 import { useState, useEffect, useCallback, use } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 
 interface Product {
   id: string;
@@ -159,68 +158,52 @@ export default function AdminLiveControlPage({ params }: { params: Promise<{ id:
     return () => clearInterval(interval);
   }, [stream?.scheduledAt, stream?.status, stream?.id, stream?.title]);
 
-  // ── Supabase 실시간 구독 연동 ────────────────────────────
+  // ── 폴링 방식 실시간 연동 (Supabase Realtime이 커스텀 스키마 미지원으로 폴링으로 대체) ──
   useEffect(() => {
     if (!streamId) return;
 
-    const supabase = createSupabaseBrowserClient();
-
-    // 1. 실시간 채팅 구독
-    const chatChannel = supabase
-      .channel(`live-chats-${streamId}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "INSERT",
-          schema: "model_beauty",
-          table: "live_stream_chats",
-          filter: `stream_id=eq.${streamId}`,
-        },
-        (payload: any) => {
-          const newChat: ChatMessage = {
-            id: payload.new.id,
-            nickname: payload.new.nickname,
-            message: payload.new.message,
-            createdAt: payload.new.created_at,
-          };
-          setChats((prev) => [...prev, newChat]);
+    // 채팅 폴링: 5초마다 새 메시지 확인
+    const chatTimer = setInterval(async () => {
+      try {
+        const res = await fetch(`/api/live/${streamId}/chat`);
+        const { data, success } = await res.json();
+        if (success && data) {
+          setChats(data);
         }
-      )
-      .subscribe();
+      } catch (e) {
+        console.error("[ChatPoll]", e);
+      }
+    }, 5000);
 
-    // 2. 실시간 방송 상태 업데이트 구독
-    const streamChannel = supabase
-      .channel(`live-stream-status-${streamId}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "UPDATE",
-          schema: "model_beauty",
-          table: "live_streams",
-          filter: `id=eq.${streamId}`,
-        },
-        (payload: any) => {
+    // 방송 상태 + 시청자 수 폴링: 10초마다 갱신
+    const streamTimer = setInterval(async () => {
+      try {
+        const res = await fetch(`/api/live/${streamId}`);
+        const { data, success } = await res.json();
+        if (success && data) {
           setStream((prev) => {
-            if (!prev) return null;
+            if (!prev) return data;
             return {
               ...prev,
-              status: payload.new.status,
-              activeProductId: payload.new.active_product_id,
-              viewerCount: payload.new.viewer_count,
-              replayUrl: payload.new.replay_url,
-              ingestEndpoint: payload.new.ingest_endpoint,
-              streamKey: payload.new.stream_key,
-              startedAt: payload.new.started_at,
-              endedAt: payload.new.ended_at,
+              status: data.status,
+              viewerCount: data.viewerCount,
+              activeProductId: data.activeProductId,
+              replayUrl: data.replayUrl,
+              ingestEndpoint: data.ingestEndpoint,
+              streamKey: data.streamKey,
+              startedAt: data.startedAt,
+              endedAt: data.endedAt,
             };
           });
         }
-      )
-      .subscribe();
+      } catch (e) {
+        console.error("[StreamPoll]", e);
+      }
+    }, 10000);
 
     return () => {
-      chatChannel.unsubscribe();
-      streamChannel.unsubscribe();
+      clearInterval(chatTimer);
+      clearInterval(streamTimer);
     };
   }, [streamId]);
 

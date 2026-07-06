@@ -133,8 +133,21 @@ export default function ProductOptions({
       show("옵션을 선택해 주세요.", "error");
       return;
     }
-    // 먼저 장바구니에 추가 후 checkout으로 이동 (Phase 5)
-    show("Phase 5에서 결제 기능이 추가될 예정입니다.", "info");
+    if (isOutOfStock) return;
+
+    setIsAddingToCart(true);
+    const result = await addToCart(
+      productId,
+      selectedVariant?.id,
+      quantity
+    );
+    setIsAddingToCart(false);
+
+    if (result.success) {
+      router.push("/checkout");
+    } else {
+      show(result.message, "error");
+    }
   };
 
   const handleWishlistToggle = () => {

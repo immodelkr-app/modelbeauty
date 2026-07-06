@@ -7,7 +7,9 @@ import { createSupabaseServerClient, createSupabaseAdmin } from "@/lib/supabase/
 async function getAuthenticatedMasterUserId(): Promise<string | null> {
   const supabase = await createSupabaseServerClient();
   const { data: { user } } = await supabase.auth.getUser();
-  return (user?.user_metadata?.master_user_id as string) ?? null;
+  if (!user) return null;
+  // master_user_id가 없으면 user.id로 폴백
+  return (user.user_metadata?.master_user_id as string | undefined) ?? user.id;
 }
 
 export async function GET(

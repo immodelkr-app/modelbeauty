@@ -29,7 +29,7 @@ export async function GET(request: Request) {
 
     // orderId가 있으면 해당 주문의 소유자인지 검증
     if (orderId) {
-      const masterUserId = user.user_metadata?.master_user_id as string;
+      const masterUserId = (user.user_metadata?.master_user_id as string | undefined) ?? user.id;
       if (masterUserId) {
         const admin = createSupabaseAdmin();
         const { data: order } = await admin

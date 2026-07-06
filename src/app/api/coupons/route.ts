@@ -26,8 +26,9 @@ export async function GET() {
     }
 
     try {
-      // Supabase user id가 im-core-auth의 localUserId이자 masterUserId와 매핑됨
-      const coupons = await getAvailableCoupons(user.id);
+      // master_user_id가 있으면 사용, 없으면 user.id로 폴백
+      const masterUserId = (user.user_metadata?.master_user_id as string | undefined) ?? user.id;
+      const coupons = await getAvailableCoupons(masterUserId);
       return NextResponse.json({ success: true, coupons });
     } catch (coreAuthError) {
       console.warn("[/api/coupons] im-core-auth 연결 불가, 빈 쿠폰 반환:", coreAuthError);

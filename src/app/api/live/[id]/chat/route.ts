@@ -67,7 +67,8 @@ export async function POST(
     }
 
     // ── 유저 정보 동기화 및 관리자 판별 ──────────────────────────
-    let masterUserId = user.id;
+    // user_metadata에 캐시된 master_user_id를 우선 사용 (im-core-auth sync 불필요)
+    let masterUserId = (user.user_metadata?.master_user_id as string | undefined) ?? user.id;
     let nickname = user.user_metadata?.name ?? "사용자";
     let isCrew = false;
     let crewNickname = "";
@@ -104,17 +105,22 @@ export async function POST(
     } else if (isCrew) {
       nickname = `🎤 ${crewNickname}`;
     } else if (user.phone) {
-      try {
-        const masterUser = await syncMasterUser({
-          phoneNumber: user.phone,
-          appName: "MODEL_BEAUTY",
-          localUserId: user.id,
-          name: user.user_metadata?.name,
-        });
-        masterUserId = masterUser.masterUserId;
-        nickname = masterUser.name ?? nickname;
-      } catch (coreAuthError) {
-        console.warn("[POST /api/live/[id]/chat] im-core-auth sync failed, using fallback:", coreAuthError);
+      // user_metadata에 캐시가 없는 경우만 im-core-auth sync 호출
+      if (!user.user_metadata?.master_user_id) {
+        try {
+          const masterUser = await syncMasterUser({
+            phoneNumber: user.phone,
+            appName: "MODEL_BEAUTY",
+            localUserId: user.id,
+            name: user.user_metadata?.name,
+          });
+          masterUserId = masterUser.masterUserId;
+          nickname = masterUser.name ?? nickname;
+        } catch (coreAuthError) {
+          console.warn("[POST /api/live/[id]/chat] im-core-auth sync failed, using fallback:", coreAuthError);
+        }
+      } else {
+        nickname = user.user_metadata?.name ?? nickname;
       }
     } else if (user.email) {
       nickname = user.user_metadata?.name ?? user.email.split("@")[0] ?? "관리자";

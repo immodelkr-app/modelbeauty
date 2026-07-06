@@ -13,8 +13,9 @@ async function getAuthenticatedMasterUserId(): Promise<string | null> {
   if (!user) return null;
 
   // user_metadata에 master_user_id 캐싱 (auth/sync 시 저장됨)
+  // im-core-auth 오프라인 또는 이메일 유저의 경우 user.id로 폴백
   const masterUserId =
-    user.user_metadata?.master_user_id as string | undefined;
+    (user.user_metadata?.master_user_id as string | undefined) ?? user.id;
   return masterUserId ?? null;
 }
 

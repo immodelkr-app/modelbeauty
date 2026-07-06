@@ -7,7 +7,7 @@
 // 이메일 유저(관리자 등): Supabase user_metadata에서 name 반환
 
 import { NextResponse } from "next/server";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createSupabaseServerClient, createSupabaseAdmin } from "@/lib/supabase/server";
 import { syncMasterUser } from "@/lib/core-auth";
 
 export async function GET() {
@@ -51,6 +51,22 @@ export async function GET() {
         localUserId: user.id,
         name: user.user_metadata?.name,
       });
+
+      // master_user_id를 Supabase user_metadata에 캐싱
+      if (masterUser.masterUserId && user.user_metadata?.master_user_id !== masterUser.masterUserId) {
+        try {
+          const adminClient = createSupabaseAdmin();
+          await adminClient.auth.admin.updateUserById(user.id, {
+            user_metadata: {
+              master_user_id: masterUser.masterUserId,
+              name: masterUser.name ?? user.user_metadata?.name,
+            },
+          });
+        } catch (metaErr) {
+          console.warn("[/api/auth/me] user_metadata 캐싱 실패:", metaErr);
+        }
+      }
+
       return NextResponse.json({ success: true, user: masterUser });
     } catch (coreAuthError) {
       // im-core-auth 서버가 아직 미배포인 경우 graceful fallback

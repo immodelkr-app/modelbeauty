@@ -29,6 +29,12 @@ interface ProductOption {
   name: string;
 }
 
+interface CrewOption {
+  id: string;
+  nickname: string;
+  ivs_playback_url: string | null;
+}
+
 export default function AdminLivePage() {
   const [streams, setStreams] = useState<LiveStreamRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -44,7 +50,11 @@ export default function AdminLivePage() {
   const [replayUrl, setReplayUrl] = useState("");
   const [scheduledAt, setScheduledAt] = useState("");
   const [selectedProductIds, setSelectedProductIds] = useState<string[]>([]);
-  
+
+  // 크루 선택
+  const [allCrews, setAllCrews] = useState<CrewOption[]>([]);
+  const [selectedCrewId, setSelectedCrewId] = useState<string>("");
+
   // 전체 상품 옵션 리스트
   const [allProducts, setAllProducts] = useState<ProductOption[]>([]);
   const [submitting, setSubmitting] = useState(false);
@@ -82,10 +92,29 @@ export default function AdminLivePage() {
     }
   }, []);
 
+  const fetchCrews = useCallback(async () => {
+    try {
+      const res = await fetch("/api/admin/crews");
+      const { data, success } = await res.json();
+      if (success) {
+        setAllCrews(
+          (data ?? []).map((c: any) => ({
+            id: c.id,
+            nickname: c.nickname,
+            ivs_playback_url: c.ivs_playback_url ?? null,
+          }))
+        );
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  }, []);
+
   useEffect(() => {
     fetchStreams();
     fetchProducts();
-  }, [fetchStreams, fetchProducts]);
+    fetchCrews();
+  }, [fetchStreams, fetchProducts, fetchCrews]);
 
   const handleDeleteSelected = async () => {
     if (selectedIds.length === 0) return;
@@ -116,6 +145,18 @@ export default function AdminLivePage() {
     }
   };
 
+  const handleCrewSelect = (crewId: string) => {
+    setSelectedCrewId(crewId);
+    if (!crewId) return;
+    const crew = allCrews.find((c) => c.id === crewId);
+    if (crew) {
+      setStreamerName(crew.nickname);
+      if (crew.ivs_playback_url) {
+        setStreamUrl(crew.ivs_playback_url);
+      }
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title || !streamerName) {
@@ -137,6 +178,7 @@ export default function AdminLivePage() {
           replayUrl: replayUrl || null,
           scheduledAt: scheduledAt || null,
           productIds: selectedProductIds,
+          crewId: selectedCrewId || null,
         }),
       });
 
@@ -152,16 +194,13 @@ export default function AdminLivePage() {
         setReplayUrl("");
         setScheduledAt("");
         setSelectedProductIds([]);
+        setSelectedCrewId("");
         fetchStreams();
-        // IVS 채널 자동 발급 실패 시 안내 메시지 (방송 등록 자체는 성공)
-        if (!result.data?.ivsAutoCreated && !streamUrl) {
+        // 크루 선택 없이 새 IVS 채널 발급 실패 시 안내 메시지
+        if (!result.data?.ivsAutoCreated && !streamUrl && !selectedCrewId) {
           alert(
             "✅ 방송이 등록되었습니다.\n\n⚠️ AWS IVS 채널 자동 발급은 실패하였습니다.\n" +
-            "Vercel 환경 변수에 아래 3가지가 모두 최신 값으로 등록되어 있는지 확인해 주세요:\n" +
-            "• AWS_ACCESS_KEY_ID\n" +
-            "• AWS_SECRET_ACCESS_KEY\n" +
-            "• AWS_SESSION_TOKEN (임시 자격 증명 사용 시 필수, 2~3시간마다 갱신 필요)\n\n" +
-            "스트림 키는 나중에 제어실에서 직접 입력할 수 있습니다."
+            "크루 전용 채널 사용 시에는 방송 등록 시 크루를 선택해 주세요."
           );
         }
       } else {
@@ -400,6 +439,29 @@ export default function AdminLivePage() {
                   />
                 </div>
 
+                {/* 크루(호스트) 선택 드롭다운 */}
+                <div className="admin-field">
+                  <label className="admin-label">👤 담당 크루(호스트) 선택</label>
+                  <select
+                    className="admin-input"
+                    value={selectedCrewId}
+                    onChange={(e) => handleCrewSelect(e.target.value)}
+                    style={{ cursor: "pointer" }}
+                  >
+                    <option value="">— 직접 입력 / IVS 자동 발급 —</option>
+                    {allCrews.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.nickname}{c.ivs_playback_url ? " ✅ 채널 발급됨" : " ⚠️ 채널 없음"}
+                      </option>
+                    ))}
+                  </select>
+                  {selectedCrewId && (
+                    <p style={{ fontSize: "0.75rem", color: "#15803d", marginTop: "4px" }}>
+                      ✅ 크루의 전용 채널이 자동으로 연결됩니다. 스트리머명과 스트리밍 주소가 자동 입력되었습니다.
+                    </p>
+                  )}
+                </div>
+
                 <div className="admin-field">
                   <label className="admin-label">방송 설명</label>
                   <textarea
@@ -419,7 +481,8 @@ export default function AdminLivePage() {
                       value={streamerName}
                       onChange={(e) => setStreamerName(e.target.value)}
                       required
-                      placeholder="예) 쇼호스트 김민지"
+                      placeholder="크루 선택 시 자동 입력됩니다"
+                      style={selectedCrewId ? { background: "#f0fdf4", color: "#15803d" } : undefined}
                     />
                   </div>
                   <div className="admin-field">
@@ -449,12 +512,13 @@ export default function AdminLivePage() {
 
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
                   <div className="admin-field">
-                    <label className="admin-label">스트리밍 주소 (비워두면 AWS IVS 자동 생성)</label>
+                    <label className="admin-label">스트리밍 주소 (크루 선택 시 자동 입력)</label>
                     <input
                       className="admin-input"
                       value={streamUrl}
                       onChange={(e) => setStreamUrl(e.target.value)}
-                      placeholder="비워두면 방송 송출 정보 자동 발급 (직접 입력도 가능)"
+                      placeholder="크루 선택 시 자동 입력 / 직접 입력도 가능"
+                      style={selectedCrewId && streamUrl ? { background: "#f0fdf4", color: "#15803d" } : undefined}
                     />
                   </div>
                   <div className="admin-field">

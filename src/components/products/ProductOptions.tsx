@@ -144,7 +144,10 @@ export default function ProductOptions({
     setIsAddingToCart(false);
 
     if (result.success) {
-      router.push("/checkout");
+      if (result.cartItemId) {
+        sessionStorage.setItem("direct_checkout_item_id", result.cartItemId);
+      }
+      router.push("/checkout?direct=true");
     } else {
       show(result.message, "error");
     }

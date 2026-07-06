@@ -18,7 +18,7 @@ type Status = "loading" | "success" | "error";
 function SuccessContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
-  const { clearCart } = useCartStore();
+  const { clearCart, removeItem } = useCartStore();
   const { masterUser, setMasterUser } = useAuthStore();
 
   const [status, setStatus] = useState<Status>("loading");
@@ -59,7 +59,14 @@ function SuccessContent() {
           setApprovedAt(data.approvedAt);
           setAmount(amt);
           setStatus("success");
-          clearCart(); // 장바구니 비우기
+          // 바로구매 아이템 삭제 처리 또는 전체 비우기
+          const directItemId = sessionStorage.getItem("direct_checkout_item_id");
+          if (directItemId) {
+            removeItem(directItemId);
+            sessionStorage.removeItem("direct_checkout_item_id");
+          } else {
+            clearCart(); // 장바구니 비우기
+          }
 
           // 기본 주소로 저장 처리
           const savedAddrRaw = sessionStorage.getItem("save_address_on_success");

@@ -45,7 +45,7 @@ interface CartState {
   // 서버 데이터 동기화
   fetchCart: () => Promise<void>;
   // 상품 추가
-  addItem: (productId: string, variantId?: string, quantity?: number) => Promise<{ success: boolean; message: string }>;
+  addItem: (productId: string, variantId?: string, quantity?: number) => Promise<{ success: boolean; message: string; cartItemId?: string }>;
   // 수량 변경
   updateQuantity: (itemId: string, quantity: number) => Promise<void>;
   // 항목 삭제
@@ -98,9 +98,9 @@ export const useCartStore = create<CartState>((set, get) => ({
       });
       const result = await res.json();
       if (res.ok) {
-        // 서버 최신 데이터로 동기화
-        get().fetchCart();
-        return { success: true, message: result.message };
+        // 서버 최신 데이터로 동기화 완료될 때까지 대기
+        await get().fetchCart();
+        return { success: true, message: result.message, cartItemId: result.data?.id };
       }
       return { success: false, message: result.error ?? "오류가 발생했습니다." };
     } catch {

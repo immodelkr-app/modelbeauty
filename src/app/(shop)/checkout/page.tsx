@@ -26,6 +26,23 @@ export default function CheckoutPage() {
   const { items, clearCart } = useCartStore();
   const { masterUser, isLoggedIn, isLoading: authLoading } = useAuthStore();
 
+  const [isDirect, setIsDirect] = useState(false);
+  const [directItemId, setDirectItemId] = useState<string | null>(null);
+  const [isLoaded, setIsLoaded] = useState(false);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("direct") === "true") {
+      setIsDirect(true);
+      setDirectItemId(sessionStorage.getItem("direct_checkout_item_id"));
+    }
+    setIsLoaded(true);
+  }, []);
+
+  const checkoutItems = (isDirect && directItemId)
+    ? items.filter((item) => item.id === directItemId)
+    : items;
+
   // 배송지 폼
   const [form, setForm] = useState({
     recipientName: masterUser?.name ?? "",
@@ -56,7 +73,7 @@ export default function CheckoutPage() {
   const [appliedPoints, setAppliedPoints] = useState(0);
 
   // 금액 계산
-  const subtotal = items.reduce((s, i) => s + i.subtotal, 0);
+  const subtotal = checkoutItems.reduce((s, i) => s + i.subtotal, 0);
   const shippingFee = subtotal >= SHIPPING_FREE_THRESHOLD ? 0 : SHIPPING_FEE;
 
   // 쿠폰 할인 계산
@@ -90,10 +107,10 @@ export default function CheckoutPage() {
 
   // 장바구니 비어있는 경우
   useEffect(() => {
-    if (!authLoading && items.length === 0) {
+    if (isLoaded && !authLoading && checkoutItems.length === 0) {
       router.replace("/cart");
     }
-  }, [authLoading, items.length, router]);
+  }, [isLoaded, authLoading, checkoutItems.length, router]);
 
   // masterUser 이름 폼에 자동 입력 및 쿠폰 조회 제거 (하단으로 이동)
 
@@ -186,7 +203,7 @@ export default function CheckoutPage() {
     setIsSubmitting(true);
     try {
       // 주문 생성
-      const orderItems = items.map((item) => {
+      const orderItems = checkoutItems.map((item) => {
         return {
           productId: item.product?.id,
           variantId: item.variant?.id ?? null,
@@ -300,9 +317,9 @@ export default function CheckoutPage() {
 
       await widgets.requestPayment({
         orderId: oid,
-        orderName: items.length === 1
-          ? (items[0].product?.name ?? "상품")
-          : `${items[0].product?.name ?? "상품"} 외 ${items.length - 1}건`,
+        orderName: checkoutItems.length === 1
+          ? (checkoutItems[0].product?.name ?? "상품")
+          : `${checkoutItems[0].product?.name ?? "상품"} 외 ${checkoutItems.length - 1}건`,
         successUrl: `${window.location.origin}/checkout/success`,
         failUrl: `${window.location.origin}/checkout/fail`,
         customerEmail: undefined,
@@ -375,10 +392,10 @@ export default function CheckoutPage() {
             {/* 주문 상품 요약 */}
             <section style={{ background: "#fff", borderRadius: "16px", padding: "1.25rem", border: "1px solid var(--mb-gray-100)" }}>
               <h2 style={{ fontSize: "1rem", fontWeight: 700, margin: "0 0 1rem", color: "var(--mb-gray-900)" }}>
-                주문 상품 ({items.length}개)
+                주문 상품 ({checkoutItems.length}개)
               </h2>
               <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
-                {items.map((item) => (
+                {checkoutItems.map((item) => (
                   <div key={item.id} style={{ display: "flex", gap: "0.75rem", alignItems: "center" }}>
                     {item.product?.images?.[0]?.url && (
                       <img

@@ -8,6 +8,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 
 interface Category { id: string; name: string; }
+interface Crew { id: string; name: string; nickname: string; }
 
 export interface ProductFormData {
   name: string;
@@ -23,6 +24,8 @@ export interface ProductFormData {
   tags: string;       // 쉼표 구분
   isActive: boolean;
   isFeatured: boolean;
+  recommenderCrewId: string;   // 추천 크루 ID (없으면 빈 문자열)
+  recommendationNote: string;  // 추천 한마디
 }
 
 const INITIAL: ProductFormData = {
@@ -30,6 +33,7 @@ const INITIAL: ProductFormData = {
   basePrice: "", salePrice: "", stockQuantity: "0",
   sku: "", imageUrl: "", imageAlt: "", tags: "",
   isActive: true, isFeatured: false,
+  recommenderCrewId: "", recommendationNote: "",
 };
 
 function toSlug(name: string): string {
@@ -51,12 +55,14 @@ export default function ProductForm({ productId, initialData, onSuccess }: Produ
   const router = useRouter();
   const [form, setForm] = useState<ProductFormData>({ ...INITIAL, ...initialData });
   const [categories, setCategories] = useState<Category[]>([]);
+  const [crews, setCrews] = useState<Crew[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const isEdit = !!productId;
 
   useEffect(() => {
     fetch("/api/categories").then((r) => r.json()).then(({ data }) => setCategories(data ?? []));
+    fetch("/api/admin/crews").then((r) => r.json()).then(({ data }) => setCrews(data ?? []));
   }, []);
 
   const set = (field: keyof ProductFormData, value: string | boolean) =>
@@ -85,6 +91,8 @@ export default function ProductForm({ productId, initialData, onSuccess }: Produ
       tags: form.tags ? form.tags.split(",").map((t) => t.trim()).filter(Boolean) : [],
       isActive: form.isActive,
       isFeatured: form.isFeatured,
+      recommenderCrewId: form.recommenderCrewId || null,
+      recommendationNote: form.recommendationNote || null,
     };
 
     try {
@@ -187,6 +195,43 @@ export default function ProductForm({ productId, initialData, onSuccess }: Produ
             <div>
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={form.imageUrl} alt="미리보기" style={{ width: "100px", height: "100px", objectFit: "cover", borderRadius: "10px", border: "1px solid #e5e7eb" }} onError={(e) => (e.currentTarget.style.display = "none")} />
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* 추천 크루 */}
+      <div className="admin-card" style={{ padding: "1.5rem" }}>
+        <h2 className="admin-card-title" style={{ marginBottom: "1.25rem" }}>🎬 추천 크루 지정</h2>
+        <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
+          <div className="admin-field">
+            <label className="admin-label">추천 크루</label>
+            <select
+              className="admin-select"
+              value={form.recommenderCrewId}
+              onChange={(e) => set("recommenderCrewId", e.target.value)}
+            >
+              <option value="">추천 크루 없음</option>
+              {crews.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.nickname} ({c.name})
+                </option>
+              ))}
+            </select>
+            <p className="admin-input-hint">상품 상세 페이지에 크루 추천 배너가 표시됩니다</p>
+          </div>
+          {form.recommenderCrewId && (
+            <div className="admin-field">
+              <label className="admin-label">추천 한마디</label>
+              <textarea
+                className="admin-textarea"
+                value={form.recommendationNote}
+                onChange={(e) => set("recommendationNote", e.target.value)}
+                placeholder="예) 라이브 방송에서 매번 들고 나오는 필수 템이에요!"
+                rows={2}
+                maxLength={150}
+              />
+              <p className="admin-input-hint">{form.recommendationNote.length}/150자</p>
             </div>
           )}
         </div>

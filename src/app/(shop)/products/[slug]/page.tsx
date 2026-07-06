@@ -10,6 +10,8 @@ import ProductGallery from "@/components/products/ProductGallery";
 import ProductOptions from "@/components/products/ProductOptions";
 import ProductCard from "@/components/products/ProductCard";
 import ProductDetailTabs from "@/components/products/ProductDetailTabs";
+import CrewRecommendBanner from "@/components/products/CrewRecommendBanner";
+import ShareButtons from "@/components/products/ShareButtons";
 import type { Product, ProductOption, ProductVariant, ProductVideo } from "@/types";
 
 const APP_URL = "https://www.modelbeauty.kr";
@@ -67,7 +69,13 @@ export async function generateMetadata({
 
 // ── 데이터 패칭 ─────────────────────────────────────────
 
-async function getProduct(slug: string): Promise<Product | null> {
+// ── getProduct 확장 타입 ─────────────────────────────────
+type ProductWithCrew = Product & {
+  recommenderCrew?: { id: string; name: string; nickname: string } | null;
+  recommendationNote?: string | null;
+};
+
+async function getProduct(slug: string): Promise<ProductWithCrew | null> {
   const supabase = await createSupabaseServerClient();
 
   const { data, error } = await supabase
@@ -76,7 +84,9 @@ async function getProduct(slug: string): Promise<Product | null> {
       `id, name, slug, description, content, base_price, sale_price,
        stock_quantity, sku, images, tags, is_active, is_featured,
        created_at, updated_at, category_id,
-       categories ( id, name, slug, parent_id )`
+       categories ( id, name, slug, parent_id ),
+       recommender_crew_id, recommendation_note,
+       live_crews ( id, name, nickname )`
     )
     .eq("slug", slug)
     .eq("is_active", true)
@@ -87,6 +97,10 @@ async function getProduct(slug: string): Promise<Product | null> {
   const cat = Array.isArray(data.categories)
     ? data.categories[0]
     : data.categories;
+
+  const crewRaw = Array.isArray(data.live_crews)
+    ? data.live_crews[0]
+    : data.live_crews;
 
   return {
     id: data.id,
@@ -108,6 +122,10 @@ async function getProduct(slug: string): Promise<Product | null> {
     category: cat
       ? { id: cat.id, name: cat.name, slug: cat.slug, parentId: cat.parent_id, sortOrder: 0, imageUrl: null, isActive: true, createdAt: "" }
       : undefined,
+    recommenderCrew: crewRaw
+      ? { id: crewRaw.id, name: crewRaw.name, nickname: crewRaw.nickname }
+      : null,
+    recommendationNote: data.recommendation_note ?? null,
   };
 }
 
@@ -374,6 +392,25 @@ export default async function ProductDetailPage({
               basePrice={product.basePrice}
               salePrice={product.salePrice}
               stockQuantity={product.stockQuantity}
+            />
+
+            {/* 크루 추천 배너 */}
+            {product.recommenderCrew && (
+              <CrewRecommendBanner
+                crewNickname={product.recommenderCrew.nickname}
+                crewName={product.recommenderCrew.name}
+                note={product.recommendationNote}
+              />
+            )}
+
+            {/* 공유 버튼 */}
+            <ShareButtons
+              productName={product.name}
+              productUrl={`${APP_URL}/products/${product.slug}`}
+              thumbnailUrl={(product.images?.[0] as { url: string } | undefined)?.url}
+              description={product.description}
+              crewNickname={product.recommenderCrew?.nickname}
+              recommendationNote={product.recommendationNote}
             />
 
             {/* 태그 */}

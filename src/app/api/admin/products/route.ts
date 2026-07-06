@@ -90,6 +90,8 @@ export async function POST(request: Request) {
       isFeatured,
       options,
       variants,
+      recommenderCrewId,
+      recommendationNote,
     } = body;
 
     // 필수 필드 검증
@@ -131,6 +133,8 @@ export async function POST(request: Request) {
         tags: tags ?? [],
         is_active: isActive ?? true,
         is_featured: isFeatured ?? false,
+        recommender_crew_id: recommenderCrewId ?? null,
+        recommendation_note: recommendationNote ?? null,
       })
       .select()
       .single();

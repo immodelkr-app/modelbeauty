@@ -19,7 +19,7 @@ export async function GET(
     const admin = createSupabaseAdmin();
     const { data, error } = await admin
       .from("products")
-      .select(`*, categories ( id, name, slug ), product_options ( * ), product_variants ( * )`)
+      .select(`*, categories ( id, name, slug ), product_options ( * ), product_variants ( * ), live_crews ( id, name, nickname )`)
       .eq("id", id)
       .single();
 
@@ -58,6 +58,8 @@ export async function PATCH(
       tags,
       isActive,
       isFeatured,
+      recommenderCrewId,
+      recommendationNote,
     } = body;
 
     if (slug && !/^[a-z0-9-]+$/.test(slug)) {
@@ -88,6 +90,9 @@ export async function PATCH(
     if (tags !== undefined) updatePayload.tags = tags;
     if (isActive !== undefined) updatePayload.is_active = isActive;
     if (isFeatured !== undefined) updatePayload.is_featured = isFeatured;
+    // recommenderCrewId: null 전달 시 크루 연결 해제 지원
+    if (recommenderCrewId !== undefined) updatePayload.recommender_crew_id = recommenderCrewId || null;
+    if (recommendationNote !== undefined) updatePayload.recommendation_note = recommendationNote || null;
 
     if (Object.keys(updatePayload).length === 0) {
       return Response.json(

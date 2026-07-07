@@ -131,7 +131,7 @@ export async function POST(request: NextRequest) {
         if (ivsRes.channel && ivsRes.streamKey) {
           ivsChannelArn     = ivsRes.channel.arn ?? null;
           ivsIngestEndpoint = ivsRes.channel.ingestEndpoint
-            ? `rtmps://${ivsRes.channel.ingestEndpoint}:443/app/`
+            ? `rtmps://${ivsRes.channel.ingestEndpoint}/app/`
             : null;
           ivsStreamKey      = ivsRes.streamKey.value ?? null;
           ivsPlaybackUrl    = ivsRes.channel.playbackUrl ?? null;

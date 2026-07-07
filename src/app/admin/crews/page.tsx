@@ -171,11 +171,15 @@ export default function AdminCrewsPage() {
     }
   };
 
-  // IVS 채널 재발급
+  // IVS 채널 발급 / 재발급
   const handleReissueIvs = async (crew: LiveCrew) => {
+    const hasIvs = !!crew.ivs_channel_arn;
     const ok = confirm(
-      `📡 "${crew.nickname}" 크루의 전용 IVS 채널을 새로 발급하시겠습니까?\n\n` +
-      `⚠️ 기존 스트림 키는 즉시 무효화됩니다.\n새 스트림 키를 호스트의 프리즘 앱에 다시 입력해야 합니다.`
+      hasIvs
+        ? `📡 "${crew.nickname}" 크루의 전용 IVS 채널을 새로 재발급하시겠습니까?\n\n` +
+          `⚠️ 기존 스트림 키는 즉시 무효화됩니다.\n새 스트림 키를 호스트의 프리즘 앱에 다시 입력해야 합니다.`
+        : `📡 "${crew.nickname}" 크루의 전용 IVS 채널을 신규 발급하시겠습니까?\n\n` +
+          `발급 완료 후 송출 정보(RTMPS 주소 + 스트림 키)를 확인하여 호스트에게 전달해 주세요.`
     );
     if (!ok) return;
 
@@ -188,11 +192,15 @@ export default function AdminCrewsPage() {
       });
       const result = await res.json();
       if (result.success && result.ivsAutoCreated) {
-        alert("✅ IVS 채널이 새로 발급되었습니다. 아래 새 스트림 키를 호스트에게 전달해 주세요.");
+        alert(
+          hasIvs
+            ? "✅ IVS 채널이 재발급되었습니다. 아래 새 스트림 키를 호스트에게 전달해 주세요."
+            : "✅ IVS 채널이 발급되었습니다. 아래 송출 정보를 호스트에게 전달해 주세요."
+        );
         fetchCrews();
         setExpandedCrewId(crew.id); // 결과 바로 펼쳐보기
       } else {
-        alert(result.error ?? "IVS 채널 재발급에 실패했습니다.");
+        alert(result.error ?? "IVS 채널 발급/재발급에 실패했습니다.");
       }
     } catch (err) {
       console.error(err);
@@ -360,14 +368,14 @@ export default function AdminCrewsPage() {
                               className="admin-btn admin-btn-sm"
                               disabled={reissuingId === crew.id}
                               style={{
-                                borderColor: "#fbbf24",
-                                color: "#92400e",
-                                backgroundColor: "#fffbeb",
+                                borderColor: hasIvs ? "#fbbf24" : "#86efac",
+                                color: hasIvs ? "#92400e" : "#15803d",
+                                backgroundColor: hasIvs ? "#fffbeb" : "#f0fdf4",
                                 fontSize: "0.72rem",
                                 fontWeight: 700,
                               }}
                             >
-                              {reissuingId === crew.id ? "⏳" : "🔄 재발급"}
+                              {reissuingId === crew.id ? "⏳" : hasIvs ? "🔄 재발급" : "📡 채널 발급"}
                             </button>
                           </div>
                         </td>

@@ -89,7 +89,7 @@ export async function PUT(
           if (ivsRes.channel && ivsRes.streamKey) {
             updateData.ivs_channel_arn     = ivsRes.channel.arn ?? null;
             updateData.ivs_ingest_endpoint = ivsRes.channel.ingestEndpoint
-              ? `rtmps://${ivsRes.channel.ingestEndpoint}:443/app/`
+              ? `rtmps://${ivsRes.channel.ingestEndpoint}/app/`
               : null;
             updateData.ivs_stream_key      = ivsRes.streamKey.value ?? null;
             updateData.ivs_playback_url    = ivsRes.channel.playbackUrl ?? null;

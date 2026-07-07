@@ -93,8 +93,9 @@ export async function POST(request: NextRequest) {
         phoneNumber: phoneDigits,
         appName: "MODEL_BEAUTY",
         localUserId,
-        name: cleanNickname,
-        realName: cleanRealName,
+        name: cleanRealName, // master_users.name에 실명 저장 (기존 MOCA 데이터 등과의 호환성)
+        realName: cleanRealName, // master_users.real_name에 실명 저장
+        nickname: cleanNickname, // app_user_mapping.nickname에 닉네임 저장
       });
       linkedApps = (masterUser as any).linkedApps ?? [];
 

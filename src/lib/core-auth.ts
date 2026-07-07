@@ -38,6 +38,7 @@ export async function syncMasterUser(params: {
   localUserId: string;
   name?: string;
   realName?: string;
+  nickname?: string;
 }): Promise<MasterUser> {
   const res = await coreAuthFetch("/api/auth/sync", {
     method: "POST",

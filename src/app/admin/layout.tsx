@@ -18,8 +18,11 @@ const NAV = [
   { href: "/admin/orders", label: "주문 관리", icon: "📦" },
   { href: "/admin/live", label: "라이브 관리", icon: "🎥" },
   { href: "/admin/users", label: "회원 관리", icon: "👥" },
-  { href: "/admin/crews", label: "크루 관리", icon: "👥" },
-  { href: "/admin/settlements", label: "정산 관리", icon: "💰" },
+  { href: "/admin/crews", label: "크루 관리", icon: "🎙️" },
+  { href: "/admin/vendors", label: "업체 관리", icon: "🏢" },
+  { section: "정산" },
+  { href: "/admin/settlements", label: "크루 정산", icon: "💰" },
+  { href: "/admin/vendor-settlements", label: "업체 정산", icon: "📊" },
 ] as const;
 
 function AdminSidebar({ pathname }: { pathname: string }) {
@@ -101,7 +104,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       "/admin/live": "라이브 관리",
       "/admin/users": "회원 관리",
       "/admin/crews": "크루 관리",
-      "/admin/settlements": "정산 관리",
+      "/admin/vendors": "업체 관리",
+      "/admin/settlements": "크루 정산",
+      "/admin/vendor-settlements": "업체 정산",
     };
     setPageTitle(
       Object.entries(titles).find(([k]) =>

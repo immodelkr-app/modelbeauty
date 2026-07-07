@@ -9,6 +9,7 @@ import { useRouter } from "next/navigation";
 
 interface Category { id: string; name: string; }
 interface Crew { id: string; name: string; nickname: string; }
+interface Vendor { id: string; name: string; default_cost_type: string; default_cost_rate: number; }
 
 export interface ProductFormData {
   name: string;
@@ -26,6 +27,10 @@ export interface ProductFormData {
   isFeatured: boolean;
   recommenderCrewId: string;   // 추천 크루 ID (없으면 빈 문자열)
   recommendationNote: string;  // 추천 한마디
+  vendorId: string;
+  vendorCostType: string;
+  vendorCostRate: string;
+  vendorSupplyPrice: string;
 }
 
 const INITIAL: ProductFormData = {
@@ -34,6 +39,7 @@ const INITIAL: ProductFormData = {
   sku: "", imageUrl: "", imageAlt: "", tags: "",
   isActive: true, isFeatured: false,
   recommenderCrewId: "", recommendationNote: "",
+  vendorId: "", vendorCostType: "rate", vendorCostRate: "0", vendorSupplyPrice: "0",
 };
 
 function toSlug(name: string): string {
@@ -56,6 +62,7 @@ export default function ProductForm({ productId, initialData, onSuccess }: Produ
   const [form, setForm] = useState<ProductFormData>({ ...INITIAL, ...initialData });
   const [categories, setCategories] = useState<Category[]>([]);
   const [crews, setCrews] = useState<Crew[]>([]);
+  const [vendors, setVendors] = useState<Vendor[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const isEdit = !!productId;
@@ -63,6 +70,7 @@ export default function ProductForm({ productId, initialData, onSuccess }: Produ
   useEffect(() => {
     fetch("/api/categories").then((r) => r.json()).then(({ data }) => setCategories(data ?? []));
     fetch("/api/admin/crews").then((r) => r.json()).then(({ data }) => setCrews(data ?? []));
+    fetch("/api/admin/vendors").then((r) => r.json()).then(({ data }) => setVendors(data ?? []));
   }, []);
 
   const set = (field: keyof ProductFormData, value: string | boolean) =>
@@ -93,6 +101,10 @@ export default function ProductForm({ productId, initialData, onSuccess }: Produ
       isFeatured: form.isFeatured,
       recommenderCrewId: form.recommenderCrewId || null,
       recommendationNote: form.recommendationNote || null,
+      vendorId: form.vendorId || null,
+      vendorCostType: form.vendorCostType,
+      vendorCostRate: parseFloat(form.vendorCostRate) || 0,
+      vendorSupplyPrice: parseInt(form.vendorSupplyPrice, 10) || 0,
     };
 
     try {
@@ -175,6 +187,67 @@ export default function ProductForm({ productId, initialData, onSuccess }: Produ
             <label className="admin-label">SKU</label>
             <input className="admin-input" value={form.sku} onChange={(e) => set("sku", e.target.value)} placeholder="MB-001" />
           </div>
+        </div>
+      </div>
+
+      {/* 업체 연결 / 공급 조건 */}
+      <div className="admin-card" style={{ padding: "1.5rem" }}>
+        <h2 className="admin-card-title" style={{ marginBottom: "1.25rem" }}>🏢 업체 연결 / 공급 조건</h2>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1.25rem" }}>
+          <div className="admin-field" style={{ gridColumn: "1 / -1" }}>
+            <label className="admin-label">공급 업체</label>
+            <select
+              className="admin-select"
+              value={form.vendorId}
+              onChange={(e) => {
+                const vendorId = e.target.value;
+                set("vendorId", vendorId);
+                if (vendorId) {
+                  const v = vendors.find((x) => x.id === vendorId);
+                  if (v) {
+                    set("vendorCostType", v.default_cost_type);
+                    set("vendorCostRate", String(v.default_cost_rate));
+                  }
+                }
+              }}
+            >
+              <option value="">업체 없음 (자사 상품)</option>
+              {vendors.map((v) => (
+                <option key={v.id} value={v.id}>
+                  {v.name} ({v.default_cost_type === "rate" ? `기본 ${v.default_cost_rate}%` : "고정 공급가"})
+                </option>
+              ))}
+            </select>
+            {vendors.length === 0 && (
+              <p className="admin-input-hint" style={{ color: "#d97706" }}>⚠️ 업체 관리에서 업체를 먼저 등록해주세요.</p>
+            )}
+          </div>
+          <div className="admin-field">
+            <label className="admin-label">공급 방식</label>
+            <div style={{ display: "flex", gap: "1rem", marginTop: "0.25rem" }}>
+              <label style={{ display: "flex", alignItems: "center", gap: "0.4rem", cursor: "pointer" }}>
+                <input type="radio" name="vendorCostType" value="rate" checked={form.vendorCostType === "rate"} onChange={() => set("vendorCostType", "rate")} />
+                <span>판매가의 % (원가율)</span>
+              </label>
+              <label style={{ display: "flex", alignItems: "center", gap: "0.4rem", cursor: "pointer" }}>
+                <input type="radio" name="vendorCostType" value="fixed" checked={form.vendorCostType === "fixed"} onChange={() => set("vendorCostType", "fixed")} />
+                <span>고정 공급가 (원)</span>
+              </label>
+            </div>
+          </div>
+          {form.vendorCostType === "rate" ? (
+            <div className="admin-field">
+              <label className="admin-label">원가율 (%)</label>
+              <input type="number" className="admin-input" value={form.vendorCostRate} onChange={(e) => set("vendorCostRate", e.target.value)} min={0} max={100} step={0.1} placeholder="60" />
+              <p className="admin-input-hint">업체 선택 시 기본값 자동 입력. 상품별 개별 조정 가능.</p>
+            </div>
+          ) : (
+            <div className="admin-field">
+              <label className="admin-label">고정 공급가 (원)</label>
+              <input type="number" className="admin-input" value={form.vendorSupplyPrice} onChange={(e) => set("vendorSupplyPrice", e.target.value)} min={0} placeholder="7000" />
+              <p className="admin-input-hint">할인/쿠폰과 무관하게 고정된 금액을 업체에 지급합니다.</p>
+            </div>
+          )}
         </div>
       </div>
 

@@ -3,6 +3,8 @@
 // Google Search Console에 제출할 sitemap.xml을 동적으로 생성
 // ============================================================
 
+export const dynamic = "force-dynamic"; // 빌드 시 프리렌더 방지 (Supabase URL 미설정 환경 대응)
+
 import type { MetadataRoute } from "next";
 import { createSupabaseAdmin } from "@/lib/supabase/server";
 

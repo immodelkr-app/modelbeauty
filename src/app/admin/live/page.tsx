@@ -27,12 +27,19 @@ interface LiveStreamRow {
 interface ProductOption {
   id: string;
   name: string;
+  vendorName: string | null;
+  vendorCostType: string;
+  vendorCostRate: number;
+  vendorSupplyPrice: number;
+  salePrice: number | null;
+  basePrice: number;
 }
 
 interface CrewOption {
   id: string;
   nickname: string;
   ivs_playback_url: string | null;
+  default_commission_rate: number;
 }
 
 export default function AdminLivePage() {
@@ -54,6 +61,7 @@ export default function AdminLivePage() {
   // 크루 선택
   const [allCrews, setAllCrews] = useState<CrewOption[]>([]);
   const [selectedCrewId, setSelectedCrewId] = useState<string>("");
+  const [crewCommissionRate, setCrewCommissionRate] = useState<number>(0);
 
   // 전체 상품 옵션 리스트
   const [allProducts, setAllProducts] = useState<ProductOption[]>([]);
@@ -84,6 +92,12 @@ export default function AdminLivePage() {
           data.products.map((p: any) => ({
             id: p.id,
             name: p.name,
+            vendorName: p.vendor?.name ?? null,
+            vendorCostType: p.vendorCostType ?? "rate",
+            vendorCostRate: p.vendorCostRate ?? 0,
+            vendorSupplyPrice: p.vendorSupplyPrice ?? 0,
+            salePrice: p.salePrice,
+            basePrice: p.basePrice,
           }))
         );
       }
@@ -102,6 +116,7 @@ export default function AdminLivePage() {
             id: c.id,
             nickname: c.nickname,
             ivs_playback_url: c.ivs_playback_url ?? null,
+            default_commission_rate: c.default_commission_rate ?? 0,
           }))
         );
       }
@@ -147,10 +162,14 @@ export default function AdminLivePage() {
 
   const handleCrewSelect = (crewId: string) => {
     setSelectedCrewId(crewId);
-    if (!crewId) return;
+    if (!crewId) {
+      setCrewCommissionRate(0);
+      return;
+    }
     const crew = allCrews.find((c) => c.id === crewId);
     if (crew) {
       setStreamerName(crew.nickname);
+      setCrewCommissionRate(crew.default_commission_rate);
       if (crew.ivs_playback_url) {
         setStreamUrl(crew.ivs_playback_url);
       }
@@ -179,6 +198,7 @@ export default function AdminLivePage() {
           scheduledAt: scheduledAt || null,
           productIds: selectedProductIds,
           crewId: selectedCrewId || null,
+          crewCommissionRate: crewCommissionRate,
         }),
       });
 
@@ -195,6 +215,7 @@ export default function AdminLivePage() {
         setScheduledAt("");
         setSelectedProductIds([]);
         setSelectedCrewId("");
+        setCrewCommissionRate(0);
         fetchStreams();
         // 크루 선택 없이 새 IVS 채널 발급 실패 시 안내 메시지
         if (!result.data?.ivsAutoCreated && !streamUrl && !selectedCrewId) {
@@ -462,6 +483,28 @@ export default function AdminLivePage() {
                   )}
                 </div>
 
+                {/* 크루 수수료율 (방송 단위 통일) */}
+                <div className="admin-field">
+                  <label className="admin-label">💰 이 방송 크루 수수료율 (%)</label>
+                  <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                    <input
+                      className="admin-input"
+                      type="number"
+                      min={0}
+                      max={100}
+                      step={0.1}
+                      value={crewCommissionRate}
+                      onChange={(e) => setCrewCommissionRate(parseFloat(e.target.value) || 0)}
+                      style={{ maxWidth: 120 }}
+                    />
+                    <span style={{ fontSize: "0.875rem", color: "#374151", fontWeight: 600 }}>%</span>
+                  </div>
+                  <p style={{ fontSize: "0.75rem", color: "#6b7280", marginTop: "4px" }}>
+                    크루 선택 시 기본 수수료율이 자동 입력됩니다. 이 방송에 한해 개별 조정 가능합니다.
+                    방송의 모든 상품에 동일 비율이 적용됩니다.
+                  </p>
+                </div>
+
                 <div className="admin-field">
                   <label className="admin-label">방송 설명</label>
                   <textarea
@@ -541,19 +584,55 @@ export default function AdminLivePage() {
                       </p>
                     ) : (
                       allProducts.map((p) => (
-                        <label key={p.id} className="admin-checklist-item">
+                        <label key={p.id} className="admin-checklist-item" style={{ alignItems: "flex-start" }}>
                           <input
                             type="checkbox"
                             checked={selectedProductIds.includes(p.id)}
                             onChange={() => handleProductToggle(p.id)}
+                            style={{ marginTop: "3px" }}
                           />
-                          <span style={{ fontSize: "0.875rem", marginLeft: "6px" }}>
-                            {p.name}
-                          </span>
+                          <div style={{ marginLeft: "6px" }}>
+                            <span style={{ fontSize: "0.875rem", fontWeight: 500 }}>{p.name}</span>
+                            {p.vendorName && (
+                              <span style={{ fontSize: "0.72rem", color: "#6b7280", marginLeft: "6px" }}>
+                                [{p.vendorName}]
+                                {p.vendorCostType === "rate"
+                                  ? ` 원가율 ${p.vendorCostRate}%`
+                                  : ` 공급가 ${p.vendorSupplyPrice.toLocaleString()}원`}
+                              </span>
+                            )}
+                            {!p.vendorName && (
+                              <span style={{ fontSize: "0.72rem", color: "#d97706", marginLeft: "6px" }}>⚠️ 업체 미연결</span>
+                            )}
+                          </div>
                         </label>
                       ))
                     )}
                   </div>
+                  {/* 예상 마진 미리보기 */}
+                  {selectedProductIds.length > 0 && crewCommissionRate > 0 && (() => {
+                    const selectedProds = allProducts.filter(p => selectedProductIds.includes(p.id));
+                    const withVendor = selectedProds.filter(p => p.vendorName);
+                    if (withVendor.length === 0) return null;
+                    return (
+                      <div style={{ marginTop: "0.5rem", background: "#f0fdf4", border: "1px solid #86efac", borderRadius: 8, padding: "0.6rem 0.75rem" }}>
+                        <div style={{ fontSize: "0.75rem", fontWeight: 700, color: "#15803d", marginBottom: "0.25rem" }}>📊 예상 마진 미리보기 (판매가 기준)</div>
+                        {withVendor.map(p => {
+                          const price = p.salePrice ?? p.basePrice;
+                          const crew = Math.floor(price * crewCommissionRate / 100);
+                          const vendor = p.vendorCostType === "rate"
+                            ? Math.floor(price * p.vendorCostRate / 100)
+                            : p.vendorSupplyPrice;
+                          const mb = price - crew - vendor;
+                          return (
+                            <div key={p.id} style={{ fontSize: "0.72rem", color: "#374151", marginBottom: "2px" }}>
+                              <strong>{p.name}</strong>: {price.toLocaleString()}원 - 크루 {crew.toLocaleString()}원 - 업체 {vendor.toLocaleString()}원 = <strong style={{ color: mb >= 0 ? "#15803d" : "#dc2626" }}>MB {mb.toLocaleString()}원</strong>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    );
+                  })()}
                 </div>
               </div>
 

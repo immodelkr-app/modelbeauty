@@ -119,6 +119,8 @@ export async function POST(request: Request) {
       replayUrl,
       scheduledAt,
       productIds = [],
+      crewId,
+      crewCommissionRate,
     } = body;
 
     if (!title || !streamerName) {
@@ -224,7 +226,20 @@ export async function POST(request: Request) {
 
       if (mappingError) {
         console.error("[POST /api/live] Mapping error:", mappingError);
-        // 라이브 방송 생성에 오류가 없었으므로 롤백하지 않고 그냥 경고만 남김
+      }
+    }
+
+    // 3. 크루-수수료율 매핑 저장 (live_stream_crews)
+    if (crewId) {
+      const commissionRate = crewCommissionRate !== undefined ? Number(crewCommissionRate) : 0;
+      const { error: crewMappingError } = await admin
+        .from("live_stream_crews")
+        .upsert(
+          { stream_id: stream.id, crew_id: crewId, commission_rate: commissionRate },
+          { onConflict: "stream_id,crew_id" }
+        );
+      if (crewMappingError) {
+        console.error("[POST /api/live] Crew mapping error:", crewMappingError);
       }
     }
 

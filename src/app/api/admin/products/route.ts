@@ -25,7 +25,9 @@ export async function GET(request: Request) {
       .select(
         `id, name, slug, base_price, sale_price, stock_quantity,
          is_active, is_featured, sku, images, created_at, updated_at,
-         categories ( id, name, slug )`,
+         vendor_id, vendor_cost_type, vendor_cost_rate, vendor_supply_price,
+         categories ( id, name, slug ),
+         vendors ( id, name )`,
         { count: "exact" }
       )
       .order("created_at", { ascending: false })
@@ -41,6 +43,7 @@ export async function GET(request: Request) {
 
     const products = (data ?? []).map((p) => {
       const cat = Array.isArray(p.categories) ? p.categories[0] : p.categories;
+      const vendor = Array.isArray(p.vendors) ? p.vendors[0] : p.vendors;
       return {
         id: p.id,
         name: p.name,
@@ -54,7 +57,12 @@ export async function GET(request: Request) {
         thumbnail: (p.images as { url: string }[])?.[0]?.url ?? null,
         createdAt: p.created_at,
         updatedAt: p.updated_at,
+        vendorId: p.vendor_id,
+        vendorCostType: p.vendor_cost_type,
+        vendorCostRate: p.vendor_cost_rate,
+        vendorSupplyPrice: p.vendor_supply_price,
         category: cat ? { id: cat.id, name: cat.name, slug: cat.slug } : null,
+        vendor: vendor ? { id: vendor.id, name: vendor.name } : null,
       };
     });
 
@@ -92,6 +100,10 @@ export async function POST(request: Request) {
       variants,
       recommenderCrewId,
       recommendationNote,
+      vendorId,
+      vendorCostType = "rate",
+      vendorCostRate = 0,
+      vendorSupplyPrice = 0,
     } = body;
 
     // 필수 필드 검증
@@ -135,6 +147,10 @@ export async function POST(request: Request) {
         is_featured: isFeatured ?? false,
         recommender_crew_id: recommenderCrewId ?? null,
         recommendation_note: recommendationNote ?? null,
+        vendor_id: vendorId ?? null,
+        vendor_cost_type: vendorCostType,
+        vendor_cost_rate: Number(vendorCostRate),
+        vendor_supply_price: Number(vendorSupplyPrice),
       })
       .select()
       .single();

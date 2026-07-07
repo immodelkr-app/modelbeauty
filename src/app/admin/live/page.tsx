@@ -427,7 +427,7 @@ export default function AdminLivePage() {
               </button>
             </div>
             <form onSubmit={handleSubmit} className="admin-form">
-              <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+              <div className="admin-modal-body" style={{ display: "flex", flexDirection: "column", gap: "1rem", flex: 1, overflowY: "auto", paddingRight: "6px" }}>
                 <div className="admin-field">
                   <label className="admin-label admin-label-required">방송 제목</label>
                   <input
@@ -640,6 +640,7 @@ export default function AdminLivePage() {
           border-radius: 16px;
           width: 100%;
           max-width: 600px;
+          max-height: 85vh;
           box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
           overflow: hidden;
           display: flex;
@@ -674,6 +675,11 @@ export default function AdminLivePage() {
         
         .admin-modal-container form {
           padding: 1.5rem;
+          display: flex;
+          flex-direction: column;
+          overflow: hidden;
+          flex: 1;
+          min-height: 0;
         }
         
         .admin-modal-footer {

@@ -1,9 +1,10 @@
 "use client";
 
 // ============================================================
-// 로그인 페이지 — 전화번호 OTP 인증 (2단계)
-// Step 1: 전화번호 입력 → OTP 발송
-// Step 2: OTP 입력 → 검증 → im-core-auth sync → 리다이렉트
+// 로그인 페이지 — 닉네임 + 비밀번호 기반
+// - 닉네임 입력 → get-auth-email API로 가상 이메일 조회 → signInWithPassword
+// - 닉네임 찾기 모달 (실명 + 전화번호 기반)
+// - 비밀번호 재설정 모달 (닉네임 + 실명 + 전화번호 → 2단계 변경)
 // ============================================================
 
 import { Suspense, useState, useRef, useEffect } from "react";
@@ -11,46 +12,16 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { useAuthStore } from "@/store/auth.store";
 import type { MasterUser } from "@/types";
+import Link from "next/link";
 
-type Step = "phone" | "otp" | "loading" | "nickname";
-
-// useSearchParams를 사용하는 내부 컴포넌트 (Suspense 경계 필요)
-function LoginForm() {
-  const router = useRouter();
-  const searchParams = useSearchParams();
-  const redirectTo = searchParams.get("redirect") || "/";
-  const mode = searchParams.get("mode"); // 'signup' 여부 확인
-
-  const { setMasterUser } = useAuthStore();
-  const supabase = createSupabaseBrowserClient();
-
-  const [step, setStep] = useState<Step>("phone");
-  const [phone, setPhone] = useState("");
-  const [otp, setOtp] = useState(["", "", "", "", "", ""]);
+// ── 닉네임 찾기 모달 ──────────────────────────────────────────
+function FindNicknameModal({ onClose }: { onClose: () => void }) {
+  const [realName, setRealName] = useState("");
+  const [phoneNumber, setPhoneNumber] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState<string | null>(null);
   const [error, setError] = useState("");
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [countdown, setCountdown] = useState(0);
-  // 닉네임 Step 3
-  const [nickname, setNickname] = useState("");
-  const [pendingUser, setPendingUser] = useState<{ id: string; phone: string; masterUserId?: string } | null>(null);
 
-  const otpRefs = useRef<(HTMLInputElement | null)[]>([]);
-
-  // OTP 재전송 카운트다운
-  useEffect(() => {
-    if (countdown <= 0) return;
-    const timer = setTimeout(() => setCountdown((c) => c - 1), 1000);
-    return () => clearTimeout(timer);
-  }, [countdown]);
-
-  // URL mode 파라미터가 admin인 경우 자동으로 이메일 로그인 모드 설정
-  useEffect(() => {
-    if (mode === "admin") {
-      setLoginMode("email");
-    }
-  }, [mode]);
-
-  // 전화번호 포맷팅 (010-XXXX-XXXX)
   const formatPhone = (value: string) => {
     const digits = value.replace(/\D/g, "").slice(0, 11);
     if (digits.length <= 3) return digits;
@@ -58,42 +29,464 @@ function LoginForm() {
     return `${digits.slice(0, 3)}-${digits.slice(3, 7)}-${digits.slice(7)}`;
   };
 
-  // 국제 전화번호 형식으로 변환 (+82XXXXXXXXXX)
-  const toE164 = (formatted: string) => {
-    const digits = formatted.replace(/\D/g, "");
-    if (digits.startsWith("0")) {
-      return `+82${digits.slice(1)}`;
+  const handleFind = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+    setResult(null);
+    setLoading(true);
+    try {
+      const res = await fetch("/api/auth/find-nickname", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          realName: realName.trim(),
+          phoneNumber: phoneNumber.replace(/\D/g, ""),
+        }),
+      });
+      const data = await res.json();
+      if (data.found) {
+        setResult(data.nickname);
+      } else {
+        setError("일치하는 회원 정보를 찾을 수 없습니다.");
+      }
+    } catch {
+      setError("조회 중 오류가 발생했습니다. 다시 시도해주세요.");
+    } finally {
+      setLoading(false);
     }
-    return `+${digits}`;
   };
 
-  // Step 1: OTP 발송
-  const handleSendOtp = async (e: React.FormEvent) => {
+  return (
+    <div style={{
+      position: "fixed", inset: 0, zIndex: 9999,
+      background: "rgba(0,0,0,0.5)",
+      display: "flex", alignItems: "center", justifyContent: "center",
+      padding: "1rem",
+    }}>
+      <div style={{
+        background: "#fff",
+        width: "100%", maxWidth: "400px",
+        borderRadius: "20px",
+        boxShadow: "0 24px 64px rgba(0,0,0,0.2)",
+        overflow: "hidden",
+      }}>
+        {/* 헤더 */}
+        <div style={{
+          display: "flex", justifyContent: "space-between", alignItems: "center",
+          padding: "1.25rem 1.5rem",
+          borderBottom: "1px solid #f1f5f9",
+        }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+            <div style={{
+              width: "32px", height: "32px", borderRadius: "10px",
+              background: "linear-gradient(135deg, #db2777, #9333ea)",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              fontSize: "1rem",
+            }}>🔍</div>
+            <h3 style={{ fontSize: "1rem", fontWeight: 700, color: "#1e293b" }}>닉네임 찾기</h3>
+          </div>
+          <button type="button" onClick={onClose}
+            style={{ background: "none", border: "none", cursor: "pointer", fontSize: "1.25rem", color: "#94a3b8", padding: "0.25rem" }}>
+            ✕
+          </button>
+        </div>
+
+        <div style={{ padding: "1.5rem" }}>
+          {result ? (
+            <div style={{ textAlign: "center" }}>
+              <div style={{ fontSize: "2.5rem", marginBottom: "0.75rem" }}>✅</div>
+              <p style={{ fontSize: "0.875rem", color: "#64748b", marginBottom: "0.75rem" }}>
+                회원님의 닉네임은
+              </p>
+              <div style={{
+                background: "linear-gradient(135deg, #fdf2f8, #fae8ff)",
+                border: "1.5px solid #f0abfc",
+                borderRadius: "12px",
+                padding: "1rem 1.5rem",
+                marginBottom: "1.25rem",
+              }}>
+                <span style={{ fontSize: "1.5rem", fontWeight: 900, color: "#9333ea" }}>{result}</span>
+              </div>
+              <button onClick={onClose} style={{
+                width: "100%", padding: "0.75rem",
+                background: "linear-gradient(135deg, #db2777, #9333ea)",
+                color: "#fff", border: "none", borderRadius: "12px",
+                fontSize: "0.9375rem", fontWeight: 700, cursor: "pointer",
+              }}>
+                확인
+              </button>
+            </div>
+          ) : (
+            <form onSubmit={handleFind} style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+              <p style={{ fontSize: "0.8125rem", color: "#64748b", lineHeight: 1.6 }}>
+                가입 시 등록한 <strong>실명</strong>과 <strong>휴대폰 번호</strong>로 닉네임을 확인합니다.
+              </p>
+              {error && (
+                <div style={{
+                  padding: "0.75rem", borderRadius: "10px",
+                  background: "#fef2f2", border: "1px solid #fecaca",
+                  color: "#dc2626", fontSize: "0.8125rem", fontWeight: 600,
+                }}>
+                  {error}
+                </div>
+              )}
+              <div className="login-field">
+                <label>실명</label>
+                <input type="text" className="login-input" placeholder="홍길동"
+                  value={realName} onChange={(e) => setRealName(e.target.value)} required />
+              </div>
+              <div className="login-field">
+                <label>휴대폰 번호</label>
+                <input type="tel" className="login-input" placeholder="010-0000-0000"
+                  value={phoneNumber}
+                  onChange={(e) => setPhoneNumber(formatPhone(e.target.value))}
+                  required />
+              </div>
+              <button type="submit" disabled={loading} style={{
+                width: "100%", padding: "0.75rem",
+                background: loading ? "#e2e8f0" : "linear-gradient(135deg, #db2777, #9333ea)",
+                color: loading ? "#94a3b8" : "#fff", border: "none", borderRadius: "12px",
+                fontSize: "0.9375rem", fontWeight: 700, cursor: loading ? "not-allowed" : "pointer",
+                display: "flex", alignItems: "center", justifyContent: "center", gap: "0.5rem",
+              }}>
+                {loading ? <><span className="login-btn-spinner" /> 조회 중...</> : "닉네임 찾기"}
+              </button>
+            </form>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── 비밀번호 재설정 모달 ───────────────────────────────────────
+function ResetPasswordModal({ onClose }: { onClose: () => void }) {
+  const [step, setStep] = useState<1 | 2>(1);
+  const [uid, setUid] = useState("");
+  const [verifiedNickname, setVerifiedNickname] = useState("");
+
+  const [nickname, setNickname] = useState("");
+  const [realName, setRealName] = useState("");
+  const [phoneNumber, setPhoneNumber] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [showNewPw, setShowNewPw] = useState(false);
+  const [showConfirmPw, setShowConfirmPw] = useState(false);
+
+  const [loading, setLoading] = useState(false);
+  const [done, setDone] = useState(false);
+  const [error, setError] = useState("");
+
+  const formatPhone = (value: string) => {
+    const digits = value.replace(/\D/g, "").slice(0, 11);
+    if (digits.length <= 3) return digits;
+    if (digits.length <= 7) return `${digits.slice(0, 3)}-${digits.slice(3)}`;
+    return `${digits.slice(0, 3)}-${digits.slice(3, 7)}-${digits.slice(7)}`;
+  };
+
+  const handleVerify = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+    setLoading(true);
+    try {
+      const res = await fetch("/api/auth/reset-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          nickname: nickname.trim(),
+          realName: realName.trim(),
+          phoneNumber: phoneNumber.replace(/\D/g, ""),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.found) {
+        setError(data.error || "일치하는 회원 정보를 찾을 수 없습니다.");
+        return;
+      }
+      setUid(data.uid);
+      setVerifiedNickname(nickname.trim());
+      setStep(2);
+    } catch {
+      setError("처리 중 오류가 발생했습니다. 다시 시도해주세요.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleReset = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+    if (newPassword.length < 6) {
+      setError("비밀번호는 6자리 이상이어야 합니다.");
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setError("비밀번호가 일치하지 않습니다.");
+      return;
+    }
+    setLoading(true);
+    try {
+      const res = await fetch("/api/auth/reset-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ uid, newPassword }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        setError(data.error || "비밀번호 변경에 실패했습니다.");
+        return;
+      }
+      setDone(true);
+    } catch {
+      setError("처리 중 오류가 발생했습니다. 다시 시도해주세요.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div style={{
+      position: "fixed", inset: 0, zIndex: 9999,
+      background: "rgba(0,0,0,0.5)",
+      display: "flex", alignItems: "center", justifyContent: "center",
+      padding: "1rem",
+    }}>
+      <div style={{
+        background: "#fff", width: "100%", maxWidth: "400px",
+        borderRadius: "20px", boxShadow: "0 24px 64px rgba(0,0,0,0.2)", overflow: "hidden",
+      }}>
+        {/* 헤더 */}
+        <div style={{
+          display: "flex", justifyContent: "space-between", alignItems: "center",
+          padding: "1.25rem 1.5rem", borderBottom: "1px solid #f1f5f9",
+        }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+            <div style={{
+              width: "32px", height: "32px", borderRadius: "10px",
+              background: "linear-gradient(135deg, #db2777, #9333ea)",
+              display: "flex", alignItems: "center", justifyContent: "center", fontSize: "1rem",
+            }}>🔑</div>
+            <div>
+              <h3 style={{ fontSize: "1rem", fontWeight: 700, color: "#1e293b" }}>비밀번호 재설정</h3>
+              <p style={{ fontSize: "0.75rem", color: "#94a3b8", marginTop: "2px" }}>
+                {step === 1 ? "1단계: 본인 확인" : "2단계: 새 비밀번호 설정"}
+              </p>
+            </div>
+          </div>
+          <button type="button" onClick={onClose}
+            style={{ background: "none", border: "none", cursor: "pointer", fontSize: "1.25rem", color: "#94a3b8" }}>
+            ✕
+          </button>
+        </div>
+
+        {/* 진행 바 */}
+        <div style={{ height: "3px", background: "#f1f5f9" }}>
+          <div style={{
+            height: "100%", width: step === 1 ? "50%" : "100%",
+            background: "linear-gradient(90deg, #db2777, #9333ea)",
+            transition: "width 0.3s ease",
+          }} />
+        </div>
+
+        <div style={{ padding: "1.5rem" }}>
+          {done ? (
+            <div style={{ textAlign: "center", padding: "0.5rem 0" }}>
+              <div style={{ fontSize: "3rem", marginBottom: "1rem" }}>✅</div>
+              <p style={{ fontSize: "1.0625rem", fontWeight: 800, color: "#1e293b", marginBottom: "0.5rem" }}>
+                비밀번호 변경 완료!
+              </p>
+              <p style={{ fontSize: "0.8125rem", color: "#64748b", lineHeight: 1.7, marginBottom: "1.5rem" }}>
+                새 비밀번호로 로그인해 주세요.
+              </p>
+              <button onClick={onClose} style={{
+                width: "100%", padding: "0.75rem",
+                background: "linear-gradient(135deg, #db2777, #9333ea)",
+                color: "#fff", border: "none", borderRadius: "12px",
+                fontSize: "0.9375rem", fontWeight: 700, cursor: "pointer",
+              }}>
+                로그인하러 가기
+              </button>
+            </div>
+          ) : step === 1 ? (
+            <form onSubmit={handleVerify} style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+              <p style={{ fontSize: "0.8125rem", color: "#64748b", lineHeight: 1.6 }}>
+                가입 시 등록한 정보를 입력해 본인 확인 후 비밀번호를 변경하세요.
+              </p>
+              {error && (
+                <div style={{
+                  padding: "0.75rem", borderRadius: "10px",
+                  background: "#fef2f2", border: "1px solid #fecaca",
+                  color: "#dc2626", fontSize: "0.8125rem", fontWeight: 600,
+                }}>
+                  {error}
+                </div>
+              )}
+              <div className="login-field">
+                <label>닉네임</label>
+                <input type="text" className="login-input" placeholder="가입 시 등록한 닉네임"
+                  value={nickname} onChange={(e) => setNickname(e.target.value)} required />
+              </div>
+              <div className="login-field">
+                <label>실명</label>
+                <input type="text" className="login-input" placeholder="홍길동"
+                  value={realName} onChange={(e) => setRealName(e.target.value)} required />
+              </div>
+              <div className="login-field">
+                <label>휴대폰 번호</label>
+                <input type="tel" className="login-input" placeholder="010-0000-0000"
+                  value={phoneNumber} onChange={(e) => setPhoneNumber(formatPhone(e.target.value))} required />
+              </div>
+              <button type="submit" disabled={loading} style={{
+                width: "100%", padding: "0.75rem",
+                background: loading ? "#e2e8f0" : "linear-gradient(135deg, #db2777, #9333ea)",
+                color: loading ? "#94a3b8" : "#fff", border: "none", borderRadius: "12px",
+                fontSize: "0.9375rem", fontWeight: 700, cursor: loading ? "not-allowed" : "pointer",
+                display: "flex", alignItems: "center", justifyContent: "center", gap: "0.5rem",
+              }}>
+                {loading ? <><span className="login-btn-spinner" /> 확인 중...</> : "본인 확인"}
+              </button>
+            </form>
+          ) : (
+            <form onSubmit={handleReset} style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+              <p style={{ fontSize: "0.8125rem", color: "#64748b", lineHeight: 1.6 }}>
+                <strong style={{ color: "#9333ea" }}>{verifiedNickname}</strong>님, 본인 확인 완료!<br />
+                새로 사용할 비밀번호를 입력해 주세요.
+              </p>
+              {error && (
+                <div style={{
+                  padding: "0.75rem", borderRadius: "10px",
+                  background: "#fef2f2", border: "1px solid #fecaca",
+                  color: "#dc2626", fontSize: "0.8125rem", fontWeight: 600,
+                }}>
+                  {error}
+                </div>
+              )}
+              <div className="login-field">
+                <label>새 비밀번호 (6자리 이상)</label>
+                <div className="login-input-wrap">
+                  <input
+                    type={showNewPw ? "text" : "password"} className="login-input"
+                    placeholder="새 비밀번호 입력" value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)} minLength={6} required
+                  />
+                  <button type="button" onClick={() => setShowNewPw(!showNewPw)} style={{
+                    position: "absolute", right: "0.75rem", top: "50%", transform: "translateY(-50%)",
+                    background: "none", border: "none", cursor: "pointer", color: "#94a3b8", fontSize: "0.875rem",
+                  }}>
+                    {showNewPw ? "숨기기" : "보기"}
+                  </button>
+                </div>
+              </div>
+              <div className="login-field">
+                <label>새 비밀번호 확인</label>
+                <div className="login-input-wrap">
+                  <input
+                    type={showConfirmPw ? "text" : "password"} className="login-input"
+                    placeholder="비밀번호 재입력" value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)} required
+                  />
+                  <button type="button" onClick={() => setShowConfirmPw(!showConfirmPw)} style={{
+                    position: "absolute", right: "0.75rem", top: "50%", transform: "translateY(-50%)",
+                    background: "none", border: "none", cursor: "pointer", color: "#94a3b8", fontSize: "0.875rem",
+                  }}>
+                    {showConfirmPw ? "숨기기" : "보기"}
+                  </button>
+                </div>
+                {confirmPassword && (
+                  <span style={{
+                    fontSize: "0.75rem", marginTop: "0.25rem", display: "block",
+                    color: newPassword === confirmPassword ? "#22c55e" : "#ef4444",
+                  }}>
+                    {newPassword === confirmPassword ? "✅ 일치합니다." : "❌ 일치하지 않습니다."}
+                  </span>
+                )}
+              </div>
+              <button type="submit" disabled={loading} style={{
+                width: "100%", padding: "0.75rem",
+                background: loading ? "#e2e8f0" : "linear-gradient(135deg, #db2777, #9333ea)",
+                color: loading ? "#94a3b8" : "#fff", border: "none", borderRadius: "12px",
+                fontSize: "0.9375rem", fontWeight: 700, cursor: loading ? "not-allowed" : "pointer",
+                display: "flex", alignItems: "center", justifyContent: "center", gap: "0.5rem",
+              }}>
+                {loading ? <><span className="login-btn-spinner" /> 변경 중...</> : "🔑 비밀번호 변경"}
+              </button>
+            </form>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── 로그인 폼 내부 컴포넌트 ───────────────────────────────────
+function LoginForm() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const redirectTo = searchParams.get("redirect") || "/";
+  const mode = searchParams.get("mode");
+
+  const { setMasterUser } = useAuthStore();
+  const supabase = createSupabaseBrowserClient();
+
+  const [nickname, setNickname] = useState("");
+  const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [error, setError] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showFindNickname, setShowFindNickname] = useState(false);
+  const [showResetPassword, setShowResetPassword] = useState(false);
+
+  // 관리자 이메일 로그인 (mode=admin)
+  const [loginMode, setLoginMode] = useState<"nickname" | "email">("nickname");
+  const [email, setEmail] = useState("");
+  const [adminPassword, setAdminPassword] = useState("");
+
+  useEffect(() => {
+    if (mode === "admin") {
+      setLoginMode("email");
+    }
+  }, [mode]);
+
+  // 닉네임 + 비밀번호 로그인
+  const handleNicknameLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
     setIsSubmitting(true);
 
-    const digits = phone.replace(/\D/g, "");
-    if (digits.length < 10 || digits.length > 11) {
-      setError("올바른 전화번호를 입력해주세요.");
-      setIsSubmitting(false);
-      return;
-    }
-
     try {
-      const e164Phone = toE164(phone);
-      const { error: sendError } = await supabase.auth.signInWithOtp({
-        phone: e164Phone,
+      // 닉네임 → 가상 이메일 조회
+      const emailRes = await fetch("/api/auth/get-auth-email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ nickname: nickname.trim() }),
       });
+      const emailData = await emailRes.json();
 
-      if (sendError) {
-        setError(sendError.message || "인증번호 발송에 실패했습니다.");
+      if (!emailData.found || !emailData.authEmail) {
+        setError("닉네임 또는 비밀번호가 올바르지 않습니다.");
         return;
       }
 
-      setStep("otp");
-      setCountdown(60);
-      setTimeout(() => otpRefs.current[0]?.focus(), 100);
+      // Supabase signInWithPassword
+      const { data, error: signInError } = await supabase.auth.signInWithPassword({
+        email: emailData.authEmail,
+        password,
+      });
+
+      if (signInError || !data.user) {
+        setError("닉네임 또는 비밀번호가 올바르지 않습니다.");
+        return;
+      }
+
+      // 마스터 유저 정보 로드
+      const meRes = await fetch("/api/auth/me");
+      if (meRes.ok) {
+        const meData = await meRes.json();
+        setMasterUser(meData.user as MasterUser);
+      }
+
+      router.push(redirectTo);
+      router.refresh();
     } catch {
       setError("네트워크 오류가 발생했습니다. 다시 시도해주세요.");
     } finally {
@@ -101,190 +494,29 @@ function LoginForm() {
     }
   };
 
-  // Step 2: OTP 검증
-  const handleVerifyOtp = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError("");
-
-    const otpCode = otp.join("");
-    if (otpCode.length !== 6) {
-      setError("6자리 인증번호를 모두 입력해주세요.");
-      return;
-    }
-
-    setIsSubmitting(true);
-    setStep("loading");
-
-    try {
-      const e164Phone = toE164(phone);
-      const { data, error: verifyError } = await supabase.auth.verifyOtp({
-        phone: e164Phone,
-        token: otpCode,
-        type: "sms",
-      });
-
-      if (verifyError || !data.user) {
-        setStep("otp");
-        setError("인증번호가 올바르지 않습니다. 다시 확인해주세요.");
-        return;
-      }
-
-      // im-core-auth sync — 신규 유저 여부 판별
-      const syncRes = await fetch("/api/auth/sync", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          phoneNumber: data.user.phone,
-          localUserId: data.user.id,
-          name: data.user.user_metadata?.name,
-        }),
-      });
-
-      if (syncRes.ok) {
-        const syncData = await syncRes.json();
-        const masterUser = syncData as MasterUser & { masterUserId?: string };
-
-        // 신규 유저이거나 닉네임(name)이 없으면 → Step 3 닉네임 설정
-        if (!masterUser.name || masterUser.name.trim() === "") {
-          setPendingUser({
-            id: data.user.id,
-            phone: data.user.phone ?? "",
-            masterUserId: masterUser.masterUserId,
-          });
-          setStep("nickname");
-          return;
-        }
-
-        // 기존 유저 — 바로 로그인 완료
-        setMasterUser(masterUser);
-      }
-
-      router.push(redirectTo);
-      router.refresh();
-    } catch {
-      setStep("otp");
-      setError("인증 처리 중 오류가 발생했습니다.");
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  // Step 3: 닉네임 설정 후 완료
-  const handleSetNickname = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const trimmed = nickname.trim();
-    if (!trimmed || trimmed.length < 2) {
-      setError("닉네임은 2자 이상 입력해주세요.");
-      return;
-    }
-    if (trimmed.length > 12) {
-      setError("닉네임은 12자 이하로 입력해주세요.");
-      return;
-    }
-    setIsSubmitting(true);
-    setStep("loading");
-    try {
-      // im-core-auth에 닉네임 저장
-      await fetch("/api/auth/sync", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          masterUserId: pendingUser?.masterUserId,
-          name: trimmed,
-        }),
-      });
-
-      // 최신 유저 정보 로드
-      const meRes = await fetch("/api/auth/me");
-      if (meRes.ok) {
-        const meData = await meRes.json();
-        setMasterUser(meData.user as MasterUser);
-      }
-
-      router.push(redirectTo);
-      router.refresh();
-    } catch {
-      setStep("nickname");
-      setError("닉네임 저장 중 오류가 발생했습니다. 다시 시도해주세요.");
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  // OTP 입력 칸 처리
-  const handleOtpChange = (index: number, value: string) => {
-    const digit = value.replace(/\D/g, "").slice(-1);
-    const newOtp = [...otp];
-    newOtp[index] = digit;
-    setOtp(newOtp);
-
-    if (digit && index < 5) {
-      otpRefs.current[index + 1]?.focus();
-    }
-  };
-
-  const handleOtpKeyDown = (index: number, e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Backspace" && !otp[index] && index > 0) {
-      otpRefs.current[index - 1]?.focus();
-    }
-  };
-
-  const handleOtpPaste = (e: React.ClipboardEvent) => {
-    e.preventDefault();
-    const pasted = e.clipboardData.getData("text").replace(/\D/g, "").slice(0, 6);
-    const newOtp = ["", "", "", "", "", ""];
-    pasted.split("").forEach((char, i) => {
-      if (i < 6) newOtp[i] = char;
-    });
-    setOtp(newOtp);
-    const nextEmpty = pasted.length < 6 ? pasted.length : 5;
-    otpRefs.current[nextEmpty]?.focus();
-  };
-
-  const handleResend = () => {
-    setOtp(["", "", "", "", "", ""]);
-    setError("");
-    setStep("phone");
-  };
-
-  // ── 이메일 로그인 ──────────────────────────────────────────
-  const [loginMode, setLoginMode] = useState<"phone" | "email">("email");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-
+  // 관리자 이메일 로그인
   const handleEmailLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
     setIsSubmitting(true);
-    setStep("loading");
     try {
       const { data, error: signInError } = await supabase.auth.signInWithPassword({
         email,
-        password,
+        password: adminPassword,
       });
       if (signInError || !data.user) {
-        setStep("phone");
         setError(signInError?.message || "이메일 또는 비밀번호가 올바르지 않습니다.");
         return;
       }
-      // 이메일 유저도 /api/auth/me로 마스터유저 정보 로드
       const meRes = await fetch("/api/auth/me");
       if (meRes.ok) {
         const meData = await meRes.json();
         setMasterUser(meData.user as MasterUser);
       }
-      
-      // 관리자 이메일 계정이거나 mode=admin 인 경우 어드민 화면으로 바로 리다이렉트
-      let targetUrl = redirectTo;
       const isAdminEmail = data.user.email?.startsWith("admin") || data.user.email === "admin@immodel.kr";
-      if (isAdminEmail && redirectTo === "/") {
-        targetUrl = "/admin";
-      }
-
-      router.push(targetUrl);
+      router.push(isAdminEmail && redirectTo === "/" ? "/admin" : redirectTo);
       router.refresh();
     } catch {
-      setStep("phone");
       setError("네트워크 오류가 발생했습니다. 다시 시도해주세요.");
     } finally {
       setIsSubmitting(false);
@@ -293,317 +525,174 @@ function LoginForm() {
 
   return (
     <>
-      {/* 로딩 상태 */}
-      {step === "loading" && (
-        <div className="login-loading">
-          <div className="login-spinner" />
-          <p>로그인 처리 중...</p>
+      {showFindNickname && <FindNicknameModal onClose={() => setShowFindNickname(false)} />}
+      {showResetPassword && <ResetPasswordModal onClose={() => setShowResetPassword(false)} />}
+
+      {/* 로그인 모드 탭 (관리자용 이메일 전환) */}
+      {mode === "admin" && (
+        <div style={{
+          display: "flex", gap: 0, marginBottom: "1.5rem",
+          borderRadius: "12px", overflow: "hidden",
+          border: "1px solid rgba(219,39,119,0.2)",
+        }}>
+          <button type="button"
+            onClick={() => { setLoginMode("nickname"); setError(""); }}
+            style={{
+              flex: 1, padding: "0.75rem", fontSize: "0.875rem", fontWeight: 600,
+              border: "none", cursor: "pointer",
+              background: loginMode === "nickname" ? "linear-gradient(135deg,#db2777,#9333ea)" : "transparent",
+              color: loginMode === "nickname" ? "#fff" : "#9ca3af", transition: "all 0.2s",
+            }}
+          >👤 닉네임 로그인</button>
+          <button type="button"
+            onClick={() => { setLoginMode("email"); setError(""); }}
+            style={{
+              flex: 1, padding: "0.75rem", fontSize: "0.875rem", fontWeight: 600,
+              border: "none", cursor: "pointer",
+              background: loginMode === "email" ? "linear-gradient(135deg,#db2777,#9333ea)" : "transparent",
+              color: loginMode === "email" ? "#fff" : "#9ca3af", transition: "all 0.2s",
+            }}
+          >✉️ 관리자 이메일</button>
         </div>
       )}
 
-      {/* Step 3: 닉네임 설정 (신규 회원 전용) */}
-      {step === "nickname" && (
-        <form onSubmit={handleSetNickname} className="login-form">
+      {/* 이메일 로그인 폼 (관리자) */}
+      {loginMode === "email" ? (
+        <form onSubmit={handleEmailLogin} className="login-form">
           <div className="login-form-header">
-            <div style={{ fontSize: "2rem", marginBottom: "0.5rem" }}>🎉</div>
-            <h2>환영합니다!</h2>
-            <p>사용할 닉네임을 설정해 주세요.<br/>모카, IMFF 앱과 함께 사용됩니다.</p>
+            <h2>관리자 로그인</h2>
+            <p>관리자 이메일과 비밀번호를 입력하세요</p>
           </div>
+          <div className="login-field">
+            <label htmlFor="email">이메일</label>
+            <input id="email" type="email" placeholder="admin@immodel.kr"
+              value={email} onChange={(e) => setEmail(e.target.value)}
+              className="login-input" autoFocus required />
+          </div>
+          <div className="login-field">
+            <label htmlFor="admin-password">비밀번호</label>
+            <input id="admin-password" type="password" placeholder="비밀번호 입력"
+              value={adminPassword} onChange={(e) => setAdminPassword(e.target.value)}
+              className="login-input" required />
+          </div>
+          {error && <p className="login-error">{error}</p>}
+          <button type="submit" className="login-btn" disabled={isSubmitting}>
+            {isSubmitting ? "로그인 중..." : "로그인"}
+          </button>
+        </form>
+      ) : (
+        /* 닉네임 + 비밀번호 로그인 폼 */
+        <form onSubmit={handleNicknameLogin} className="login-form">
+          <div className="login-form-header">
+            <h2>로그인</h2>
+            <p>닉네임과 비밀번호를 입력해주세요</p>
+          </div>
+
           <div className="login-field">
             <label htmlFor="nickname">닉네임</label>
             <input
               id="nickname"
               type="text"
-              placeholder="2~12자 닉네임 입력"
+              placeholder="가입 시 등록한 닉네임"
               value={nickname}
               onChange={(e) => setNickname(e.target.value)}
               className="login-input"
-              autoFocus
-              maxLength={12}
-              required
-            />
-            <span style={{ fontSize: "0.75rem", color: "var(--mb-gray-400)", marginTop: "0.25rem", display: "block" }}>
-              {nickname.length}/12자 · 나중에 마이페이지에서 변경할 수 있어요
-            </span>
-          </div>
-          {error && <p className="login-error">{error}</p>}
-          <button
-            type="submit"
-            className="login-btn"
-            disabled={isSubmitting || nickname.trim().length < 2}
-          >
-            {isSubmitting ? "저장 중..." : "가입 완료 →"}
-          </button>
-        </form>
-      )}
-
-      {/* 로그인 모드 탭 — phone/email 선택 (nickname step 또는 회원가입 모드에서는 숨김) */}
-      {step !== "loading" && step !== "otp" && step !== "nickname" && mode !== "signup" && (
-        <div style={{
-          display: "flex",
-          gap: "0",
-          marginBottom: "1.5rem",
-          borderRadius: "12px",
-          overflow: "hidden",
-          border: "1px solid rgba(219,39,119,0.2)",
-        }}>
-          <button
-            type="button"
-            onClick={() => { setLoginMode("email"); setError(""); }}
-            style={{
-              flex: 1,
-              padding: "0.75rem",
-              fontSize: "0.875rem",
-              fontWeight: 600,
-              border: "none",
-              cursor: "pointer",
-              background: loginMode === "email" ? "linear-gradient(135deg,#db2777,#9333ea)" : "transparent",
-              color: loginMode === "email" ? "#fff" : "#9ca3af",
-              transition: "all 0.2s",
-            }}
-          >✉️ 이메일 로그인</button>
-          <button
-            type="button"
-            onClick={() => { setLoginMode("phone"); setError(""); }}
-            style={{
-              flex: 1,
-              padding: "0.75rem",
-              fontSize: "0.875rem",
-              fontWeight: 600,
-              border: "none",
-              cursor: "pointer",
-              background: loginMode === "phone" ? "linear-gradient(135deg,#db2777,#9333ea)" : "transparent",
-              color: loginMode === "phone" ? "#fff" : "#9ca3af",
-              transition: "all 0.2s",
-            }}
-          >⚡ 휴대폰 간편 로그인/가입</button>
-        </div>
-      )}
-
-      {/* 이메일 로그인 폼 */}
-      {step !== "loading" && step !== "otp" && step !== "nickname" && loginMode === "email" && (
-        <form onSubmit={handleEmailLogin} className="login-form">
-          <div className="login-form-header">
-            <h2>이메일로 로그인</h2>
-            <p>이메일과 비밀번호를 입력하세요</p>
-          </div>
-          <div className="login-field">
-            <label htmlFor="email">이메일</label>
-            <input
-              id="email"
-              type="email"
-              placeholder="admin@immodel.kr"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="login-input"
-              autoComplete="email"
+              autoComplete="username"
               autoFocus
               required
             />
           </div>
+
           <div className="login-field">
             <label htmlFor="password">비밀번호</label>
-            <input
-              id="password"
-              type="password"
-              placeholder="비밀번호 입력"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="login-input"
-              autoComplete="current-password"
-              required
-            />
-          </div>
-          {error && <p className="login-error">{error}</p>}
-          <button
-            type="submit"
-            className="login-btn"
-            disabled={isSubmitting}
-          >
-            {isSubmitting ? "로그인 중..." : "로그인"}
-          </button>
-
-          <div style={{ textAlign: "center", fontSize: "0.875rem", borderTop: "1px solid var(--mb-gray-100)", paddingTop: "1rem", marginTop: "1rem" }}>
-            <div style={{ color: "var(--mb-gray-500)" }}>
-              일반 회원이신가요?{" "}
-              <button
-                type="button"
-                onClick={() => {
-                  setError("");
-                  setLoginMode("phone");
-                  router.push("/login");
-                }}
-                style={{
-                  background: "none", border: "none", color: "var(--mb-pink-500)",
-                  fontWeight: 700, cursor: "pointer", padding: 0, textDecoration: "underline"
-                }}
-              >
-                휴대폰 번호로 간편 가입/로그인하기
-              </button>
-            </div>
-          </div>
-        </form>
-      )}
-
-      {/* Step 1: 전화번호 입력 */}
-      {step === "phone" && loginMode === "phone" && (
-        <form onSubmit={handleSendOtp} className="login-form">
-          <div className="login-form-header">
-            <h2>{mode === "signup" ? "10초 간편 회원가입" : "전화번호로 로그인"}</h2>
-            <p>
-              {mode === "signup" 
-                ? "휴대폰 번호만 있으면 10초 만에 가입 완료!" 
-                : "인증번호를 문자로 보내드립니다"}
-            </p>
-          </div>
-
-          <div className="login-field">
-            <label htmlFor="phone">전화번호</label>
             <div className="login-input-wrap">
-              <span className="login-input-prefix">🇰🇷 +82</span>
               <input
-                id="phone"
-                type="tel"
-                inputMode="numeric"
-                placeholder="010-0000-0000"
-                value={phone}
-                onChange={(e) => setPhone(formatPhone(e.target.value))}
-                className="login-input login-input-phone"
-                autoComplete="tel"
-                autoFocus
+                id="password"
+                type={showPassword ? "text" : "password"}
+                placeholder="비밀번호를 입력하세요"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="login-input"
+                autoComplete="current-password"
                 required
               />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                style={{
+                  position: "absolute", right: "0.75rem", top: "50%", transform: "translateY(-50%)",
+                  background: "none", border: "none", cursor: "pointer",
+                  color: "var(--mb-gray-400)", fontSize: "0.875rem", padding: "0.25rem",
+                }}
+              >
+                {showPassword ? "숨기기" : "보기"}
+              </button>
             </div>
           </div>
 
           {error && <p className="login-error">{error}</p>}
 
-          <button
-            type="submit"
-            className="login-btn-primary"
-            disabled={isSubmitting || phone.replace(/\D/g, "").length < 10}
-          >
-            {isSubmitting ? (
-              <span className="login-btn-spinner" />
-            ) : (
-              mode === "signup" ? "인증번호 받고 가입하기" : "인증번호 받기"
-            )}
+          <button type="submit" className="login-btn-primary" disabled={isSubmitting}>
+            {isSubmitting ? <span className="login-btn-spinner" /> : "로그인"}
           </button>
 
-          <p className="login-notice" style={{ marginBottom: "1rem" }}>
-            {mode === "signup" ? "가입" : "로그인"} 시 <span>이용약관</span> 및 <span>개인정보처리방침</span>에 동의하게 됩니다
-          </p>
-
-          <div style={{ textAlign: "center", fontSize: "0.875rem", borderTop: "1px solid var(--mb-gray-100)", paddingTop: "1rem", marginTop: "0.5rem" }}>
-            {mode === "signup" ? (
-              <div style={{ color: "var(--mb-gray-500)" }}>
-                이미 계정이 있으신가요?{" "}
-                <button
-                  type="button"
-                  onClick={() => {
-                    setError("");
-                    setPhone("");
-                    router.push("/login");
-                  }}
-                  style={{
-                    background: "none", border: "none", color: "var(--mb-pink-500)",
-                    fontWeight: 700, cursor: "pointer", padding: 0, textDecoration: "underline"
-                  }}
-                >
-                  로그인하기
-                </button>
-              </div>
-            ) : (
-              <div style={{ color: "var(--mb-gray-500)", display: "flex", flexDirection: "column", gap: "0.5rem", alignItems: "center" }}>
-                <div>
-                  아직 회원이 아니신가요?{" "}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setError("");
-                      setPhone("");
-                      router.push("/login?mode=signup");
-                    }}
-                    style={{
-                      background: "none", border: "none", color: "var(--mb-pink-500)",
-                      fontWeight: 700, cursor: "pointer", padding: 0, textDecoration: "underline"
-                    }}
-                  >
-                    10초 회원가입하기
-                  </button>
-                </div>
-                 <div style={{ fontSize: "0.8125rem", marginTop: "0.25rem" }}>
-                  이메일 계정으로 로그인하시겠습니까?{" "}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setError("");
-                      setLoginMode("email");
-                      router.push("/login");
-                    }}
-                    style={{
-                      background: "none", border: "none", color: "var(--mb-gray-500)",
-                      fontWeight: 700, cursor: "pointer", padding: 0, textDecoration: "underline"
-                    }}
-                  >
-                    이메일 로그인 바로가기
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-        </form>
-      )}
-
-      {/* Step 2: OTP 입력 */}
-      {step === "otp" && (
-        <form onSubmit={handleVerifyOtp} className="login-form">
-          <div className="login-form-header">
-            <h2>인증번호 입력</h2>
-            <p>
-              <strong>{phone}</strong>으로 발송된
-              <br />6자리 인증번호를 입력해주세요
-            </p>
+          {/* 닉네임 찾기 / 비밀번호 재설정 */}
+          <div style={{
+            display: "flex", alignItems: "center", justifyContent: "center",
+            gap: 0, marginTop: "0.5rem",
+          }}>
+            <button
+              type="button"
+              onClick={() => setShowFindNickname(true)}
+              style={{
+                background: "none", border: "none", cursor: "pointer",
+                color: "var(--mb-gray-500)", fontWeight: 600, fontSize: "0.8125rem",
+                padding: "0.25rem 0.75rem 0.25rem 0",
+                borderRight: "1px solid var(--mb-gray-200)",
+              }}
+            >
+              닉네임 찾기
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowResetPassword(true)}
+              style={{
+                background: "none", border: "none", cursor: "pointer",
+                color: "var(--mb-gray-500)", fontWeight: 600, fontSize: "0.8125rem",
+                padding: "0.25rem 0 0.25rem 0.75rem",
+              }}
+            >
+              비밀번호 찾기
+            </button>
           </div>
 
-          <div className="login-otp-wrap">
-            {otp.map((digit, i) => (
-              <input
-                key={i}
-                ref={(el) => { otpRefs.current[i] = el; }}
-                type="text"
-                inputMode="numeric"
-                maxLength={1}
-                value={digit}
-                onChange={(e) => handleOtpChange(i, e.target.value)}
-                onKeyDown={(e) => handleOtpKeyDown(i, e)}
-                onPaste={i === 0 ? handleOtpPaste : undefined}
-                className={`login-otp-input ${digit ? "login-otp-filled" : ""}`}
-                autoComplete="one-time-code"
-              />
-            ))}
+          <div style={{
+            textAlign: "center", fontSize: "0.875rem",
+            borderTop: "1px solid var(--mb-gray-100)",
+            paddingTop: "1rem", marginTop: "1rem",
+            color: "var(--mb-gray-500)",
+          }}>
+            아직 회원이 아니신가요?{" "}
+            <Link href="/signup" style={{
+              color: "var(--mb-pink-500)", fontWeight: 700, textDecoration: "underline",
+            }}>
+              10초 회원가입
+            </Link>
           </div>
 
-          {error && <p className="login-error">{error}</p>}
-
-          <button
-            type="submit"
-            className="login-btn-primary"
-            disabled={isSubmitting || otp.join("").length !== 6}
-          >
-            {isSubmitting ? <span className="login-btn-spinner" /> : "확인"}
-          </button>
-
-          <div className="login-resend">
-            {countdown > 0 ? (
-              <p className="login-countdown">
-                <span>{countdown}초</span> 후 재전송 가능
-              </p>
-            ) : (
-              <button type="button" onClick={handleResend} className="login-resend-btn">
-                인증번호 재전송
-              </button>
-            )}
+          {/* 기존 OTP 가입자 안내 */}
+          <div style={{
+            background: "rgba(219,39,119,0.05)",
+            border: "1px solid rgba(219,39,119,0.15)",
+            borderRadius: "10px",
+            padding: "0.75rem 1rem",
+            fontSize: "0.75rem",
+            color: "var(--mb-gray-500)",
+            lineHeight: 1.6,
+          }}>
+            💡 <strong>기존 휴대폰 인증 가입자</strong>이신가요?<br />
+            비밀번호 찾기를 통해 비밀번호를 설정하면<br />
+            닉네임으로 간편하게 로그인할 수 있습니다.
           </div>
         </form>
       )}
@@ -611,34 +700,22 @@ function LoginForm() {
   );
 }
 
-// 로그인 페이지 — Suspense로 useSearchParams 감싸기
+// ── 로그인 페이지 (Suspense 래퍼) ────────────────────────────
 export default function LoginPage() {
   return (
     <main className="login-page">
-      {/* 배경 장식 */}
       <div className="login-bg-blob login-bg-blob-1" />
       <div className="login-bg-blob login-bg-blob-2" />
       <div className="login-bg-blob login-bg-blob-3" />
 
       <div className="login-card">
-        {/* 로고 영역 */}
+        {/* 로고 */}
         <div className="login-logo-wrap">
           <div className="login-logo-icon">
             <svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
               <circle cx="16" cy="16" r="16" fill="url(#mb-g1)" />
-              <path
-                d="M9 22 L16 10 L23 22"
-                stroke="white"
-                strokeWidth="2.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-              <path
-                d="M11.5 18 H20.5"
-                stroke="white"
-                strokeWidth="2"
-                strokeLinecap="round"
-              />
+              <path d="M9 22 L16 10 L23 22" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+              <path d="M11.5 18 H20.5" stroke="white" strokeWidth="2" strokeLinecap="round" />
               <defs>
                 <linearGradient id="mb-g1" x1="0" y1="0" x2="32" y2="32" gradientUnits="userSpaceOnUse">
                   <stop stopColor="#e879a0" />
@@ -651,7 +728,6 @@ export default function LoginPage() {
           <p className="login-tagline">뷰티의 시작, 모델뷰티</p>
         </div>
 
-        {/* useSearchParams는 Suspense 경계 필요 */}
         <Suspense
           fallback={
             <div className="login-loading">

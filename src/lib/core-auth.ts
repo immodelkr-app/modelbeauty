@@ -37,6 +37,7 @@ export async function syncMasterUser(params: {
   appName: AppName;
   localUserId: string;
   name?: string;
+  realName?: string;
 }): Promise<MasterUser> {
   const res = await coreAuthFetch("/api/auth/sync", {
     method: "POST",
@@ -50,6 +51,73 @@ export async function syncMasterUser(params: {
 
   const data = await res.json();
   return data as MasterUser;
+}
+
+/**
+ * 닉네임 사용 가능 여부 확인 (im-core-auth 통합 DB 조회)
+ * 회원가입 시 실시간 중복 확인용
+ */
+export async function checkNicknameAvailable(nickname: string): Promise<boolean> {
+  const res = await coreAuthFetch(
+    `/api/auth/check-nickname?nickname=${encodeURIComponent(nickname)}`
+  );
+  if (!res.ok) return false;
+  const data = await res.json();
+  return data.available === true;
+}
+
+/**
+ * 닉네임으로 마스터 유저 조회
+ * 로그인 시 닉네임 → 휴대폰번호 변환용
+ */
+export async function getMasterUserByNickname(
+  nickname: string
+): Promise<{ masterUserId: string; phoneNumber: string } | null> {
+  const res = await coreAuthFetch(
+    `/api/auth/user/nickname/${encodeURIComponent(nickname)}`
+  );
+  if (res.status === 200) {
+    const data = await res.json();
+    if (data.found) {
+      return { masterUserId: data.masterUserId, phoneNumber: data.phoneNumber };
+    }
+  }
+  return null;
+}
+
+/**
+ * 실명 + 휴대폰번호로 닉네임 찾기
+ */
+export async function findNicknameByRealNameAndPhone(
+  realName: string,
+  phoneNumber: string
+): Promise<string | null> {
+  const res = await coreAuthFetch("/api/auth/find-nickname", {
+    method: "POST",
+    body: JSON.stringify({ realName, phoneNumber }),
+  });
+  if (!res.ok) return null;
+  const data = await res.json();
+  return data.found ? data.nickname : null;
+}
+
+/**
+ * 비밀번호 재설정 전 본인 확인
+ * 닉네임 + 실명 + 휴대폰번호 일치 시 localUserId 반환
+ */
+export async function verifyUserIdentity(params: {
+  nickname: string;
+  realName: string;
+  phoneNumber: string;
+  appName: AppName;
+}): Promise<{ localUserId: string; masterUserId: string } | null> {
+  const res = await coreAuthFetch("/api/auth/verify-user", {
+    method: "POST",
+    body: JSON.stringify(params),
+  });
+  if (!res.ok) return null;
+  const data = await res.json();
+  return data.found ? { localUserId: data.localUserId, masterUserId: data.masterUserId } : null;
 }
 
 /**

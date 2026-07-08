@@ -20,8 +20,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // ── 어드민 닉네임 하드코딩 예외 처리 ───────────────────────
+    const cleanNickname = nickname.trim();
+    if (cleanNickname === "어드민" || cleanNickname === "최고관리자") {
+      return NextResponse.json({ found: true, authEmail: "admin@modelbeauty.kr" }, { status: 200 });
+    }
+
     // im-core-auth에서 닉네임 → 마스터유저(휴대폰번호) 조회
-    const masterUser = await getMasterUserByNickname(nickname.trim());
+    const masterUser = await getMasterUserByNickname(cleanNickname);
 
     if (!masterUser) {
       return NextResponse.json({ found: false }, { status: 200 });

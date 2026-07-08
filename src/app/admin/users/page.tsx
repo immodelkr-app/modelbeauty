@@ -38,6 +38,7 @@ export default function AdminUsersPage() {
   // 모달 상세 정보
   const [selectedUser, setSelectedUser] = useState<UserDetail | null>(null);
   const [modalLoading, setModalLoading] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [showModal, setShowModal] = useState(false);
 
   useEffect(() => {
@@ -90,6 +91,33 @@ export default function AdminUsersPage() {
       console.error("상세 정보 조회 실패:", e);
     } finally {
       setModalLoading(false);
+    }
+  };
+
+  const handleDeleteUser = async (userId: string, userName: string | null) => {
+    const displayName = userName ? `"${userName}"` : "이 사용자";
+    const confirm1 = confirm(`${displayName} 회원을 강제로 탈퇴 처리하시겠습니까?\n이 작업은 Supabase 인증 계정을 삭제하며 되돌릴 수 없습니다.`);
+    if (!confirm1) return;
+
+    const confirm2 = confirm(`정말로 삭제하시겠습니까? 삭제 시 해당 회원은 로그인이 불가능해집니다.\n동의하시면 확인을 눌러주세요.`);
+    if (!confirm2) return;
+
+    setDeleting(true);
+    try {
+      const res = await fetch(`/api/admin/users/${userId}`, { method: "DELETE" });
+      const data = await res.json();
+      if (data.success) {
+        alert("✅ 회원이 성공적으로 강제 탈퇴 처리되었습니다.");
+        setShowModal(false);
+        fetchUsers();
+      } else {
+        alert(data.error ?? "회원 삭제 실패");
+      }
+    } catch (e) {
+      console.error("회원 탈퇴 요청 실패:", e);
+      alert("네트워크 오류가 발생했습니다.");
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -225,6 +253,35 @@ export default function AdminUsersPage() {
                       <span style={{ fontSize: "0.75rem", color: "#64748b", display: "block" }}>가입일시</span>
                       <span style={{ fontSize: "0.875rem", color: "#cbd5e1" }}>{formatDate(selectedUser.createdAt)}</span>
                     </div>
+                  </div>
+                  {/* 강제 탈퇴 위험 버튼 */}
+                  <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "0.75rem" }}>
+                    <button
+                      onClick={() => handleDeleteUser(selectedUser.id, selectedUser.name)}
+                      disabled={deleting}
+                      className="admin-btn-danger"
+                      style={{
+                        padding: "6px 14px",
+                        fontSize: "0.8125rem",
+                        borderRadius: "8px",
+                        cursor: deleting ? "not-allowed" : "pointer",
+                        border: "1px solid #ef4444",
+                        background: "rgba(239,68,68,0.1)",
+                        color: "#f87171",
+                        fontWeight: 600,
+                        transition: "all 0.2s"
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.background = "#ef4444";
+                        e.currentTarget.style.color = "#ffffff";
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = "rgba(239,68,68,0.1)";
+                        e.currentTarget.style.color = "#f87171";
+                      }}
+                    >
+                      {deleting ? "⏳ 탈퇴 처리 중..." : "🚫 회원 강제 탈퇴"}
+                    </button>
                   </div>
                 </section>
 

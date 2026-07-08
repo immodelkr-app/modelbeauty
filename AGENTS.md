@@ -18,3 +18,9 @@ This version has breaking changes — APIs, conventions, and file structure may 
 3. **신규 환경변수(Env) 등록 안내**
    - 새로운 기능(암호화 대칭키, 외부 API 등) 추가로 신규 환경변수가 도입될 경우, 사용자가 Vercel 설정에 즉시 등록할 수 있도록 변수명과 용도를 명확히 텍스트로 가이드하여 전달합니다.
 
+# 🗣️ 용어 및 소통 규칙 (Terminology Rules)
+
+1. **통합 인증 및 포인트 시스템 명칭**
+   - 프로젝트 내 통합 인증/포인트 서버를 가리키는 `im-core-auth`는 소통 시 **'아임모델 공화국'** (또는 '아임모델 광화국')으로 지칭하여 이야기합니다.
+
+

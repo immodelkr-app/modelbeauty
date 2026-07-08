@@ -429,51 +429,121 @@ export default function AdminUsersPage() {
                 )}
 
                 {/* 멤버십 등급 관리 */}
-                <section style={{ borderTop: "1px solid rgba(255,255,255,0.07)", paddingTop: "1rem" }}>
-                  <h4 style={{ fontSize: "0.875rem", fontWeight: 700, color: "#94a3b8", marginBottom: "0.75rem" }}>🏆 멤버십 등급 관리</h4>
+                <section style={{ borderTop: "1px solid rgba(255,255,255,0.07)", paddingTop: "1.25rem" }}>
+                  <h4 style={{ fontSize: "0.9375rem", fontWeight: 800, color: "#f1f5f9", marginBottom: "0.875rem", display: "flex", alignItems: "center", gap: "0.375rem" }}>
+                    <span>🏆</span> 멤버십 등급 관리
+                  </h4>
                   {membership ? (
-                    <div style={{ background: "rgba(15,23,42,0.6)", padding: "1rem", borderRadius: 10, border: "1px solid rgba(255,255,255,0.03)" }}>
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.75rem" }}>
-                        <div>
-                          <span style={{ fontSize: "1.5rem" }}>{membership.currentTier.badge_emoji}</span>
-                          <strong style={{ marginLeft: "0.5rem", fontSize: "1rem", color: "#f1f5f9" }}>{membership.currentTier.name}</strong>
-                          <span style={{ marginLeft: "0.5rem", fontSize: "0.8125rem", color: "#94a3b8" }}>(할인 {membership.currentTier.discount_rate}%)</span>
-                          {membership.isLocked && <span style={{ marginLeft: "0.5rem", fontSize: "0.75rem", background: "rgba(234,179,8,0.15)", color: "#fbbf24", padding: "2px 8px", borderRadius: 4 }}>🔒 잠금</span>}
+                    <div style={{ background: "rgba(15, 23, 42, 0.8)", padding: "1.25rem", borderRadius: 12, border: "1px solid rgba(255,255,255,0.06)" }}>
+                      {/* 현재 등급 표시 */}
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.25rem", borderBottom: "1px solid rgba(255,255,255,0.04)", paddingBottom: "0.875rem" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: "0.625rem" }}>
+                          <span style={{ fontSize: "1.75rem", lineHeight: 1 }}>{membership.currentTier.badge_emoji}</span>
+                          <div>
+                            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                              <strong style={{ fontSize: "1.0625rem", color: "#f8fafc", fontWeight: 800 }}>{membership.currentTier.name}</strong>
+                              <span style={{ fontSize: "0.8125rem", color: "#38bdf8", fontWeight: 700 }}>(할인 {membership.currentTier.discount_rate}%)</span>
+                            </div>
+                            <div style={{ marginTop: "0.125rem" }}>
+                              {membership.isLocked && (
+                                <span style={{ fontSize: "0.75rem", background: "rgba(234,179,8,0.2)", color: "#fbbf24", padding: "2px 8px", borderRadius: 6, fontWeight: 600 }}>
+                                  🔒 관리자 지정 등급 ({membership.lockReason || "잠금됨"})
+                                </span>
+                              )}
+                            </div>
+                          </div>
                         </div>
-                        <div style={{ fontSize: "0.8125rem", color: "#64748b" }}>
-                          6개월 구매액: <strong style={{ color: "#f1f5f9" }}>{membership.totalPurchasedLast6m.toLocaleString()}원</strong>
+                        <div style={{ fontSize: "0.875rem", color: "#94a3b8", textAlign: "right" }}>
+                          최근 6개월 누적 구매액: <strong style={{ color: "#ec4899", fontSize: "0.9375rem" }}>{membership.totalPurchasedLast6m.toLocaleString()}원</strong>
                         </div>
                       </div>
-                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
-                        <div className="admin-field">
-                          <label className="admin-label">등급 변경</label>
-                          <select className="admin-select" value={gradeForm.tierId} onChange={(e) => setGradeForm((p) => ({ ...p, tierId: e.target.value }))}>
+
+                      {/* 등급 설정 컨트롤 */}
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem", alignItems: "end" }}>
+                        <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+                          <label style={{ fontSize: "0.875rem", fontWeight: 700, color: "#cbd5e1" }}>등급 변경</label>
+                          <select
+                            value={gradeForm.tierId}
+                            onChange={(e) => setGradeForm((p) => ({ ...p, tierId: e.target.value }))}
+                            style={{
+                              width: "100%",
+                              height: "45px",
+                              padding: "0.5rem 1rem",
+                              fontSize: "0.9375rem",
+                              color: "#f8fafc",
+                              background: "#1e293b",
+                              border: "1px solid #475569",
+                              borderRadius: "8px",
+                              outline: "none",
+                              cursor: "pointer",
+                            }}
+                          >
                             {membership.allTiers.map((t) => (
-                              <option key={t.id} value={t.id}>{t.badge_emoji} {t.name}</option>
+                              <option key={t.id} value={t.id} style={{ background: "#1e293b", color: "#f8fafc" }}>
+                                {t.badge_emoji} {t.name}
+                              </option>
                             ))}
                           </select>
                         </div>
-                        <div className="admin-field">
-                          <label className="admin-label" style={{ display: "flex", alignItems: "center", gap: "0.5rem", cursor: "pointer" }}>
-                            <input type="checkbox" checked={gradeForm.isLocked} onChange={(e) => setGradeForm((p) => ({ ...p, isLocked: e.target.checked }))} />
-                            <span>등급 잠금 (자동 재산정 제외)</span>
+                        
+                        <div style={{ height: "45px", display: "flex", alignItems: "center" }}>
+                          <label style={{ display: "flex", alignItems: "center", gap: "0.625rem", cursor: "pointer", fontSize: "0.9375rem", color: "#cbd5e1", userSelect: "none" }}>
+                            <input
+                              type="checkbox"
+                              checked={gradeForm.isLocked}
+                              onChange={(e) => setGradeForm((p) => ({ ...p, isLocked: e.target.checked }))}
+                              style={{ width: "18px", height: "18px", cursor: "pointer" }}
+                            />
+                            <strong>등급 잠금 (자동 재산정 제외)</strong>
                           </label>
                         </div>
+
                         {gradeForm.isLocked && (
-                          <div className="admin-field" style={{ gridColumn: "1/-1" }}>
-                            <label className="admin-label">잠금 사유</label>
-                            <input className="admin-input" value={gradeForm.lockReason} onChange={(e) => setGradeForm((p) => ({ ...p, lockReason: e.target.value }))} placeholder="예) MOCA 골드 등급 연동" />
+                          <div style={{ gridColumn: "1/-1", display: "flex", flexDirection: "column", gap: "0.5rem", marginTop: "0.25rem" }}>
+                            <label style={{ fontSize: "0.875rem", fontWeight: 700, color: "#cbd5e1" }}>잠금 사유</label>
+                            <input
+                              type="text"
+                              value={gradeForm.lockReason}
+                              onChange={(e) => setGradeForm((p) => ({ ...p, lockReason: e.target.value }))}
+                              placeholder="예) MOCA 골드 회원 등급 연동"
+                              style={{
+                                width: "100%",
+                                height: "45px",
+                                padding: "0.5rem 1rem",
+                                fontSize: "0.9375rem",
+                                color: "#f8fafc",
+                                background: "#1e293b",
+                                border: "1px solid #475569",
+                                borderRadius: "8px",
+                                outline: "none",
+                              }}
+                            />
                           </div>
                         )}
                       </div>
-                      <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "0.75rem" }}>
-                        <button onClick={handleSaveGrade} disabled={savingGrade} className="admin-btn admin-btn-primary" style={{ fontSize: "0.8125rem" }}>
-                          {savingGrade ? "저장 중..." : "등급 저장"}
+
+                      {/* 저장 버튼 */}
+                      <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "1.25rem" }}>
+                        <button
+                          onClick={handleSaveGrade}
+                          disabled={savingGrade}
+                          className="admin-btn admin-btn-primary"
+                          style={{
+                            padding: "0.625rem 1.25rem",
+                            fontSize: "0.875rem",
+                            fontWeight: 700,
+                            borderRadius: "8px",
+                            cursor: "pointer",
+                          }}
+                        >
+                          {savingGrade ? "⏳ 저장 중..." : "💾 등급 저장"}
                         </button>
                       </div>
                     </div>
                   ) : (
-                    <div style={{ color: "#64748b", fontSize: "0.875rem", textAlign: "center", padding: "1rem" }}>등급 정보를 불러오는 중...</div>
+                    <div style={{ color: "#94a3b8", fontSize: "0.875rem", textAlign: "center", padding: "2rem", background: "rgba(15,23,42,0.4)", borderRadius: 12 }}>
+                      ⏳ 등급 정보를 불러오는 중...
+                    </div>
                   )}
                 </section>
 

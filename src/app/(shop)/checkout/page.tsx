@@ -72,9 +72,27 @@ export default function CheckoutPage() {
   const [pointInput, setPointInput] = useState("");
   const [appliedPoints, setAppliedPoints] = useState(0);
 
-  // 금액 계산
+  // 멤버십 등급 할인
+  const [membershipInfo, setMembershipInfo] = useState<{
+    currentTier: { id: string; name: string; badge_emoji: string; discount_rate: number };
+  } | null>(null);
+
+  useEffect(() => {
+    if (isLoggedIn && !authLoading) {
+      fetch("/api/membership")
+        .then((r) => r.json())
+        .then((res) => { if (res.success) setMembershipInfo(res.data); })
+        .catch(() => {});
+    }
+  }, [isLoggedIn, authLoading]);
+
+  // 메인 금액 계산
   const subtotal = checkoutItems.reduce((s, i) => s + i.subtotal, 0);
   const shippingFee = subtotal >= SHIPPING_FREE_THRESHOLD ? 0 : SHIPPING_FEE;
+
+  // 회원 등급 할인 (자동 적용)
+  const membershipDiscountRate = membershipInfo?.currentTier?.discount_rate ?? 0;
+  const membershipDiscount = membershipDiscountRate > 0 ? Math.floor(subtotal * (membershipDiscountRate / 100)) : 0;
 
   // 쿠폰 할인 계산
   let couponDiscount = 0;
@@ -92,10 +110,10 @@ export default function CheckoutPage() {
   // 포인트 할인 계산 (조건 A: 1만원 이상 구매 시, 상품 금액의 최대 30%까지 사용 가능)
   const maxAvailablePoints = masterUser?.integratedPoints ?? 0;
   const maxPointsAllowed = subtotal >= 10000 ? Math.floor(subtotal * 0.3) : 0;
-  const maxPointsToUse = Math.min(maxPointsAllowed, Math.max(0, subtotal - couponDiscount));
+  const maxPointsToUse = Math.min(maxPointsAllowed, Math.max(0, subtotal - membershipDiscount - couponDiscount));
   const actualPointDiscount = Math.min(appliedPoints, maxPointsToUse);
 
-  const finalTotal = Math.max(0, subtotal + shippingFee - actualPointDiscount - couponDiscount);
+  const finalTotal = Math.max(0, subtotal + shippingFee - membershipDiscount - actualPointDiscount - couponDiscount);
   const estimatedPoints = Math.floor(finalTotal * POINT_REWARD_RATE);
 
   // 비로그인 처리
@@ -613,6 +631,12 @@ export default function CheckoutPage() {
                   <span>배송비</span>
                   <span>{shippingFee === 0 ? <span style={{ color: "var(--mb-pink-500)" }}>무료</span> : fmt(shippingFee)}</span>
                 </div>
+                {membershipDiscount > 0 && membershipInfo && (
+                  <div style={{ display: "flex", justifyContent: "space-between", color: "#9333ea" }}>
+                    <span>🏆 {membershipInfo.currentTier.name} 등급 할인 ({membershipInfo.currentTier.discount_rate}%)</span>
+                    <span>-{fmt(membershipDiscount)}</span>
+                  </div>
+                )}
                 {couponDiscount > 0 && (
                   <div style={{ display: "flex", justifyContent: "space-between", color: "var(--mb-pink-600)" }}>
                     <span>쿠폰 할인</span><span>-{fmt(couponDiscount)}</span>

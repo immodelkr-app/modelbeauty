@@ -46,6 +46,15 @@ export default function MypagePage() {
   const [isSavingNickname, setIsSavingNickname] = useState(false);
   const [nicknameError, setNicknameError] = useState("");
 
+  // 멤버십 등급
+  const [membershipInfo, setMembershipInfo] = useState<{
+    currentTier: { id: string; name: string; badge_emoji: string; discount_rate: number; min_amount: number };
+    nextTier: { id: string; name: string; badge_emoji: string; min_amount: number } | null;
+    totalPurchasedLast6m: number;
+    amountToNextTier: number;
+    isLocked: boolean;
+  } | null>(null);
+
   // 주소 수정 상태
   const [isEditingAddress, setIsEditingAddress] = useState(false);
   const [addressState, setAddressState] = useState({
@@ -74,6 +83,11 @@ export default function MypagePage() {
         address: masterUser.shipping_address ?? "",
         detail: masterUser.shipping_detail ?? "",
       });
+      // 멤버십 등급 조회
+      fetch("/api/membership")
+        .then((r) => r.json())
+        .then((res) => { if (res.success) setMembershipInfo(res.data); })
+        .catch(() => {});
     }
   }, [masterUser]);
 
@@ -376,6 +390,52 @@ export default function MypagePage() {
           </Link>
         ))}
       </div>
+
+      {/* 멤버십 등급 배지 카드 */}
+      {membershipInfo && (
+        <div style={{
+          background: "linear-gradient(135deg, rgba(var(--mb-pink-rgb,236,72,153),0.08), rgba(168,85,247,0.06))",
+          border: "1px solid rgba(var(--mb-pink-rgb,236,72,153),0.18)",
+          borderRadius: 16, padding: "1.25rem 1.5rem",
+          marginBottom: "1.5rem", display: "flex", flexDirection: "column", gap: "0.75rem",
+        }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "0.625rem" }}>
+              <span style={{ fontSize: "2rem" }}>{membershipInfo.currentTier.badge_emoji}</span>
+              <div>
+                <div style={{ fontWeight: 800, fontSize: "1.0625rem" }}>{membershipInfo.currentTier.name} 등급</div>
+                <div style={{ fontSize: "0.8125rem", color: "var(--mb-gray-500)", marginTop: 2 }}>
+                  {membershipInfo.currentTier.discount_rate > 0
+                    ? `전 상품 ${membershipInfo.currentTier.discount_rate}% 할인 혜택`
+                    : "등급 현황을 유지하세요"}
+                </div>
+              </div>
+            </div>
+            {membershipInfo.nextTier && (
+              <div style={{ textAlign: "right", fontSize: "0.8125rem", color: "var(--mb-gray-500)" }}>
+                <div>다음 등급: <strong style={{ color: "var(--mb-gray-700)" }}>{membershipInfo.nextTier.badge_emoji} {membershipInfo.nextTier.name}</strong></div>
+                <div style={{ marginTop: 2 }}><strong style={{ color: "var(--mb-pink-500)" }}>{membershipInfo.amountToNextTier.toLocaleString()}원</strong> 더 구매하면 승급</div>
+              </div>
+            )}
+          </div>
+          {membershipInfo.nextTier && (
+            <div>
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.75rem", color: "var(--mb-gray-400)", marginBottom: 6 }}>
+                <span>6개월 구매액: {membershipInfo.totalPurchasedLast6m.toLocaleString()}원</span>
+                <span>{membershipInfo.nextTier.name} 목표: {membershipInfo.nextTier.min_amount.toLocaleString()}원</span>
+              </div>
+              <div style={{ height: 8, background: "rgba(0,0,0,0.08)", borderRadius: 99, overflow: "hidden" }}>
+                <div style={{
+                  height: "100%",
+                  width: `${Math.min(100, (membershipInfo.totalPurchasedLast6m / membershipInfo.nextTier.min_amount) * 100)}%`,
+                  background: "linear-gradient(90deg, var(--mb-pink-400), #a855f7)",
+                  borderRadius: 99, transition: "width 0.5s ease",
+                }} />
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* 내 주소 설정 카드 */}
       <div style={{

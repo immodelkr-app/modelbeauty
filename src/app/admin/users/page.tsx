@@ -16,6 +16,8 @@ interface UserSummary {
   masterUserId: string;
   createdAt: string;
   lastSignInAt: string | null;
+  tier: { id: string; name: string; badge_emoji: string; sort_order: number };
+  isLocked: boolean;
 }
 
 interface UserDetail extends UserSummary {
@@ -29,6 +31,16 @@ interface UserDetail extends UserSummary {
   _coreAuthOffline?: boolean;
 }
 
+interface MembershipInfo {
+  currentTier: { id: string; name: string; sort_order: number; discount_rate: number; badge_emoji: string; min_amount: number };
+  isLocked: boolean;
+  lockReason: string | null;
+  totalPurchasedLast6m: number;
+  nextTier: { id: string; name: string; min_amount: number; badge_emoji: string } | null;
+  amountToNextTier: number;
+  allTiers: { id: string; name: string; sort_order: number; badge_emoji: string }[];
+}
+
 export default function AdminUsersPage() {
   const [users, setUsers] = useState<UserSummary[]>([]);
   const [filteredUsers, setFilteredUsers] = useState<UserSummary[]>([]);
@@ -40,6 +52,11 @@ export default function AdminUsersPage() {
   const [modalLoading, setModalLoading] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [showModal, setShowModal] = useState(false);
+
+  // 멤버십 등급
+  const [membership, setMembership] = useState<MembershipInfo | null>(null);
+  const [savingGrade, setSavingGrade] = useState(false);
+  const [gradeForm, setGradeForm] = useState({ tierId: "normal", isLocked: false, lockReason: "" });
 
   useEffect(() => {
     fetchUsers();
@@ -81,16 +98,54 @@ export default function AdminUsersPage() {
     setModalLoading(true);
     setShowModal(true);
     setSelectedUser(null);
+    setMembership(null);
     try {
-      const res = await fetch(`/api/admin/users/${userId}`);
-      const data = await res.json();
-      if (data.success) {
-        setSelectedUser(data.user);
+      const [userRes, membershipRes] = await Promise.all([
+        fetch(`/api/admin/users/${userId}`),
+        fetch(`/api/admin/membership/${userId}`),
+      ]);
+      const userData = await userRes.json();
+      const membershipData = await membershipRes.json();
+      if (userData.success) setSelectedUser(userData.user);
+      if (membershipData.success) {
+        setMembership(membershipData.data);
+        setGradeForm({
+          tierId: membershipData.data.currentTier.id,
+          isLocked: membershipData.data.isLocked,
+          lockReason: membershipData.data.lockReason ?? "",
+        });
       }
     } catch (e) {
       console.error("상세 정보 조회 실패:", e);
     } finally {
       setModalLoading(false);
+    }
+  };
+
+  const handleSaveGrade = async () => {
+    if (!selectedUser) return;
+    setSavingGrade(true);
+    try {
+      const res = await fetch(`/api/admin/membership/${selectedUser.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          tierId: gradeForm.tierId,
+          isLocked: gradeForm.isLocked,
+          lockReason: gradeForm.lockReason || null,
+        }),
+      });
+      const result = await res.json();
+      if (result.success) {
+        alert("✅ 등급이 저장되었습니다.");
+        const membershipRes = await fetch(`/api/admin/membership/${selectedUser.id}`);
+        const membershipData = await membershipRes.json();
+        if (membershipData.success) setMembership(membershipData.data);
+      } else {
+        alert(result.error ?? "저장 실패");
+      }
+    } finally {
+      setSavingGrade(false);
     }
   };
 
@@ -173,19 +228,28 @@ export default function AdminUsersPage() {
             <tbody>
               {filteredUsers.map((u) => (
                 <tr key={u.id}>
-                  <td style={{ fontWeight: 700, color: "var(--mb-pink-500)" }}>{u.name || <span style={{ color: "var(--mb-gray-600)" }}>(미설정)</span>}</td>
+                  <td style={{ fontWeight: 700, color: "var(--mb-pink-500)" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                      {u.name || <span style={{ color: "var(--mb-gray-600)" }}>(미설정)</span>}
+                      <span style={{ fontSize: "0.75rem", background: "rgba(255,255,255,0.05)", padding: "2px 6px", borderRadius: "4px" }}>
+                        {u.tier.badge_emoji} {u.tier.name}
+                      </span>
+                    </div>
+                  </td>
                   <td>{u.email || <span style={{ color: "var(--mb-gray-600)" }}>-</span>}</td>
                   <td>{u.phone || <span style={{ color: "var(--mb-gray-600)" }}>-</span>}</td>
                   <td>{formatDate(u.createdAt)}</td>
                   <td>{formatDate(u.lastSignInAt)}</td>
                   <td>
-                    <button
-                      onClick={() => handleViewDetail(u.id)}
-                      className="admin-btn-primary"
-                      style={{ padding: "6px 12px", fontSize: "0.8125rem", borderRadius: "6px", cursor: "pointer" }}
-                    >
-                      상세 정보
-                    </button>
+                    <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
+                      <button
+                        onClick={() => handleViewDetail(u.id)}
+                        className="admin-btn-primary"
+                        style={{ padding: "6px 12px", fontSize: "0.8125rem", borderRadius: "6px", cursor: "pointer" }}
+                      >
+                        상세 정보
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -363,6 +427,55 @@ export default function AdminUsersPage() {
                     ⚠️ 현재 통합 인증 서버(im-core-auth)에 일시적으로 접속할 수 없어 실시간 포인트/쿠폰 내역 조회가 제한되었습니다.
                   </p>
                 )}
+
+                {/* 멤버십 등급 관리 */}
+                <section style={{ borderTop: "1px solid rgba(255,255,255,0.07)", paddingTop: "1rem" }}>
+                  <h4 style={{ fontSize: "0.875rem", fontWeight: 700, color: "#94a3b8", marginBottom: "0.75rem" }}>🏆 멤버십 등급 관리</h4>
+                  {membership ? (
+                    <div style={{ background: "rgba(15,23,42,0.6)", padding: "1rem", borderRadius: 10, border: "1px solid rgba(255,255,255,0.03)" }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.75rem" }}>
+                        <div>
+                          <span style={{ fontSize: "1.5rem" }}>{membership.currentTier.badge_emoji}</span>
+                          <strong style={{ marginLeft: "0.5rem", fontSize: "1rem", color: "#f1f5f9" }}>{membership.currentTier.name}</strong>
+                          <span style={{ marginLeft: "0.5rem", fontSize: "0.8125rem", color: "#94a3b8" }}>(할인 {membership.currentTier.discount_rate}%)</span>
+                          {membership.isLocked && <span style={{ marginLeft: "0.5rem", fontSize: "0.75rem", background: "rgba(234,179,8,0.15)", color: "#fbbf24", padding: "2px 8px", borderRadius: 4 }}>🔒 잠금</span>}
+                        </div>
+                        <div style={{ fontSize: "0.8125rem", color: "#64748b" }}>
+                          6개월 구매액: <strong style={{ color: "#f1f5f9" }}>{membership.totalPurchasedLast6m.toLocaleString()}원</strong>
+                        </div>
+                      </div>
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
+                        <div className="admin-field">
+                          <label className="admin-label">등급 변경</label>
+                          <select className="admin-select" value={gradeForm.tierId} onChange={(e) => setGradeForm((p) => ({ ...p, tierId: e.target.value }))}>
+                            {membership.allTiers.map((t) => (
+                              <option key={t.id} value={t.id}>{t.badge_emoji} {t.name}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div className="admin-field">
+                          <label className="admin-label" style={{ display: "flex", alignItems: "center", gap: "0.5rem", cursor: "pointer" }}>
+                            <input type="checkbox" checked={gradeForm.isLocked} onChange={(e) => setGradeForm((p) => ({ ...p, isLocked: e.target.checked }))} />
+                            <span>등급 잠금 (자동 재산정 제외)</span>
+                          </label>
+                        </div>
+                        {gradeForm.isLocked && (
+                          <div className="admin-field" style={{ gridColumn: "1/-1" }}>
+                            <label className="admin-label">잠금 사유</label>
+                            <input className="admin-input" value={gradeForm.lockReason} onChange={(e) => setGradeForm((p) => ({ ...p, lockReason: e.target.value }))} placeholder="예) MOCA 골드 등급 연동" />
+                          </div>
+                        )}
+                      </div>
+                      <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "0.75rem" }}>
+                        <button onClick={handleSaveGrade} disabled={savingGrade} className="admin-btn admin-btn-primary" style={{ fontSize: "0.8125rem" }}>
+                          {savingGrade ? "저장 중..." : "등급 저장"}
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div style={{ color: "#64748b", fontSize: "0.875rem", textAlign: "center", padding: "1rem" }}>등급 정보를 불러오는 중...</div>
+                  )}
+                </section>
 
               </div>
             ) : (

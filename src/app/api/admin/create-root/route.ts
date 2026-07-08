@@ -10,7 +10,7 @@ export async function GET() {
     // 1. 일반 서버 클라이언트 생성 (Anon Key 기반)
     const supabase = await createSupabaseServerClient();
 
-    const email = "admin@modelbeauty.kr";
+    const email = "admin@immodel.kr";
     const password = "kimday@9674";
 
     // 2. 일반 회원가입 실행 (비밀번호 Bcrypt 암호화는 Supabase Auth 서버가 보증 및 자동 처리)

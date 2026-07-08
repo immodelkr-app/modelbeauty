@@ -82,6 +82,7 @@ export default function LiveRoomClient({ initialStream, initialChats }: LiveRoom
 
   const chatEndRef = useRef<HTMLDivElement>(null);
   const heartsContainerRef = useRef<HTMLDivElement>(null);
+  const chatPaneRef = useRef<HTMLDivElement>(null);
 
   // ── 대기 화면 카운트다운 타이머 ────────────────────────────────
   const [countdown, setCountdown] = useState<{ days: number; hours: number; mins: number; secs: number } | null>(null);
@@ -177,6 +178,37 @@ export default function LiveRoomClient({ initialStream, initialChats }: LiveRoom
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [chats]);
+
+  // ── 모바일 키보드 대응 (visualViewport) ────────────────────────
+  // 키보드가 올라올 때 채팅 입력란이 가려지지 않도록 뷰포트 높이를 동적으로 조절
+  useEffect(() => {
+    const vv = window.visualViewport;
+    if (!vv) return;
+
+    const handleResize = () => {
+      if (chatPaneRef.current) {
+        // 키보드가 올라오면 남은 뷰포트 높이를 채팅 패널에 반영
+        const availableHeight = vv.height;
+        chatPaneRef.current.style.height = `${availableHeight}px`;
+        // 최신 채팅 메시지로 스크롤
+        chatEndRef.current?.scrollIntoView({ behavior: "instant" });
+      }
+    };
+
+    const handleScroll = () => {
+      if (chatPaneRef.current) {
+        chatPaneRef.current.style.top = `${vv.offsetTop}px`;
+      }
+    };
+
+    vv.addEventListener("resize", handleResize);
+    vv.addEventListener("scroll", handleScroll);
+
+    return () => {
+      vv.removeEventListener("resize", handleResize);
+      vv.removeEventListener("scroll", handleScroll);
+    };
+  }, []);
 
   // ── 채팅 메시지 전송 ──────────────────────────────────────
   const handleSendChat = async (e: React.FormEvent) => {
@@ -633,7 +665,7 @@ export default function LiveRoomClient({ initialStream, initialChats }: LiveRoom
         </div>
 
         {/* 오른쪽: 채팅 패널 */}
-        <div className="liveroom-chat-pane" style={{ position: "relative" }}>
+        <div ref={chatPaneRef} className="liveroom-chat-pane" style={{ position: "relative" }}>
           {/* 장바구니 담기 토스트 */}
           {cartToasts.length > 0 && (
             <div className="cart-toast-container">
@@ -1405,24 +1437,119 @@ export default function LiveRoomClient({ initialStream, initialChats }: LiveRoom
         }
 
         @media (max-width: 768px) {
+          /* ── 모바일 전용 레이아웃: 비디오 sticky 고정 + 채팅 독립 스크롤 ── */
+
+          .liveroom-root {
+            padding: 0;
+            min-height: 100dvh;
+            align-items: flex-start;
+          }
+
           .liveroom-container {
             flex-direction: column;
-            height: auto;
+            height: 100dvh;
+            max-height: 100dvh;
+            border-radius: 0;
+            overflow: hidden;
           }
+
+          /* 비디오 패널: sticky로 상단 고정 */
           .liveroom-video-pane {
+            flex: none;
             border-right: none;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+            position: sticky;
+            top: 0;
+            z-index: 10;
+            /* 영상 높이를 화면의 42%로 제한 */
+            height: 42dvh;
+            min-height: 200px;
+            max-height: 280px;
           }
+
+          /* 비디오 래퍼는 남은 공간 모두 차지 (stream-detail-info 제외) */
+          .liveroom-video-pane .video-player-wrapper {
+            flex: 1;
+            min-height: 0;
+          }
+
+          /* 스트리머 정보: 컴팩트하게 */
+          .stream-detail-info {
+            padding: 0.5rem 1rem;
+            flex-shrink: 0;
+          }
+          .stream-streamer-avatar {
+            width: 30px;
+            height: 30px;
+            font-size: 1.1rem;
+          }
+          .streamer-name {
+            font-size: 0.8125rem;
+          }
+          .stream-description {
+            font-size: 0.75rem;
+            margin-top: 1px;
+            display: -webkit-box;
+            -webkit-line-clamp: 1;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+          }
+
+          /* 채팅 패널: 남은 전체 높이 사용, 내부 스크롤 */
+          .liveroom-chat-pane {
+            flex: 1;
+            min-height: 0;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+          }
+
+          /* 채팅 메시지 영역: flex로 남은 공간 채움 */
           .chat-messages-box {
-            height: 250px;
+            flex: 1;
+            height: auto;
+            min-height: 0;
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
+            padding: 0.75rem 1rem;
           }
+
+          /* 채팅 입력란: 패널 하단에 sticky */
+          .chat-input-bar {
+            flex-shrink: 0;
+            position: sticky;
+            bottom: 0;
+            padding: 0.625rem 0.875rem;
+            padding-bottom: max(0.625rem, env(safe-area-inset-bottom));
+            z-index: 20;
+          }
+
+          /* 채팅 헤더: 컴팩트 */
+          .chat-header {
+            padding: 0.625rem 1rem;
+            flex-shrink: 0;
+          }
+          .chat-header h3 {
+            font-size: 0.8125rem;
+          }
+
+          /* 상품 오버레이: 모바일 전체 너비 */
           .floating-live-product-wrap {
-            width: calc(100% - 3rem);
-            left: 1.5rem;
-            bottom: 1.5rem;
+            width: calc(100% - 1.5rem);
+            left: 0.75rem;
+            bottom: 0.75rem;
           }
           .featured-product-overlay-card {
             width: 100%;
+          }
+
+          /* 좋아요 버튼: 비디오 영역 내 위치 조정 */
+          .floating-like-btn {
+            bottom: 0.75rem;
+            right: 0.75rem;
+            width: 40px;
+            height: 40px;
+            font-size: 1.25rem;
           }
         }
 

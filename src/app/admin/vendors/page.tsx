@@ -15,6 +15,7 @@ interface Vendor {
   account_holder: string | null;
   default_cost_type: "rate" | "fixed";
   default_cost_rate: number;
+  default_cost_price: number;
   note: string | null;
   is_active: boolean;
   created_at: string;
@@ -32,6 +33,7 @@ const EMPTY_FORM = {
   accountHolder: "",
   defaultCostType: "rate" as "rate" | "fixed",
   defaultCostRate: 0,
+  defaultCostPrice: 0,
   note: "",
   isActive: true,
 };
@@ -80,6 +82,7 @@ export default function AdminVendorsPage() {
       accountHolder: v.account_holder ?? "",
       defaultCostType: v.default_cost_type,
       defaultCostRate: v.default_cost_rate,
+      defaultCostPrice: v.default_cost_price ?? 0,
       note: v.note ?? "",
       isActive: v.is_active,
     });
@@ -190,7 +193,9 @@ export default function AdminVendorsPage() {
                           원가율 {v.default_cost_rate}%
                         </span>
                       ) : (
-                        <span style={{ color: "#7c3aed", fontWeight: 700 }}>고정 공급가</span>
+                        <span style={{ color: "#7c3aed", fontWeight: 700 }}>
+                          공급가 {(v.default_cost_price ?? 0).toLocaleString()}원
+                        </span>
                       )}
                     </td>
                     <td style={{ fontSize: "0.8rem" }}>
@@ -301,10 +306,18 @@ export default function AdminVendorsPage() {
                       </label>
                     </div>
                   </div>
-                  {form.defaultCostType === "rate" && (
+                  {form.defaultCostType === "rate" ? (
                     <div className="admin-field" style={{ marginTop: "0.5rem" }}>
                       <label className="admin-label">기본 원가율 (%)</label>
                       <input className="admin-input" type="number" min={0} max={100} step={0.1} value={form.defaultCostRate} onChange={e => setF("defaultCostRate", parseFloat(e.target.value) || 0)} style={{ maxWidth: 160 }} />
+                      <p style={{ fontSize: "0.75rem", color: "#6b7280", marginTop: 4 }}>
+                        상품 등록 시 이 값이 자동 입력됩니다. 상품별로 개별 조정 가능합니다.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="admin-field" style={{ marginTop: "0.5rem" }}>
+                      <label className="admin-label">기본 고정 공급가 (원)</label>
+                      <input className="admin-input" type="number" min={0} value={form.defaultCostPrice} onChange={e => setF("defaultCostPrice", parseInt(e.target.value, 10) || 0)} style={{ maxWidth: 160 }} />
                       <p style={{ fontSize: "0.75rem", color: "#6b7280", marginTop: 4 }}>
                         상품 등록 시 이 값이 자동 입력됩니다. 상품별로 개별 조정 가능합니다.
                       </p>

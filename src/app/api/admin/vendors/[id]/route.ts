@@ -28,6 +28,7 @@ export async function PUT(
       accountHolder,
       defaultCostType,
       defaultCostRate,
+      defaultCostPrice,
       note,
       isActive,
     } = body;
@@ -44,6 +45,7 @@ export async function PUT(
     if (accountHolder !== undefined) updateData.account_holder = accountHolder?.trim() || null;
     if (defaultCostType !== undefined) updateData.default_cost_type = defaultCostType;
     if (defaultCostRate !== undefined) updateData.default_cost_rate = Number(defaultCostRate);
+    if (defaultCostPrice !== undefined) updateData.default_cost_price = Number(defaultCostPrice);
     if (note !== undefined) updateData.note = note?.trim() || null;
     if (isActive !== undefined) updateData.is_active = isActive;
     updateData.updated_at = new Date().toISOString();

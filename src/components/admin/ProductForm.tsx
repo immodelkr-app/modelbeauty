@@ -9,7 +9,7 @@ import { useRouter } from "next/navigation";
 
 interface Category { id: string; name: string; }
 interface Crew { id: string; name: string; nickname: string; }
-interface Vendor { id: string; name: string; default_cost_type: string; default_cost_rate: number; }
+interface Vendor { id: string; name: string; default_cost_type: string; default_cost_rate: number; default_cost_price: number; }
 
 export interface ProductFormData {
   name: string;
@@ -207,6 +207,7 @@ export default function ProductForm({ productId, initialData, onSuccess }: Produ
                   if (v) {
                     set("vendorCostType", v.default_cost_type);
                     set("vendorCostRate", String(v.default_cost_rate));
+                    set("vendorSupplyPrice", String(v.default_cost_price ?? 0));
                   }
                 }
               }}
@@ -214,7 +215,7 @@ export default function ProductForm({ productId, initialData, onSuccess }: Produ
               <option value="">업체 없음 (자사 상품)</option>
               {vendors.map((v) => (
                 <option key={v.id} value={v.id}>
-                  {v.name} ({v.default_cost_type === "rate" ? `기본 ${v.default_cost_rate}%` : "고정 공급가"})
+                  {v.name} ({v.default_cost_type === "rate" ? `기본 ${v.default_cost_rate}%` : `기본 ${(v.default_cost_price ?? 0).toLocaleString()}원`})
                 </option>
               ))}
             </select>

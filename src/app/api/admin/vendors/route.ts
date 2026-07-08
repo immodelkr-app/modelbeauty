@@ -46,6 +46,7 @@ export async function POST(request: NextRequest) {
       accountHolder,
       defaultCostType = "rate",
       defaultCostRate = 0,
+      defaultCostPrice = 0,
       note,
       isActive = true,
     } = body;
@@ -72,6 +73,7 @@ export async function POST(request: NextRequest) {
         account_holder: accountHolder?.trim() || null,
         default_cost_type: defaultCostType,
         default_cost_rate: Number(defaultCostRate),
+        default_cost_price: Number(defaultCostPrice),
         note: note?.trim() || null,
         is_active: isActive,
       })

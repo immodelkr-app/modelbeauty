@@ -74,8 +74,9 @@ export default function MypagePage() {
     return `${d.slice(0, 3)}-${d.slice(3, 7)}-${d.slice(7)}`;
   };
 
+  // 1. masterUser 로드 시 기본 주소 상태 셋업 (수정 중이 아닐 때만)
   useEffect(() => {
-    if (masterUser) {
+    if (masterUser && !isEditingAddress) {
       setAddressState({
         recipient: masterUser.shipping_recipient ?? masterUser.name ?? "",
         phone: masterUser.shipping_phone ?? masterUser.phoneNumber ?? "",
@@ -83,13 +84,18 @@ export default function MypagePage() {
         address: masterUser.shipping_address ?? "",
         detail: masterUser.shipping_detail ?? "",
       });
-      // 멤버십 등급 조회
+    }
+  }, [masterUser, isEditingAddress]);
+
+  // 2. 멤버십 등급 조회 (최초 1회 실행)
+  useEffect(() => {
+    if (masterUser) {
       fetch("/api/membership")
         .then((r) => r.json())
         .then((res) => { if (res.success) setMembershipInfo(res.data); })
         .catch(() => {});
     }
-  }, [masterUser]);
+  }, [masterUser ? masterUser.masterUserId : null]);
 
 
   const handleAddressSearch = () => {
@@ -181,6 +187,20 @@ export default function MypagePage() {
     } finally {
       setIsSavingAddress(false);
     }
+  };
+
+  const handleStartEditAddress = () => {
+    if (masterUser) {
+      setAddressState({
+        recipient: masterUser.shipping_recipient ?? masterUser.name ?? "",
+        phone: masterUser.shipping_phone ?? masterUser.phoneNumber ?? "",
+        zipcode: masterUser.shipping_zipcode ?? "",
+        address: masterUser.shipping_address ?? "",
+        detail: masterUser.shipping_detail ?? "",
+      });
+    }
+    setAddressError("");
+    setIsEditingAddress(true);
   };
 
   useEffect(() => {
@@ -452,7 +472,7 @@ export default function MypagePage() {
           </h2>
           {!isEditingAddress && (
             <button
-              onClick={() => setIsEditingAddress(true)}
+              onClick={handleStartEditAddress}
               style={{
                 background: "var(--mb-pink-500)", color: "#fff",
                 border: "none", borderRadius: "8px",
@@ -587,7 +607,7 @@ export default function MypagePage() {
               <div style={{ textAlign: "center", padding: "1rem 0" }}>
                 <p style={{ color: "var(--mb-gray-400)", fontSize: "0.875rem", margin: "0 0 0.75rem 0" }}>등록된 주소가 없습니다. 필수 정보이오니 등록해주세요.</p>
                 <button
-                  onClick={() => setIsEditingAddress(true)}
+                  onClick={handleStartEditAddress}
                   style={{
                     background: "transparent", color: "var(--mb-pink-500)",
                     border: "1px solid var(--mb-pink-500)", borderRadius: "8px",

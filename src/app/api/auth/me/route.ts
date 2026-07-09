@@ -3,8 +3,7 @@
 // GET /api/auth/me
 // ============================================================
 // Supabase 세션에서 유저 확인 후 im-core-auth 마스터유저 정보 반환
-// 전화번호 유저: im-core-auth sync → 통합 포인트/닉네임 반환
-// 이메일 유저(관리자 등): Supabase user_metadata에서 name 반환
+// 가상 이메일({phone}@modelbeauty.kr) 유저도 전화번호 유저로 인식해 SSO 연동
 
 import { NextResponse } from "next/server";
 import { createSupabaseServerClient, createSupabaseAdmin } from "@/lib/supabase/server";
@@ -43,8 +42,14 @@ export async function GET() {
       return NextResponse.json({ error: "인증되지 않은 사용자입니다." }, { status: 401 });
     }
 
+    // 일반 전화번호 유저 판별 (phone 필드 또는 user_metadata 내 phone, 가상 이메일 매칭)
+    const userPhone = user.phone || user.user_metadata?.phone || (user.email?.endsWith("@modelbeauty.kr") ? user.email.split("@")[0] : null);
+    
+    // 관리자/이메일 전용 유저 판별 (가상 이메일이 아니고 전화번호 정보가 없을 때)
+    const isEmailUser = user.email && !user.email.endsWith("@modelbeauty.kr") && !userPhone;
+
     // ── 이메일 유저 (관리자 등) ──────────────────────────────────
-    if (!user.phone && user.email) {
+    if (isEmailUser) {
       return NextResponse.json({
         success: true,
         user: {
@@ -59,17 +64,18 @@ export async function GET() {
     }
 
     // ── 전화번호 유저 — im-core-auth 동기화 ─────────────────────
-    if (!user.phone) {
+    if (!userPhone) {
       return NextResponse.json({ error: "전화번호 인증이 필요합니다." }, { status: 401 });
     }
 
     try {
       // im-core-auth에서 마스터유저 동기화 (없으면 생성)
       const masterUser = await syncMasterUser({
-        phoneNumber: user.phone,
+        phoneNumber: userPhone,
         appName: "MODEL_BEAUTY",
         localUserId: user.id,
-        name: user.user_metadata?.name,
+        name: user.user_metadata?.name || user.user_metadata?.real_name,
+        realName: user.user_metadata?.real_name,
       });
 
       // master_user_id를 Supabase user_metadata에 캐싱
@@ -89,13 +95,13 @@ export async function GET() {
 
       return NextResponse.json({ success: true, user: masterUser });
     } catch (coreAuthError) {
-      // im-core-auth 서버가 아직 미배포인 경우 graceful fallback
-      console.warn("[/api/auth/me] im-core-auth 연결 불가, 로컬 세션으로 fallback:", coreAuthError);
+      // im-core-auth 서버 연결 실패 시 fallback
+      console.error("[/api/auth/me] im-core-auth 동기화 실패! 에러 원인:", coreAuthError);
       return NextResponse.json({
         success: true,
         user: {
           masterUserId: user.id,
-          phoneNumber: user.phone,
+          phoneNumber: userPhone,
           name: user.user_metadata?.name ?? null,
           integratedPoints: 0,
           linkedApps: ["MODEL_BEAUTY"],

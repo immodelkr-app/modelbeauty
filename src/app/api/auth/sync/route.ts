@@ -97,6 +97,8 @@ export async function POST(request: NextRequest) {
 export async function PATCH(request: NextRequest) {
   try {
     const body = await request.json();
+    console.log("[/api/auth/sync PATCH] Received body:", JSON.stringify(body, null, 2));
+
     const {
       masterUserId,
       shipping_recipient,
@@ -107,23 +109,28 @@ export async function PATCH(request: NextRequest) {
     } = body;
 
     if (!masterUserId) {
+      console.warn("[/api/auth/sync PATCH] Missing masterUserId!");
       return NextResponse.json(
         { error: "masterUserId는 필수입니다." },
         { status: 400 }
       );
     }
 
-    const masterUser = await updateMasterUser(masterUserId, {
+    const payload = {
       shipping_recipient,
       shipping_phone,
       shipping_zipcode,
       shipping_address,
       shipping_detail,
-    });
+    };
+    console.log("[/api/auth/sync PATCH] Sending payload to updateMasterUser:", JSON.stringify(payload, null, 2));
+
+    const masterUser = await updateMasterUser(masterUserId, payload);
+    console.log("[/api/auth/sync PATCH] Result from updateMasterUser:", JSON.stringify(masterUser, null, 2));
 
     return NextResponse.json({ success: true, ...masterUser });
   } catch (error) {
-    console.error("[/api/auth/sync PATCH]", error);
+    console.error("[/api/auth/sync PATCH] Exception occurred:", error);
     const message = error instanceof Error ? error.message : "서버 오류";
     return NextResponse.json(
       { error: message },

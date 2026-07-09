@@ -331,6 +331,15 @@ export default function CheckoutPage() {
         throw new Error("[설정 오류] NEXT_PUBLIC_TOSS_CLIENT_KEY 환경변수가 비어있습니다. Vercel 대시보드에서 환경변수를 확인해 주세요.");
       }
 
+      // 디버깅을 위해 키의 길이와 시작 부분 확인
+      const keyPrefix = cleanClientKey.substring(0, 14);
+      const keyLength = cleanClientKey.length;
+      console.log(`[디버그] Toss Client Key 로드됨: prefix=${keyPrefix}, length=${keyLength}`);
+
+      if (!cleanClientKey.startsWith("widget_")) {
+        throw new Error(`[키 설정 오류] 현재 설정된 키는 "${keyPrefix}..." (총 ${keyLength}자) 입니다. 이 키는 API 개별 키입니다. 반드시 "widget_client_"로 시작하는 결제위젯 클라이언트 키를 입력하셔야 합니다.`);
+      }
+
       const tossPayments = await loadTossPayments(cleanClientKey);
 
       const widgets = tossPayments.widgets({

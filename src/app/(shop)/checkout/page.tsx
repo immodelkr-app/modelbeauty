@@ -325,6 +325,21 @@ export default function CheckoutPage() {
         .trim()
         .replace(/^["']|["']$/g, "")
         .replace(/[\u200B-\u200D\uFEFF\u0000-\u001F]/g, "");
+
+      // 클라이언트 키 누락 체크
+      if (!cleanClientKey) {
+        throw new Error("[설정 오류] NEXT_PUBLIC_TOSS_CLIENT_KEY 환경변수가 비어있습니다. Vercel 대시보드에서 환경변수를 확인해 주세요.");
+      }
+
+      // 디버깅을 위해 키의 길이와 시작 부분 확인
+      const keyPrefix = cleanClientKey.substring(0, 14);
+      const keyLength = cleanClientKey.length;
+      console.log(`[디버그] Toss Client Key 로드됨: prefix=${keyPrefix}, length=${keyLength}`);
+
+      if (!cleanClientKey.startsWith("widget_client_")) {
+        throw new Error(`[키 설정 오류] 현재 키 앞부분: "${keyPrefix}..." (총 ${keyLength}자). 토스 대시보드 → 결제위젯 탭 → 클라이언트 키 (widget_client_로 시작하는 값)를 Vercel에 입력해 주세요.`);
+      }
+
       const tossPayments = await loadTossPayments(cleanClientKey);
 
       const widgets = tossPayments.widgets({
@@ -347,9 +362,11 @@ export default function CheckoutPage() {
 
       setTossWidgets(widgets);
       setError(""); // 에러 클리어
-    } catch (err) {
-      console.error("토스 위젯 초기화 실패:", err);
-      setError("결제 모듈 로드에 실패했습니다. 하단의 [결제 모듈 재시도] 버튼을 누르거나 페이지를 새로고침해 주세요.");
+    } catch (err: unknown) {
+      const errMsg = err instanceof Error ? err.message : String(err);
+      const keyForDebug = (process.env.NEXT_PUBLIC_TOSS_CLIENT_KEY || "").substring(0, 16);
+      console.error("토스 위젯 초기화 실패:", errMsg);
+      setError(`결제 모듈 초기화 실패: ${errMsg} \n[디버그] 현재 키 앞 16자: "${keyForDebug}"`);
     }
   };
 

@@ -164,6 +164,8 @@ function ResetPasswordModal({ onClose }: { onClose: () => void }) {
   const [step, setStep] = useState<1 | 2>(1);
   const [uid, setUid] = useState("");
   const [verifiedNickname, setVerifiedNickname] = useState("");
+  const [verifiedPhone, setVerifiedPhone] = useState("");
+  const [verifiedRealName, setVerifiedRealName] = useState("");
 
   const [nickname, setNickname] = useState("");
   const [realName, setRealName] = useState("");
@@ -204,7 +206,9 @@ function ResetPasswordModal({ onClose }: { onClose: () => void }) {
         return;
       }
       setUid(data.uid);
-      setVerifiedNickname(nickname.trim());
+      setVerifiedNickname(data.nickname || nickname.trim());
+      setVerifiedPhone(data.phoneNumber || phoneNumber.replace(/\D/g, ""));
+      setVerifiedRealName(data.realName || realName.trim());
       setStep(2);
     } catch {
       setError("처리 중 오류가 발생했습니다. 다시 시도해주세요.");
@@ -229,7 +233,13 @@ function ResetPasswordModal({ onClose }: { onClose: () => void }) {
       const res = await fetch("/api/auth/reset-password", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ uid, newPassword }),
+        body: JSON.stringify({ 
+          uid, 
+          newPassword,
+          phoneNumber: verifiedPhone,
+          nickname: verifiedNickname,
+          realName: verifiedRealName
+        }),
       });
       const data = await res.json();
       if (!res.ok || !data.success) {
@@ -370,8 +380,8 @@ function ResetPasswordModal({ onClose }: { onClose: () => void }) {
                     onChange={(e) => setNewPassword(e.target.value)} minLength={6} required
                   />
                   <button type="button" onClick={() => setShowNewPw(!showNewPw)} style={{
-                    position: "absolute", right: "0.75rem", top: "50%", transform: "translateY(-50%)",
-                    background: "none", border: "none", cursor: "pointer", color: "#94a3b8", fontSize: "0.875rem",
+                    background: "none", border: "none", cursor: "pointer", color: "#94a3b8", fontSize: "0.8125rem",
+                    padding: "0 1rem", whiteSpace: "nowrap", flexShrink: 0, height: "100%", display: "flex", alignItems: "center",
                   }}>
                     {showNewPw ? "숨기기" : "보기"}
                   </button>
@@ -386,8 +396,8 @@ function ResetPasswordModal({ onClose }: { onClose: () => void }) {
                     onChange={(e) => setConfirmPassword(e.target.value)} required
                   />
                   <button type="button" onClick={() => setShowConfirmPw(!showConfirmPw)} style={{
-                    position: "absolute", right: "0.75rem", top: "50%", transform: "translateY(-50%)",
-                    background: "none", border: "none", cursor: "pointer", color: "#94a3b8", fontSize: "0.875rem",
+                    background: "none", border: "none", cursor: "pointer", color: "#94a3b8", fontSize: "0.8125rem",
+                    padding: "0 1rem", whiteSpace: "nowrap", flexShrink: 0, height: "100%", display: "flex", alignItems: "center",
                   }}>
                     {showConfirmPw ? "숨기기" : "보기"}
                   </button>
@@ -620,9 +630,8 @@ function LoginForm() {
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
                 style={{
-                  position: "absolute", right: "0.75rem", top: "50%", transform: "translateY(-50%)",
-                  background: "none", border: "none", cursor: "pointer",
-                  color: "var(--mb-gray-400)", fontSize: "0.875rem", padding: "0.25rem",
+                  background: "none", border: "none", cursor: "pointer", color: "var(--mb-gray-400)", fontSize: "0.8125rem",
+                  padding: "0 1rem", whiteSpace: "nowrap", flexShrink: 0, height: "100%", display: "flex", alignItems: "center",
                 }}
               >
                 {showPassword ? "숨기기" : "보기"}

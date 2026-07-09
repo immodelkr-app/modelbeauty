@@ -111,14 +111,20 @@ export async function verifyUserIdentity(params: {
   realName: string;
   phoneNumber: string;
   appName: AppName;
-}): Promise<{ localUserId: string; masterUserId: string } | null> {
+}): Promise<{ localUserId: string; masterUserId: string; phoneNumber?: string; nickname?: string; realName?: string } | null> {
   const res = await coreAuthFetch("/api/auth/verify-user", {
     method: "POST",
     body: JSON.stringify(params),
   });
   if (!res.ok) return null;
   const data = await res.json();
-  return data.found ? { localUserId: data.localUserId, masterUserId: data.masterUserId } : null;
+  return data.found ? { 
+    localUserId: data.localUserId, 
+    masterUserId: data.masterUserId,
+    phoneNumber: data.phoneNumber,
+    nickname: data.nickname,
+    realName: data.realName
+  } : null;
 }
 
 /**

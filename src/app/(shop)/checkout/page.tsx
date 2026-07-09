@@ -53,18 +53,12 @@ export default function CheckoutPage() {
     deliveryMemo: "",
   });
 
-  const [step, setStep] = useState<CheckoutStep>("address");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [saveAsDefault, setSaveAsDefault] = useState(false);
   const [error, setError] = useState("");
-  const [orderId, setOrderId] = useState("");
-  const [totalAmount, setTotalAmount] = useState(0);
-  const [orderNumber, setOrderNumber] = useState("");
-  const paymentRef = useRef<HTMLDivElement>(null);
-  const agreementRef = useRef<HTMLDivElement>(null);
-
-  // Toss 위젯 인스턴스
-  const tossWidgetRef = useRef<unknown>(null);
+  
+  // Toss 위젯 인스턴스 보관 state
+  const [tossWidgets, setTossWidgets] = useState<any>(null);
 
   // 포인트 및 쿠폰 관련 상태
   const [coupons, setCoupons] = useState<any[]>([]);
@@ -130,7 +124,26 @@ export default function CheckoutPage() {
     }
   }, [isLoaded, authLoading, checkoutItems.length, router]);
 
-  // masterUser 이름 폼에 자동 입력 및 쿠폰 조회 제거 (하단으로 이동)
+  // 토스페이먼츠 위젯 마운트 시 최초 1회 즉각 초기 로드 (DOM 마운트 지연 대응을 위해 500ms 지연)
+  useEffect(() => {
+    if (isLoaded && isLoggedIn && !authLoading && checkoutItems.length > 0 && finalTotal > 0 && !tossWidgets) {
+      const timer = setTimeout(() => {
+        if (paymentRef.current && agreementRef.current) {
+          initTossWidget(finalTotal);
+        }
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [isLoaded, isLoggedIn, authLoading, checkoutItems.length, finalTotal, tossWidgets]);
+
+  // 결제 금액 변경 시 토스 위젯 금액 실시간 연동
+  useEffect(() => {
+    if (tossWidgets) {
+      tossWidgets.setAmount({ currency: "KRW", value: finalTotal }).catch((e: any) => {
+        console.error("토스 위젯 금액 업데이트 실패:", e);
+      });
+    }
+  }, [finalTotal, tossWidgets]);
 
   useEffect(() => {
     if (isLoggedIn) {
@@ -144,6 +157,9 @@ export default function CheckoutPage() {
         .catch((e) => console.error("쿠폰 정보 로딩 실패:", e));
     }
   }, [isLoggedIn]);
+
+  const paymentRef = useRef<HTMLDivElement>(null);
+  const agreementRef = useRef<HTMLDivElement>(null);
 
   const handleInput = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     setForm((f) => ({ ...f, [e.target.name]: e.target.value }));
@@ -208,7 +224,7 @@ export default function CheckoutPage() {
     }
   };
 
-  // Step 1 완료 → 주문 생성 → Step 2 결제위젯
+  // 1-Page 결제하기 버튼 클릭: 주문 생성 후 곧바로 토스 결제 호출
   const handleAddressSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
@@ -218,9 +234,14 @@ export default function CheckoutPage() {
       return;
     }
 
+    if (!tossWidgets) {
+      setError("결제 모듈이 아직 로드되지 않았습니다. 잠시 후 다시 시도해주세요.");
+      return;
+    }
+
     setIsSubmitting(true);
     try {
-      // 주문 생성
+      // 1. 주문 상품 객체 생성
       const orderItems = checkoutItems.map((item) => {
         return {
           productId: item.product?.id,
@@ -232,6 +253,7 @@ export default function CheckoutPage() {
         };
       });
 
+      // 2. 주문 레코드 생성 API 호출
       const res = await fetch("/api/orders", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -254,11 +276,6 @@ export default function CheckoutPage() {
         return;
       }
 
-      setOrderId(data.orderId);
-      setOrderNumber(data.orderNumber);
-      setTotalAmount(data.totalAmount);
-      setStep("payment");
-
       if (saveAsDefault) {
         sessionStorage.setItem("save_address_on_success", JSON.stringify({
           zipcode: form.addressZipcode,
@@ -271,18 +288,38 @@ export default function CheckoutPage() {
         sessionStorage.removeItem("save_address_on_success");
       }
 
-      // 결제위젯 초기화 (DOM이 렌더된 후)
-      setTimeout(() => initTossWidget(data.orderId, data.orderNumber, data.totalAmount), 300);
-    } catch {
-      setError("네트워크 오류가 발생했습니다. 다시 시도해주세요.");
+      // 3. 주문 생성 즉시 2페이지 전환 없이 그 자리에서 바로 토스 결제 모듈 팝업(혹은 리다이렉트) 호출!
+      await tossWidgets.requestPayment({
+        orderId: data.orderId,
+        orderName: checkoutItems.length === 1
+          ? (checkoutItems[0].product?.name ?? "상품")
+          : `${checkoutItems[0].product?.name ?? "상품"} 외 ${checkoutItems.length - 1}건`,
+        successUrl: `${window.location.origin}/checkout/success`,
+        failUrl: `${window.location.origin}/checkout/fail`,
+        customerEmail: undefined,
+        customerName: form.recipientName,
+        customerMobilePhone: form.recipientPhone.replace(/-/g, ""),
+      });
+
+    } catch (err) {
+      console.error("결제 진행 중 실패:", err);
+      // 사용자가 결제창을 취소(닫기)한 경우는 에러로 간주하지 않고 멈춤
+      if (err && typeof err === "object" && "code" in err && (err as { code: string }).code === "USER_CANCEL") {
+        return;
+      }
+      setError("결제 요청 중 오류가 발생했습니다. 다시 시도해 주세요.");
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  // 토스페이먼츠 결제위젯 초기화
-  const initTossWidget = async (oid: string, oNum: string, amount: number) => {
+  // 토스페이먼츠 결제위젯 마운트 시 즉각 초기화 (렌더링만 수행)
+  const initTossWidget = async (amount: number) => {
     try {
+      if (!paymentRef.current || !agreementRef.current) {
+        throw new Error("결제 위젯 컨테이너 엘리먼트가 존재하지 않습니다.");
+      }
+
       const { loadTossPayments } = await import("@tosspayments/tosspayments-sdk");
       const cleanClientKey = (process.env.NEXT_PUBLIC_TOSS_CLIENT_KEY || "")
         .trim()
@@ -296,64 +333,27 @@ export default function CheckoutPage() {
 
       await widgets.setAmount({ currency: "KRW", value: amount });
 
-      if (paymentRef.current) {
-        await widgets.renderPaymentMethods({
-          selector: "#payment-method",
-          variantKey: "DEFAULT",
-        });
-      }
+      // 결제수단 렌더링
+      await widgets.renderPaymentMethods({
+        selector: "#payment-method",
+        variantKey: "DEFAULT",
+      });
 
-      if (agreementRef.current) {
-        await widgets.renderAgreement({
-          selector: "#payment-agreement",
-          variantKey: "AGREEMENT",
-        });
-      }
+      // 약관동의 렌더링
+      await widgets.renderAgreement({
+        selector: "#payment-agreement",
+        variantKey: "AGREEMENT",
+      });
 
-      tossWidgetRef.current = { widgets, oid, oNum, amount };
+      setTossWidgets(widgets);
+      setError(""); // 에러 클리어
     } catch (err) {
       console.error("토스 위젯 초기화 실패:", err);
-      setError("결제 모듈 로드에 실패했습니다. 페이지를 새로고침해 주세요.");
+      setError("결제 모듈 로드에 실패했습니다. 하단의 [결제 모듈 재시도] 버튼을 누르거나 페이지를 새로고침해 주세요.");
     }
   };
 
-  // 결제 요청
-  const handlePayment = async () => {
-    if (!tossWidgetRef.current) {
-      setError("결제 모듈이 아직 로드되지 않았습니다. 잠시 후 다시 시도해주세요.");
-      return;
-    }
-    setIsSubmitting(true);
-    setError("");
-    try {
-      const { widgets, oid, oNum } = tossWidgetRef.current as {
-        widgets: { requestPayment: (params: Record<string, unknown>) => Promise<void> };
-        oid: string;
-        oNum: string;
-        amount: number;
-      };
 
-      await widgets.requestPayment({
-        orderId: oid,
-        orderName: checkoutItems.length === 1
-          ? (checkoutItems[0].product?.name ?? "상품")
-          : `${checkoutItems[0].product?.name ?? "상품"} 외 ${checkoutItems.length - 1}건`,
-        successUrl: `${window.location.origin}/checkout/success`,
-        failUrl: `${window.location.origin}/checkout/fail`,
-        customerEmail: undefined,
-        customerName: form.recipientName,
-        customerMobilePhone: form.recipientPhone.replace(/-/g, ""),
-      });
-    } catch (err: unknown) {
-      setIsSubmitting(false);
-      // 사용자가 결제창을 닫은 경우는 무시
-      if (err && typeof err === "object" && "code" in err) {
-        const code = (err as { code: string }).code;
-        if (code === "USER_CANCEL") return;
-      }
-      setError("결제 요청 중 오류가 발생했습니다.");
-    }
-  };
 
   if (authLoading) {
     return (
@@ -375,344 +375,306 @@ export default function CheckoutPage() {
         </h1>
       </div>
 
-      {/* 진행 단계 */}
-      <div style={{ display: "flex", gap: "0.5rem", marginBottom: "2rem", alignItems: "center" }}>
-        {(["address", "payment"] as const).map((s, i) => (
-          <div key={s} style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-            {i > 0 && <div style={{ width: "2rem", height: "1px", background: "var(--mb-gray-200)" }} />}
-            <div style={{
-              display: "flex", alignItems: "center", gap: "0.375rem",
-              color: step === s ? "var(--mb-pink-500)" : (
-                (s === "address" && step === "payment") ? "var(--mb-gray-400)" : "var(--mb-gray-400)"
-              ),
-              fontWeight: step === s ? 700 : 500,
-              fontSize: "0.875rem",
-            }}>
-              <div style={{
-                width: "1.5rem", height: "1.5rem", borderRadius: "50%",
-                background: step === s ? "var(--mb-pink-500)" : "var(--mb-gray-200)",
-                color: step === s ? "#fff" : "var(--mb-gray-500)",
-                display: "flex", alignItems: "center", justifyContent: "center",
-                fontSize: "0.75rem", fontWeight: 700,
-              }}>{i + 1}</div>
-              {s === "address" ? "배송지" : "결제"}
-            </div>
-          </div>
-        ))}
-      </div>
-
       <div style={{ display: "grid", gap: "1.5rem", gridTemplateColumns: "1fr" }}>
+        <form onSubmit={handleAddressSubmit} style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
 
-        {/* ── Step 1: 배송지 입력 ── */}
-        {step === "address" && (
-          <form onSubmit={handleAddressSubmit} style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
-
-            {/* 주문 상품 요약 */}
-            <section style={{ background: "#fff", borderRadius: "16px", padding: "1.25rem", border: "1px solid var(--mb-gray-100)" }}>
-              <h2 style={{ fontSize: "1rem", fontWeight: 700, margin: "0 0 1rem", color: "var(--mb-gray-900)" }}>
-                주문 상품 ({checkoutItems.length}개)
-              </h2>
-              <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
-                {checkoutItems.map((item) => (
-                  <div key={item.id} style={{ display: "flex", gap: "0.75rem", alignItems: "center" }}>
-                    {item.product?.images?.[0]?.url && (
-                      <img
-                        src={item.product.images[0].url}
-                        alt={item.product.name}
-                        style={{ width: "52px", height: "52px", borderRadius: "8px", objectFit: "cover", flexShrink: 0 }}
-                      />
-                    )}
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: "0.875rem", fontWeight: 600, color: "var(--mb-gray-900)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                        {item.product?.name}
-                      </div>
-                      <div style={{ fontSize: "0.8125rem", color: "var(--mb-gray-500)" }}>
-                        {item.quantity}개 · {fmt(item.subtotal)}
-                      </div>
+          {/* 주문 상품 요약 */}
+          <section style={{ background: "#fff", borderRadius: "16px", padding: "1.25rem", border: "1px solid var(--mb-gray-100)" }}>
+            <h2 style={{ fontSize: "1rem", fontWeight: 700, margin: "0 0 1rem", color: "var(--mb-gray-900)" }}>
+              주문 상품 ({checkoutItems.length}개)
+            </h2>
+            <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+              {checkoutItems.map((item) => (
+                <div key={item.id} style={{ display: "flex", gap: "0.75rem", alignItems: "center" }}>
+                  {item.product?.images?.[0]?.url && (
+                    <img
+                      src={item.product.images[0].url}
+                      alt={item.product.name}
+                      style={{ width: "52px", height: "52px", borderRadius: "8px", objectFit: "cover", flexShrink: 0 }}
+                    />
+                  )}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: "0.875rem", fontWeight: 600, color: "var(--mb-gray-900)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {item.product?.name}
+                    </div>
+                    <div style={{ fontSize: "0.8125rem", color: "var(--mb-gray-500)" }}>
+                      {item.quantity}개 · {fmt(item.subtotal)}
                     </div>
                   </div>
-                ))}
-              </div>
-            </section>
+                </div>
+              ))}
+            </div>
+          </section>
 
-            {/* 배송지 정보 */}
-            <section style={{ background: "#fff", borderRadius: "16px", padding: "1.25rem", border: "1px solid var(--mb-gray-100)" }}>
-              <h2 style={{ fontSize: "1rem", fontWeight: 700, margin: "0 0 1.25rem", color: "var(--mb-gray-900)" }}>
-                배송지 정보
-              </h2>
-              <div style={{ display: "flex", flexDirection: "column", gap: "0.875rem" }}>
-                <div>
-                  <label style={labelStyle}>수령인 *</label>
-                  <input name="recipientName" value={form.recipientName} onChange={handleInput}
-                    placeholder="이름을 입력하세요" required style={inputStyle} />
-                </div>
-                <div>
-                  <label style={labelStyle}>연락처 *</label>
-                  <input name="recipientPhone" value={form.recipientPhone}
-                    onChange={(e) => setForm(f => ({ ...f, recipientPhone: formatPhone(e.target.value) }))}
-                    placeholder="010-0000-0000" required style={inputStyle} inputMode="numeric" />
-                </div>
-                <div>
-                  <label style={labelStyle}>주소 *</label>
-                  <div style={{ display: "flex", gap: "0.5rem", marginBottom: "0.5rem" }}>
-                    <input name="addressZipcode" value={form.addressZipcode} readOnly onClick={handleAddressSearch}
-                      placeholder="우편번호" required style={{ ...inputStyle, flex: 1, margin: 0, background: "var(--mb-gray-50)", cursor: "pointer" }} />
-                    <button type="button" onClick={handleAddressSearch}
-                      style={{
-                        background: "var(--mb-gray-800)", color: "#fff", border: "none", borderRadius: "10px",
-                        padding: "0 1rem", fontSize: "0.8125rem", fontWeight: 600, cursor: "pointer"
-                      }}>검색</button>
-                  </div>
-                  <input name="addressMain" value={form.addressMain} readOnly onClick={handleAddressSearch}
-                    placeholder="기본 주소" required style={{ ...inputStyle, marginBottom: "0.5rem", background: "var(--mb-gray-50)", cursor: "pointer" }} />
-                  <input name="addressDetail" value={form.addressDetail} onChange={handleInput}
-                    placeholder="상세 주소 (선택)" style={inputStyle} />
-                </div>
-                <div>
-                  <label style={labelStyle}>배송 메모</label>
-                  <select name="deliveryMemo" value={form.deliveryMemo}
-                    onChange={handleInput} style={inputStyle}>
-                    <option value="">선택 안함</option>
-                    <option value="문 앞에 놔주세요">문 앞에 놔주세요</option>
-                    <option value="경비실에 맡겨주세요">경비실에 맡겨주세요</option>
-                    <option value="부재 시 연락 부탁드려요">부재 시 연락 부탁드려요</option>
-                    <option value="직접 수령할게요">직접 수령할게요</option>
-                  </select>
-                </div>
-                <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginTop: "0.25rem" }}>
-                  <input
-                    type="checkbox"
-                    id="saveAsDefault"
-                    checked={saveAsDefault}
-                    onChange={(e) => setSaveAsDefault(e.target.checked)}
-                    style={{ cursor: "pointer" }}
-                  />
-                  <label htmlFor="saveAsDefault" style={{ fontSize: "0.875rem", color: "var(--mb-gray-700)", cursor: "pointer", fontWeight: 500 }}>
-                    입력한 주소를 기본 주소로 저장
-                  </label>
-                </div>
-              </div>
-            </section>
-
-            {/* 쿠폰 및 포인트 사용 */}
-            <section style={{ background: "#fff", borderRadius: "16px", padding: "1.25rem", border: "1px solid var(--mb-gray-100)" }}>
-              <h2 style={{ fontSize: "1rem", fontWeight: 700, margin: "0 0 1.25rem", color: "var(--mb-gray-900)" }}>
-                쿠폰 / 포인트 할인
-              </h2>
-              
-              {/* 쿠폰 선택 */}
-              <div style={{ marginBottom: "1.25rem" }}>
-                <label style={labelStyle}>쿠폰 선택</label>
-                {coupons.length === 0 ? (
-                  <select disabled style={{ ...inputStyle, background: "var(--mb-gray-50)", color: "var(--mb-gray-400)" }}>
-                    <option>사용 가능한 쿠폰이 없습니다.</option>
-                  </select>
-                ) : (
-                  <select
-                    value={selectedCoupon?.userCouponId || ""}
-                    onChange={(e) => {
-                      const cid = e.target.value;
-                      const selected = coupons.find((c) => c.userCouponId === cid);
-                      setSelectedCoupon(selected || null);
-                    }}
-                    style={inputStyle}
-                  >
-                    <option value="">쿠폰 선택 안 함</option>
-                    {coupons.map((c) => (
-                      <option key={c.userCouponId} value={c.userCouponId}>
-                        {c.name} ({c.discountType === "fixed" ? `${c.discountValue.toLocaleString()}원` : `${c.discountValue}%`} 할인)
-                      </option>
-                    ))}
-                  </select>
-                )}
-              </div>
-
-              {/* 포인트 입력 */}
+          {/* 배송지 정보 */}
+          <section style={{ background: "#fff", borderRadius: "16px", padding: "1.25rem", border: "1px solid var(--mb-gray-100)" }}>
+            <h2 style={{ fontSize: "1rem", fontWeight: 700, margin: "0 0 1.25rem", color: "var(--mb-gray-900)" }}>
+              배송지 정보
+            </h2>
+            <div style={{ display: "flex", flexDirection: "column", gap: "0.875rem" }}>
               <div>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.375rem" }}>
-                  <label style={{ ...labelStyle, margin: 0 }}>포인트 사용 (상품 1만원 이상 구매 시, 최대 30% 한도)</label>
-                  <span style={{ fontSize: "0.8125rem", color: "var(--mb-gray-500)" }}>
-                    보유: {maxAvailablePoints.toLocaleString()}P
-                  </span>
-                </div>
-                <div style={{ display: "flex", gap: "0.5rem" }}>
-                  <input
-                    type="number"
-                    value={pointInput}
-                    onChange={(e) => setPointInput(e.target.value)}
-                    placeholder="0"
-                    style={{ ...inputStyle, flex: 1 }}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (subtotal < 10000) {
-                        alert("포인트는 상품 합계 금액이 10,000원 이상일 때만 사용 가능합니다.");
-                        return;
-                      }
-                      const pts = parseInt(pointInput) || 0;
-                      if (pts > maxAvailablePoints) {
-                        alert("보유하신 포인트보다 큰 금액은 사용할 수 없습니다.");
-                        return;
-                      }
-                      if (pts > 0 && pts < 1000) {
-                        alert("포인트는 최소 1,000P 이상 사용 가능합니다.");
-                        return;
-                      }
-                      if (pts > maxPointsToUse) {
-                        alert(`해당 주문에서 적용 가능한 최대 포인트는 상품 총액의 30%인 ${maxPointsToUse.toLocaleString()}P 입니다.`);
-                        return;
-                      }
-                      setAppliedPoints(pts);
-                    }}
+                <label style={labelStyle}>수령인 *</label>
+                <input name="recipientName" value={form.recipientName} onChange={handleInput}
+                  placeholder="이름을 입력하세요" required style={inputStyle} />
+              </div>
+              <div>
+                <label style={labelStyle}>연락처 *</label>
+                <input name="recipientPhone" value={form.recipientPhone}
+                  onChange={(e) => setForm(f => ({ ...f, recipientPhone: formatPhone(e.target.value) }))}
+                  placeholder="010-0000-0000" required style={inputStyle} inputMode="numeric" />
+              </div>
+              <div>
+                <label style={labelStyle}>주소 *</label>
+                <div style={{ display: "flex", gap: "0.5rem", marginBottom: "0.5rem" }}>
+                  <input name="addressZipcode" value={form.addressZipcode} readOnly onClick={handleAddressSearch}
+                    placeholder="우편번호" required style={{ ...inputStyle, flex: 1, margin: 0, background: "var(--mb-gray-50)", cursor: "pointer" }} />
+                  <button type="button" onClick={handleAddressSearch}
                     style={{
-                      padding: "0.5rem 1rem",
-                      borderRadius: "10px",
-                      border: "1px solid var(--mb-gray-300)",
-                      background: "#fff",
-                      fontSize: "0.875rem",
-                      fontWeight: 600,
-                      cursor: "pointer",
-                    }}
-                  >
-                    적용
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (subtotal < 10000) {
-                        alert("포인트는 상품 합계 금액이 10,000원 이상일 때만 사용 가능합니다.");
-                        return;
-                      }
-                      if (maxAvailablePoints < 1000) {
-                        alert("포인트는 최소 1,000P 이상부터 사용 가능합니다.");
-                        return;
-                      }
-                      if (maxPointsToUse < 1000) {
-                        alert("본 주문에서 사용 가능한 최대 포인트(상품 총액의 30%)가 1,000P 미만입니다.");
-                        return;
-                      }
-                      const allPoints = Math.min(maxAvailablePoints, maxPointsToUse);
-                      setPointInput(allPoints.toString());
-                      setAppliedPoints(allPoints);
-                    }}
-                    style={{
-                      padding: "0.5rem 1rem",
-                      borderRadius: "10px",
-                      border: "none",
-                      background: "var(--mb-gray-100)",
-                      color: "var(--mb-gray-700)",
-                      fontSize: "0.875rem",
-                      fontWeight: 600,
-                      cursor: "pointer",
-                    }}
-                  >
-                    전액 사용
-                  </button>
+                      background: "var(--mb-gray-800)", color: "#fff", border: "none", borderRadius: "10px",
+                      padding: "0 1rem", fontSize: "0.8125rem", fontWeight: 600, cursor: "pointer"
+                    }}>검색</button>
                 </div>
-                {appliedPoints > 0 && (
-                  <p style={{ color: "var(--mb-pink-600)", fontSize: "0.8125rem", margin: "0.5rem 0 0 0", fontWeight: 600 }}>
-                    ✓ {appliedPoints.toLocaleString()}P 할인이 적용되었습니다.
-                  </p>
-                )}
+                <input name="addressMain" value={form.addressMain} readOnly onClick={handleAddressSearch}
+                  placeholder="기본 주소" required style={{ ...inputStyle, marginBottom: "0.5rem", background: "var(--mb-gray-50)", cursor: "pointer" }} />
+                <input name="addressDetail" value={form.addressDetail} onChange={handleInput}
+                  placeholder="상세 주소 (선택)" style={inputStyle} />
               </div>
-            </section>
-
-            {/* 결제 금액 요약 */}
-            <section style={{ background: "#fff", borderRadius: "16px", padding: "1.25rem", border: "1px solid var(--mb-gray-100)" }}>
-              <h2 style={{ fontSize: "1rem", fontWeight: 700, margin: "0 0 1rem", color: "var(--mb-gray-900)" }}>
-                결제 금액
-              </h2>
-              <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem", fontSize: "0.875rem" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", color: "var(--mb-gray-700)" }}>
-                  <span>상품 금액</span><span>{fmt(subtotal)}</span>
-                </div>
-                <div style={{ display: "flex", justifyContent: "space-between", color: "var(--mb-gray-700)" }}>
-                  <span>배송비</span>
-                  <span>{shippingFee === 0 ? <span style={{ color: "var(--mb-pink-500)" }}>무료</span> : fmt(shippingFee)}</span>
-                </div>
-                {membershipDiscount > 0 && membershipInfo && (
-                  <div style={{ display: "flex", justifyContent: "space-between", color: "#9333ea" }}>
-                    <span>🏆 {membershipInfo.currentTier.name} 등급 할인 ({membershipInfo.currentTier.discount_rate}%)</span>
-                    <span>-{fmt(membershipDiscount)}</span>
-                  </div>
-                )}
-                {couponDiscount > 0 && (
-                  <div style={{ display: "flex", justifyContent: "space-between", color: "var(--mb-pink-600)" }}>
-                    <span>쿠폰 할인</span><span>-{fmt(couponDiscount)}</span>
-                  </div>
-                )}
-                {actualPointDiscount > 0 && (
-                  <div style={{ display: "flex", justifyContent: "space-between", color: "var(--mb-pink-600)" }}>
-                    <span>포인트 사용</span><span>-{actualPointDiscount.toLocaleString()}P</span>
-                  </div>
-                )}
-                <div style={{ height: "1px", background: "var(--mb-gray-100)", margin: "0.5rem 0" }} />
-                <div style={{ display: "flex", justifyContent: "space-between", fontWeight: 800, fontSize: "1rem", color: "var(--mb-gray-900)" }}>
-                  <span>총 결제금액</span><span style={{ color: "var(--mb-pink-600)" }}>{fmt(finalTotal)}</span>
-                </div>
-                <div style={{ fontSize: "0.8125rem", color: "var(--mb-pink-400)", textAlign: "right" }}>
-                  이 주문으로 {estimatedPoints.toLocaleString()}P 적립 예정
-                </div>
+              <div>
+                <label style={labelStyle}>배송 메모</label>
+                <select name="deliveryMemo" value={form.deliveryMemo}
+                  onChange={handleInput} style={inputStyle}>
+                  <option value="">선택 안함</option>
+                  <option value="문 앞에 놔주세요">문 앞에 놔주세요</option>
+                  <option value="경비실에 맡겨주세요">경비실에 맡겨주세요</option>
+                  <option value="부재 시 연락 부탁드려요">부재 시 연락 부탁드려요</option>
+                  <option value="직접 수령할게요">직접 수령할게요</option>
+                </select>
               </div>
-            </section>
-
-            {error && <p style={{ color: "#ef4444", fontSize: "0.875rem", margin: 0 }}>{error}</p>}
-
-            <button type="submit" disabled={isSubmitting}
-              style={{
-                padding: "1rem", borderRadius: "14px", border: "none", cursor: "pointer",
-                background: "linear-gradient(135deg, #db2777, #9333ea)",
-                color: "#fff", fontSize: "1rem", fontWeight: 700,
-                opacity: isSubmitting ? 0.7 : 1,
-              }}>
-              {isSubmitting ? "처리 중..." : `${fmt(finalTotal)} 결제하기`}
-            </button>
-          </form>
-        )}
-
-        {/* ── Step 2: 결제위젯 ── */}
-        {step === "payment" && (
-          <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
-            <section style={{ background: "#fff", borderRadius: "16px", padding: "1.25rem", border: "1px solid var(--mb-gray-100)" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.5rem" }}>
-                <span style={{ fontSize: "0.875rem", color: "var(--mb-gray-500)" }}>주문번호</span>
-                <span style={{ fontSize: "0.875rem", fontWeight: 600, color: "var(--mb-gray-700)" }}>{orderNumber}</span>
+              <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginTop: "0.25rem" }}>
+                <input
+                  type="checkbox"
+                  id="saveAsDefault"
+                  checked={saveAsDefault}
+                  onChange={(e) => setSaveAsDefault(e.target.checked)}
+                  style={{ cursor: "pointer" }}
+                />
+                <label htmlFor="saveAsDefault" style={{ fontSize: "0.875rem", color: "var(--mb-gray-700)", cursor: "pointer", fontWeight: 500 }}>
+                  입력한 주소를 기본 주소로 저장
+                </label>
               </div>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <span style={{ fontSize: "0.875rem", color: "var(--mb-gray-500)" }}>결제 금액</span>
-                <span style={{ fontSize: "1.125rem", fontWeight: 800, color: "var(--mb-pink-600)" }}>{fmt(totalAmount)}</span>
-              </div>
-            </section>
+            </div>
+          </section>
 
-            {/* 토스 결제위젯 렌더 영역 */}
-            <div style={{ background: "#fff", borderRadius: "16px", padding: "1.25rem", border: "1px solid var(--mb-gray-100)" }}>
-              <div id="payment-method" ref={paymentRef} />
-              <div id="payment-agreement" ref={agreementRef} style={{ marginTop: "1rem" }} />
+          {/* 쿠폰 및 포인트 사용 */}
+          <section style={{ background: "#fff", borderRadius: "16px", padding: "1.25rem", border: "1px solid var(--mb-gray-100)" }}>
+            <h2 style={{ fontSize: "1rem", fontWeight: 700, margin: "0 0 1.25rem", color: "var(--mb-gray-900)" }}>
+              쿠폰 / 포인트 할인
+            </h2>
+            
+            {/* 쿠폰 선택 */}
+            <div style={{ marginBottom: "1.25rem" }}>
+              <label style={labelStyle}>쿠폰 선택</label>
+              {coupons.length === 0 ? (
+                <select disabled style={{ ...inputStyle, background: "var(--mb-gray-50)", color: "var(--mb-gray-400)" }}>
+                  <option>사용 가능한 쿠폰이 없습니다.</option>
+                </select>
+              ) : (
+                <select
+                  value={selectedCoupon?.userCouponId || ""}
+                  onChange={(e) => {
+                    const cid = e.target.value;
+                    const selected = coupons.find((c) => c.userCouponId === cid);
+                    setSelectedCoupon(selected || null);
+                  }}
+                  style={inputStyle}
+                >
+                  <option value="">쿠폰 선택 안 함</option>
+                  {coupons.map((c) => (
+                    <option key={c.userCouponId} value={c.userCouponId}>
+                      {c.name} ({c.discountType === "fixed" ? `${c.discountValue.toLocaleString()}원` : `${c.discountValue}%`} 할인)
+                    </option>
+                  ))}
+                </select>
+              )}
             </div>
 
-            {error && <p style={{ color: "#ef4444", fontSize: "0.875rem", margin: 0 }}>{error}</p>}
+            {/* 포인트 입력 */}
+            <div>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.375rem" }}>
+                <label style={{ ...labelStyle, margin: 0 }}>포인트 사용 (상품 1만원 이상 구매 시, 최대 30% 한도)</label>
+                <span style={{ fontSize: "0.8125rem", color: "var(--mb-gray-500)" }}>
+                  보유: {maxAvailablePoints.toLocaleString()}P
+                </span>
+              </div>
+              <div style={{ display: "flex", gap: "0.5rem" }}>
+                <input
+                  type="number"
+                  value={pointInput}
+                  onChange={(e) => setPointInput(e.target.value)}
+                  placeholder="0"
+                  style={{ ...inputStyle, flex: 1 }}
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (subtotal < 10000) {
+                      alert("포인트는 상품 합계 금액이 10,000원 이상일 때만 사용 가능합니다.");
+                      return;
+                    }
+                    const pts = parseInt(pointInput) || 0;
+                    if (pts > maxAvailablePoints) {
+                      alert("보유하신 포인트보다 큰 금액은 사용할 수 없습니다.");
+                      return;
+                    }
+                    if (pts > 0 && pts < 1000) {
+                      alert("포인트는 최소 1,000P 이상 사용 가능합니다.");
+                      return;
+                    }
+                    if (pts > maxPointsToUse) {
+                      alert(`해당 주문에서 적용 가능한 최대 포인트는 상품 총액의 30%인 ${maxPointsToUse.toLocaleString()}P 입니다.`);
+                      return;
+                    }
+                    setAppliedPoints(pts);
+                  }}
+                  style={{
+                    padding: "0.5rem 1rem",
+                    borderRadius: "10px",
+                    border: "1px solid var(--mb-gray-300)",
+                    background: "#fff",
+                    fontSize: "0.875rem",
+                    fontWeight: 600,
+                    cursor: "pointer",
+                  }}
+                >
+                  적용
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (subtotal < 10000) {
+                      alert("포인트는 상품 합계 금액이 10,000원 이상일 때만 사용 가능합니다.");
+                      return;
+                    }
+                    if (maxAvailablePoints < 1000) {
+                      alert("포인트는 최소 1,000P 이상부터 사용 가능합니다.");
+                      return;
+                    }
+                    if (maxPointsToUse < 1000) {
+                      alert("본 주문에서 사용 가능한 최대 포인트(상품 총액의 30%)가 1,000P 미만입니다.");
+                      return;
+                    }
+                    const allPoints = Math.min(maxAvailablePoints, maxPointsToUse);
+                    setPointInput(allPoints.toString());
+                    setAppliedPoints(allPoints);
+                  }}
+                  style={{
+                    padding: "0.5rem 1rem",
+                    borderRadius: "10px",
+                    border: "none",
+                    background: "var(--mb-gray-100)",
+                    color: "var(--mb-gray-700)",
+                    fontSize: "0.875rem",
+                    fontWeight: 600,
+                    cursor: "pointer",
+                  }}
+                >
+                  전액 사용
+                </button>
+              </div>
+              {appliedPoints > 0 && (
+                <p style={{ color: "var(--mb-pink-600)", fontSize: "0.8125rem", margin: "0.5rem 0 0 0", fontWeight: 600 }}>
+                  ✓ {appliedPoints.toLocaleString()}P 할인이 적용되었습니다.
+                </p>
+              )}
+            </div>
+          </section>
 
-            <button onClick={handlePayment} disabled={isSubmitting}
-              style={{
-                padding: "1rem", borderRadius: "14px", border: "none", cursor: "pointer",
-                background: "linear-gradient(135deg, #db2777, #9333ea)",
-                color: "#fff", fontSize: "1rem", fontWeight: 700,
-                opacity: isSubmitting ? 0.7 : 1,
-              }}>
-              {isSubmitting ? "결제 처리 중..." : `${fmt(totalAmount)} 결제하기`}
-            </button>
+          {/* ── 토스 결제위젯 렌더 영역 (1페이지 상시 노출) ── */}
+          <section style={{ background: "#fff", borderRadius: "16px", padding: "1.25rem", border: "1px solid var(--mb-gray-100)" }}>
+            <h2 style={{ fontSize: "1rem", fontWeight: 700, margin: "0 0 1rem", color: "var(--mb-gray-900)" }}>
+              결제 수단 선택
+            </h2>
+            <div id="payment-method" ref={paymentRef} style={{ minHeight: "150px" }} />
+            <div id="payment-agreement" ref={agreementRef} style={{ marginTop: "1rem" }} />
+          </section>
 
-            <button onClick={() => setStep("address")}
-              style={{
-                padding: "0.75rem", borderRadius: "14px", border: "1px solid var(--mb-gray-200)",
-                background: "transparent", color: "var(--mb-gray-600)", fontSize: "0.875rem",
-                fontWeight: 600, cursor: "pointer",
-              }}>
-              ← 배송지 수정
-            </button>
-          </div>
-        )}
+          {/* 결제 금액 요약 */}
+          <section style={{ background: "#fff", borderRadius: "16px", padding: "1.25rem", border: "1px solid var(--mb-gray-100)" }}>
+            <h2 style={{ fontSize: "1rem", fontWeight: 700, margin: "0 0 1rem", color: "var(--mb-gray-900)" }}>
+              결제 금액
+            </h2>
+            <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem", fontSize: "0.875rem" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", color: "var(--mb-gray-700)" }}>
+                <span>상품 금액</span><span>{fmt(subtotal)}</span>
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between", color: "var(--mb-gray-700)" }}>
+                <span>배송비</span>
+                <span>{shippingFee === 0 ? <span style={{ color: "var(--mb-pink-500)" }}>무료</span> : fmt(shippingFee)}</span>
+              </div>
+              {membershipDiscount > 0 && membershipInfo && (
+                <div style={{ display: "flex", justifyContent: "space-between", color: "#9333ea" }}>
+                  <span>🏆 {membershipInfo.currentTier.name} 등급 할인 ({membershipInfo.currentTier.discount_rate}%)</span>
+                  <span>-{fmt(membershipDiscount)}</span>
+                </div>
+              )}
+              {couponDiscount > 0 && (
+                <div style={{ display: "flex", justifyContent: "space-between", color: "var(--mb-pink-600)" }}>
+                  <span>쿠폰 할인</span><span>-{fmt(couponDiscount)}</span>
+                </div>
+              )}
+              {actualPointDiscount > 0 && (
+                <div style={{ display: "flex", justifyContent: "space-between", color: "var(--mb-pink-600)" }}>
+                  <span>포인트 사용</span><span>-{actualPointDiscount.toLocaleString()}P</span>
+                </div>
+              )}
+              <div style={{ height: "1px", background: "var(--mb-gray-100)", margin: "0.5rem 0" }} />
+              <div style={{ display: "flex", justifyContent: "space-between", fontWeight: 800, fontSize: "1rem", color: "var(--mb-gray-900)" }}>
+                <span>총 결제금액</span><span style={{ color: "var(--mb-pink-600)" }}>{fmt(finalTotal)}</span>
+              </div>
+              <div style={{ fontSize: "0.8125rem", color: "var(--mb-pink-400)", textAlign: "right" }}>
+                이 주문으로 {estimatedPoints.toLocaleString()}P 적립 예정
+              </div>
+            </div>
+          </section>
+
+          {error && (
+            <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+              <p style={{ color: "#ef4444", fontSize: "0.875rem", margin: 0, fontWeight: 600 }}>{error}</p>
+              {!tossWidgets && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setError("");
+                    initTossWidget(finalTotal);
+                  }}
+                  style={{
+                    padding: "0.5rem 1rem",
+                    borderRadius: "10px",
+                    border: "1px solid #db2777",
+                    background: "transparent",
+                    color: "#db2777",
+                    fontSize: "0.8125rem",
+                    fontWeight: 600,
+                    cursor: "pointer",
+                    alignSelf: "flex-start"
+                  }}
+                >
+                  🔄 결제 모듈 재시도
+                </button>
+              )}
+            </div>
+          )}
+
+          <button type="submit" disabled={isSubmitting || !tossWidgets}
+            style={{
+              padding: "1rem", borderRadius: "14px", border: "none", cursor: "pointer",
+              background: "linear-gradient(135deg, #db2777, #9333ea)",
+              color: "#fff", fontSize: "1rem", fontWeight: 700,
+              opacity: (isSubmitting || !tossWidgets) ? 0.7 : 1,
+            }}>
+            {isSubmitting ? "결제 진행 중..." : (!tossWidgets ? "결제 모듈 로딩 중..." : `${fmt(finalTotal)} 결제하기`)}
+          </button>
+        </form>
       </div>
     </div>
   );

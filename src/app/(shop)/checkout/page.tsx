@@ -258,6 +258,9 @@ export default function CheckoutPage() {
       setOrderNumber(data.orderNumber);
       setTotalAmount(data.totalAmount);
       setStep("payment");
+      
+      // 스크롤 최상단 자동 이동 (푸터 처박힘 방지)
+      window.scrollTo({ top: 0, behavior: "instant" });
 
       if (saveAsDefault) {
         sessionStorage.setItem("save_address_on_success", JSON.stringify({
@@ -280,7 +283,7 @@ export default function CheckoutPage() {
     }
   };
 
-  // 토스페이먼츠 결제위젯 초기화
+  // 토스페이먼츠 결제위젯 초기화 및 자동 팝업 호출
   const initTossWidget = async (oid: string, oNum: string, amount: number) => {
     try {
       const { loadTossPayments } = await import("@tosspayments/tosspayments-sdk");
@@ -311,8 +314,26 @@ export default function CheckoutPage() {
       }
 
       tossWidgetRef.current = { widgets, oid, oNum, amount };
+
+      // 🌟 [자동 결제 트리거] 렌더링 완료 즉시 결제 팝업창을 즉각 띄워줍니다!
+      await widgets.requestPayment({
+        orderId: oid,
+        orderName: checkoutItems.length === 1
+          ? (checkoutItems[0].product?.name ?? "상품")
+          : `${checkoutItems[0].product?.name ?? "상품"} 외 ${checkoutItems.length - 1}건`,
+        successUrl: `${window.location.origin}/checkout/success`,
+        failUrl: `${window.location.origin}/checkout/fail`,
+        customerEmail: undefined,
+        customerName: form.recipientName,
+        customerMobilePhone: form.recipientPhone.replace(/-/g, ""),
+      });
+
     } catch (err) {
       console.error("토스 위젯 초기화 실패:", err);
+      // 사용자가 결제창을 닫거나 취소한 경우가 아닐 때만 일반 에러 노출
+      if (err && typeof err === "object" && "code" in err && (err as { code: string }).code === "USER_CANCEL") {
+        return;
+      }
       setError("결제 모듈 로드에 실패했습니다. 페이지를 새로고침해 주세요.");
     }
   };

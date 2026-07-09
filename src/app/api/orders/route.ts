@@ -49,16 +49,41 @@ export async function POST(request: NextRequest) {
       0
     );
     const shippingFee = subtotal >= SHIPPING_FREE_THRESHOLD ? 0 : SHIPPING_FEE;
+
+    // 회원 등급 할인 계산 (subtotal 기준 자동 적용)
+    const admin = createSupabaseAdmin();
+    let membershipDiscount = 0;
+    let membershipTierId = "normal";
+    try {
+      const { data: membership } = await admin
+        .from("user_memberships")
+        .select("tier_id")
+        .eq("master_user_id", masterUserId)
+        .maybeSingle();
+      if (membership?.tier_id) {
+        const { data: tier } = await admin
+          .from("membership_tiers")
+          .select("id, discount_rate")
+          .eq("id", membership.tier_id)
+          .maybeSingle();
+        if (tier && tier.discount_rate > 0) {
+          membershipTierId = tier.id;
+          membershipDiscount = Math.floor(subtotal * (tier.discount_rate / 100));
+        }
+      }
+    } catch {
+      // 등급 조회 실패 시 할인 없이 진행
+    }
+
     // 포인트 할인 검증 (조건 A: 10,000원 이상 구매 시, 최대 30%까지만 포인트 결제 허용, 최소 1,000P)
     let pointDiscount = 0;
     if (subtotal >= 10000 && usedPointAmount >= 1000) {
       const maxPointsAllowed = Math.floor(subtotal * 0.3);
       pointDiscount = Math.min(usedPointAmount, maxPointsAllowed);
     }
-    const totalAmount = Math.max(0, subtotal + shippingFee - pointDiscount - couponDiscount);
+    const totalAmount = Math.max(0, subtotal + shippingFee - membershipDiscount - pointDiscount - couponDiscount);
 
     const orderNumber = generateOrderNumber();
-    const admin = createSupabaseAdmin();
 
     // 주문 레코드 생성
     const { data: order, error: orderError } = await admin
@@ -68,6 +93,8 @@ export async function POST(request: NextRequest) {
         master_user_id: masterUserId,
         subtotal,
         shipping_fee: shippingFee,
+        membership_discount: membershipDiscount,
+        membership_tier_id: membershipTierId,
         point_discount: pointDiscount,
         coupon_discount: couponDiscount,
         total_amount: totalAmount,
@@ -127,6 +154,8 @@ export async function POST(request: NextRequest) {
       orderId: order.id,
       orderNumber: order.order_number,
       totalAmount: order.total_amount,
+      membershipDiscount,
+      membershipTierId,
     });
   } catch (error) {
     console.error("[POST /api/orders]", error);

@@ -16,6 +16,8 @@ interface UserSummary {
   masterUserId: string;
   createdAt: string;
   lastSignInAt: string | null;
+  tier: { id: string; name: string; badge_emoji: string; sort_order: number };
+  isLocked: boolean;
 }
 
 interface UserDetail extends UserSummary {
@@ -29,6 +31,16 @@ interface UserDetail extends UserSummary {
   _coreAuthOffline?: boolean;
 }
 
+interface MembershipInfo {
+  currentTier: { id: string; name: string; sort_order: number; discount_rate: number; badge_emoji: string; min_amount: number };
+  isLocked: boolean;
+  lockReason: string | null;
+  totalPurchasedLast6m: number;
+  nextTier: { id: string; name: string; min_amount: number; badge_emoji: string } | null;
+  amountToNextTier: number;
+  allTiers: { id: string; name: string; sort_order: number; badge_emoji: string }[];
+}
+
 export default function AdminUsersPage() {
   const [users, setUsers] = useState<UserSummary[]>([]);
   const [filteredUsers, setFilteredUsers] = useState<UserSummary[]>([]);
@@ -38,7 +50,13 @@ export default function AdminUsersPage() {
   // 모달 상세 정보
   const [selectedUser, setSelectedUser] = useState<UserDetail | null>(null);
   const [modalLoading, setModalLoading] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [showModal, setShowModal] = useState(false);
+
+  // 멤버십 등급
+  const [membership, setMembership] = useState<MembershipInfo | null>(null);
+  const [savingGrade, setSavingGrade] = useState(false);
+  const [gradeForm, setGradeForm] = useState({ tierId: "normal", isLocked: false, lockReason: "" });
 
   useEffect(() => {
     fetchUsers();
@@ -80,16 +98,81 @@ export default function AdminUsersPage() {
     setModalLoading(true);
     setShowModal(true);
     setSelectedUser(null);
+    setMembership(null);
     try {
-      const res = await fetch(`/api/admin/users/${userId}`);
-      const data = await res.json();
-      if (data.success) {
-        setSelectedUser(data.user);
+      const [userRes, membershipRes] = await Promise.all([
+        fetch(`/api/admin/users/${userId}`),
+        fetch(`/api/admin/membership/${userId}`),
+      ]);
+      const userData = await userRes.json();
+      const membershipData = await membershipRes.json();
+      if (userData.success) setSelectedUser(userData.user);
+      if (membershipData.success) {
+        setMembership(membershipData.data);
+        setGradeForm({
+          tierId: membershipData.data.currentTier.id,
+          isLocked: membershipData.data.isLocked,
+          lockReason: membershipData.data.lockReason ?? "",
+        });
       }
     } catch (e) {
       console.error("상세 정보 조회 실패:", e);
     } finally {
       setModalLoading(false);
+    }
+  };
+
+  const handleSaveGrade = async () => {
+    if (!selectedUser) return;
+    setSavingGrade(true);
+    try {
+      const res = await fetch(`/api/admin/membership/${selectedUser.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          tierId: gradeForm.tierId,
+          isLocked: gradeForm.isLocked,
+          lockReason: gradeForm.lockReason || null,
+        }),
+      });
+      const result = await res.json();
+      if (result.success) {
+        alert("✅ 등급이 저장되었습니다.");
+        const membershipRes = await fetch(`/api/admin/membership/${selectedUser.id}`);
+        const membershipData = await membershipRes.json();
+        if (membershipData.success) setMembership(membershipData.data);
+      } else {
+        alert(result.error ?? "저장 실패");
+      }
+    } finally {
+      setSavingGrade(false);
+    }
+  };
+
+  const handleDeleteUser = async (userId: string, userName: string | null) => {
+    const displayName = userName ? `"${userName}"` : "이 사용자";
+    const confirm1 = confirm(`${displayName} 회원을 강제로 탈퇴 처리하시겠습니까?\n이 작업은 Supabase 인증 계정을 삭제하며 되돌릴 수 없습니다.`);
+    if (!confirm1) return;
+
+    const confirm2 = confirm(`정말로 삭제하시겠습니까? 삭제 시 해당 회원은 로그인이 불가능해집니다.\n동의하시면 확인을 눌러주세요.`);
+    if (!confirm2) return;
+
+    setDeleting(true);
+    try {
+      const res = await fetch(`/api/admin/users/${userId}`, { method: "DELETE" });
+      const data = await res.json();
+      if (data.success) {
+        alert("✅ 회원이 성공적으로 강제 탈퇴 처리되었습니다.");
+        setShowModal(false);
+        fetchUsers();
+      } else {
+        alert(data.error ?? "회원 삭제 실패");
+      }
+    } catch (e) {
+      console.error("회원 탈퇴 요청 실패:", e);
+      alert("네트워크 오류가 발생했습니다.");
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -145,19 +228,28 @@ export default function AdminUsersPage() {
             <tbody>
               {filteredUsers.map((u) => (
                 <tr key={u.id}>
-                  <td style={{ fontWeight: 700, color: "var(--mb-pink-500)" }}>{u.name || <span style={{ color: "var(--mb-gray-600)" }}>(미설정)</span>}</td>
+                  <td style={{ fontWeight: 700, color: "var(--mb-pink-500)" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                      {u.name || <span style={{ color: "var(--mb-gray-600)" }}>(미설정)</span>}
+                      <span style={{ fontSize: "0.75rem", background: "rgba(255,255,255,0.05)", padding: "2px 6px", borderRadius: "4px" }}>
+                        {u.tier.badge_emoji} {u.tier.name}
+                      </span>
+                    </div>
+                  </td>
                   <td>{u.email || <span style={{ color: "var(--mb-gray-600)" }}>-</span>}</td>
                   <td>{u.phone || <span style={{ color: "var(--mb-gray-600)" }}>-</span>}</td>
                   <td>{formatDate(u.createdAt)}</td>
                   <td>{formatDate(u.lastSignInAt)}</td>
                   <td>
-                    <button
-                      onClick={() => handleViewDetail(u.id)}
-                      className="admin-btn-primary"
-                      style={{ padding: "6px 12px", fontSize: "0.8125rem", borderRadius: "6px", cursor: "pointer" }}
-                    >
-                      상세 정보
-                    </button>
+                    <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
+                      <button
+                        onClick={() => handleViewDetail(u.id)}
+                        className="admin-btn-primary"
+                        style={{ padding: "6px 12px", fontSize: "0.8125rem", borderRadius: "6px", cursor: "pointer" }}
+                      >
+                        상세 정보
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -225,6 +317,35 @@ export default function AdminUsersPage() {
                       <span style={{ fontSize: "0.75rem", color: "#64748b", display: "block" }}>가입일시</span>
                       <span style={{ fontSize: "0.875rem", color: "#cbd5e1" }}>{formatDate(selectedUser.createdAt)}</span>
                     </div>
+                  </div>
+                  {/* 강제 탈퇴 위험 버튼 */}
+                  <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "0.75rem" }}>
+                    <button
+                      onClick={() => handleDeleteUser(selectedUser.id, selectedUser.name)}
+                      disabled={deleting}
+                      className="admin-btn-danger"
+                      style={{
+                        padding: "6px 14px",
+                        fontSize: "0.8125rem",
+                        borderRadius: "8px",
+                        cursor: deleting ? "not-allowed" : "pointer",
+                        border: "1px solid #ef4444",
+                        background: "rgba(239,68,68,0.1)",
+                        color: "#f87171",
+                        fontWeight: 600,
+                        transition: "all 0.2s"
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.background = "#ef4444";
+                        e.currentTarget.style.color = "#ffffff";
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = "rgba(239,68,68,0.1)";
+                        e.currentTarget.style.color = "#f87171";
+                      }}
+                    >
+                      {deleting ? "⏳ 탈퇴 처리 중..." : "🚫 회원 강제 탈퇴"}
+                    </button>
                   </div>
                 </section>
 
@@ -306,6 +427,125 @@ export default function AdminUsersPage() {
                     ⚠️ 현재 통합 인증 서버(im-core-auth)에 일시적으로 접속할 수 없어 실시간 포인트/쿠폰 내역 조회가 제한되었습니다.
                   </p>
                 )}
+
+                {/* 멤버십 등급 관리 */}
+                <section style={{ borderTop: "1px solid rgba(255,255,255,0.07)", paddingTop: "1.25rem" }}>
+                  <h4 style={{ fontSize: "0.9375rem", fontWeight: 800, color: "#f1f5f9", marginBottom: "0.875rem", display: "flex", alignItems: "center", gap: "0.375rem" }}>
+                    <span>🏆</span> 멤버십 등급 관리
+                  </h4>
+                  {membership ? (
+                    <div style={{ background: "rgba(15, 23, 42, 0.8)", padding: "1.25rem", borderRadius: 12, border: "1px solid rgba(255,255,255,0.06)" }}>
+                      {/* 현재 등급 표시 */}
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.25rem", borderBottom: "1px solid rgba(255,255,255,0.04)", paddingBottom: "0.875rem" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: "0.625rem" }}>
+                          <span style={{ fontSize: "1.75rem", lineHeight: 1 }}>{membership.currentTier.badge_emoji}</span>
+                          <div>
+                            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                              <strong style={{ fontSize: "1.0625rem", color: "#f8fafc", fontWeight: 800 }}>{membership.currentTier.name}</strong>
+                              <span style={{ fontSize: "0.8125rem", color: "#38bdf8", fontWeight: 700 }}>(할인 {membership.currentTier.discount_rate}%)</span>
+                            </div>
+                            <div style={{ marginTop: "0.125rem" }}>
+                              {membership.isLocked && (
+                                <span style={{ fontSize: "0.75rem", background: "rgba(234,179,8,0.2)", color: "#fbbf24", padding: "2px 8px", borderRadius: 6, fontWeight: 600 }}>
+                                  🔒 관리자 지정 등급 ({membership.lockReason || "잠금됨"})
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                        <div style={{ fontSize: "0.875rem", color: "#94a3b8", textAlign: "right" }}>
+                          최근 6개월 누적 구매액: <strong style={{ color: "#ec4899", fontSize: "0.9375rem" }}>{membership.totalPurchasedLast6m.toLocaleString()}원</strong>
+                        </div>
+                      </div>
+
+                      {/* 등급 설정 컨트롤 */}
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem", alignItems: "end" }}>
+                        <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+                          <label style={{ fontSize: "0.875rem", fontWeight: 700, color: "#cbd5e1" }}>등급 변경</label>
+                          <select
+                            value={gradeForm.tierId}
+                            onChange={(e) => setGradeForm((p) => ({ ...p, tierId: e.target.value }))}
+                            style={{
+                              width: "100%",
+                              height: "45px",
+                              padding: "0.5rem 1rem",
+                              fontSize: "0.9375rem",
+                              color: "#f8fafc",
+                              background: "#1e293b",
+                              border: "1px solid #475569",
+                              borderRadius: "8px",
+                              outline: "none",
+                              cursor: "pointer",
+                            }}
+                          >
+                            {membership.allTiers.map((t) => (
+                              <option key={t.id} value={t.id} style={{ background: "#1e293b", color: "#f8fafc" }}>
+                                {t.badge_emoji} {t.name}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        
+                        <div style={{ height: "45px", display: "flex", alignItems: "center" }}>
+                          <label style={{ display: "flex", alignItems: "center", gap: "0.625rem", cursor: "pointer", fontSize: "0.9375rem", color: "#cbd5e1", userSelect: "none" }}>
+                            <input
+                              type="checkbox"
+                              checked={gradeForm.isLocked}
+                              onChange={(e) => setGradeForm((p) => ({ ...p, isLocked: e.target.checked }))}
+                              style={{ width: "18px", height: "18px", cursor: "pointer" }}
+                            />
+                            <strong>등급 잠금 (자동 재산정 제외)</strong>
+                          </label>
+                        </div>
+
+                        {gradeForm.isLocked && (
+                          <div style={{ gridColumn: "1/-1", display: "flex", flexDirection: "column", gap: "0.5rem", marginTop: "0.25rem" }}>
+                            <label style={{ fontSize: "0.875rem", fontWeight: 700, color: "#cbd5e1" }}>잠금 사유</label>
+                            <input
+                              type="text"
+                              value={gradeForm.lockReason}
+                              onChange={(e) => setGradeForm((p) => ({ ...p, lockReason: e.target.value }))}
+                              placeholder="예) MOCA 골드 회원 등급 연동"
+                              style={{
+                                width: "100%",
+                                height: "45px",
+                                padding: "0.5rem 1rem",
+                                fontSize: "0.9375rem",
+                                color: "#f8fafc",
+                                background: "#1e293b",
+                                border: "1px solid #475569",
+                                borderRadius: "8px",
+                                outline: "none",
+                              }}
+                            />
+                          </div>
+                        )}
+                      </div>
+
+                      {/* 저장 버튼 */}
+                      <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "1.25rem" }}>
+                        <button
+                          onClick={handleSaveGrade}
+                          disabled={savingGrade}
+                          className="admin-btn admin-btn-primary"
+                          style={{
+                            padding: "0.625rem 1.25rem",
+                            fontSize: "0.875rem",
+                            fontWeight: 700,
+                            borderRadius: "8px",
+                            cursor: "pointer",
+                          }}
+                        >
+                          {savingGrade ? "⏳ 저장 중..." : "💾 등급 저장"}
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div style={{ color: "#94a3b8", fontSize: "0.875rem", textAlign: "center", padding: "2rem", background: "rgba(15,23,42,0.4)", borderRadius: 12 }}>
+                      ⏳ 등급 정보를 불러오는 중...
+                    </div>
+                  )}
+                </section>
 
               </div>
             ) : (

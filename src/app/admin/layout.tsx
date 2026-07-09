@@ -18,6 +18,7 @@ const NAV = [
   { href: "/admin/orders", label: "주문 관리", icon: "📦" },
   { href: "/admin/live", label: "라이브 관리", icon: "🎥" },
   { href: "/admin/users", label: "회원 관리", icon: "👥" },
+  { href: "/admin/membership", label: "멤버십 등급", icon: "🏆" },
   { href: "/admin/crews", label: "크루 관리", icon: "🎙️" },
   { href: "/admin/vendors", label: "업체 관리", icon: "🏢" },
   { section: "정산" },

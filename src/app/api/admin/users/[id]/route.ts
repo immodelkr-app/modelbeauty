@@ -82,3 +82,38 @@ export async function GET(
     );
   }
 }
+
+/**
+ * DELETE /api/admin/users/[id] — 관리자 권한 회원 강제 탈퇴/삭제
+ */
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const notAllowed = await requireAdmin();
+  if (notAllowed) return notAllowed;
+
+  try {
+    const { id: userId } = await params;
+    const admin = createSupabaseAdmin();
+
+    // Supabase Auth Admin API를 통해 사용자 삭제
+    const { error } = await admin.auth.admin.deleteUser(userId);
+    
+    if (error) {
+      console.error(`[DELETE /api/admin/users/${userId}] Supabase Auth error:`, error);
+      return NextResponse.json({ success: false, error: "회원 삭제 중 오류가 발생했습니다." }, { status: 500 });
+    }
+
+    return NextResponse.json({
+      success: true,
+      message: "회원이 성공적으로 강제 탈퇴 처리되었습니다.",
+    });
+  } catch (error) {
+    console.error("[DELETE /api/admin/users/[id]] Error:", error);
+    return NextResponse.json(
+      { success: false, error: error instanceof Error ? error.message : "서버 오류" },
+      { status: 500 }
+    );
+  }
+}

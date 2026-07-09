@@ -124,10 +124,15 @@ export default function CheckoutPage() {
     }
   }, [isLoaded, authLoading, checkoutItems.length, router]);
 
-  // 토스페이먼츠 위젯 마운트 시 최초 1회 즉각 초기 로드
+  // 토스페이먼츠 위젯 마운트 시 최초 1회 즉각 초기 로드 (DOM 마운트 지연 대응을 위해 500ms 지연)
   useEffect(() => {
     if (isLoaded && isLoggedIn && !authLoading && checkoutItems.length > 0 && finalTotal > 0 && !tossWidgets) {
-      initTossWidget(finalTotal);
+      const timer = setTimeout(() => {
+        if (paymentRef.current && agreementRef.current) {
+          initTossWidget(finalTotal);
+        }
+      }, 500);
+      return () => clearTimeout(timer);
     }
   }, [isLoaded, isLoggedIn, authLoading, checkoutItems.length, finalTotal, tossWidgets]);
 
@@ -311,6 +316,10 @@ export default function CheckoutPage() {
   // 토스페이먼츠 결제위젯 마운트 시 즉각 초기화 (렌더링만 수행)
   const initTossWidget = async (amount: number) => {
     try {
+      if (!paymentRef.current || !agreementRef.current) {
+        throw new Error("결제 위젯 컨테이너 엘리먼트가 존재하지 않습니다.");
+      }
+
       const { loadTossPayments } = await import("@tosspayments/tosspayments-sdk");
       const cleanClientKey = (process.env.NEXT_PUBLIC_TOSS_CLIENT_KEY || "")
         .trim()
@@ -337,9 +346,10 @@ export default function CheckoutPage() {
       });
 
       setTossWidgets(widgets);
+      setError(""); // 에러 클리어
     } catch (err) {
       console.error("토스 위젯 초기화 실패:", err);
-      setError("결제 모듈 로드에 실패했습니다. 페이지를 새로고침해 주세요.");
+      setError("결제 모듈 로드에 실패했습니다. 하단의 [결제 모듈 재시도] 버튼을 누르거나 페이지를 새로고침해 주세요.");
     }
   };
 
@@ -627,7 +637,33 @@ export default function CheckoutPage() {
             </div>
           </section>
 
-          {error && <p style={{ color: "#ef4444", fontSize: "0.875rem", margin: 0, fontWeight: 600 }}>{error}</p>}
+          {error && (
+            <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+              <p style={{ color: "#ef4444", fontSize: "0.875rem", margin: 0, fontWeight: 600 }}>{error}</p>
+              {!tossWidgets && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setError("");
+                    initTossWidget(finalTotal);
+                  }}
+                  style={{
+                    padding: "0.5rem 1rem",
+                    borderRadius: "10px",
+                    border: "1px solid #db2777",
+                    background: "transparent",
+                    color: "#db2777",
+                    fontSize: "0.8125rem",
+                    fontWeight: 600,
+                    cursor: "pointer",
+                    alignSelf: "flex-start"
+                  }}
+                >
+                  🔄 결제 모듈 재시도
+                </button>
+              )}
+            </div>
+          )}
 
           <button type="submit" disabled={isSubmitting || !tossWidgets}
             style={{

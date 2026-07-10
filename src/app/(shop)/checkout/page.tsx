@@ -56,9 +56,6 @@ export default function CheckoutPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [saveAsDefault, setSaveAsDefault] = useState(false);
   const [error, setError] = useState("");
-  
-  // Toss 위젯 인스턴스 보관 state
-  const [tossWidgets, setTossWidgets] = useState<any>(null);
 
   // 포인트 및 쿠폰 관련 상태
   const [coupons, setCoupons] = useState<any[]>([]);
@@ -124,27 +121,6 @@ export default function CheckoutPage() {
     }
   }, [isLoaded, authLoading, checkoutItems.length, router]);
 
-  // 토스페이먼츠 위젯 마운트 시 최초 1회 즉각 초기 로드 (DOM 마운트 지연 대응을 위해 500ms 지연)
-  useEffect(() => {
-    if (isLoaded && isLoggedIn && !authLoading && checkoutItems.length > 0 && finalTotal > 0 && !tossWidgets) {
-      const timer = setTimeout(() => {
-        if (paymentRef.current && agreementRef.current) {
-          initTossWidget(finalTotal);
-        }
-      }, 500);
-      return () => clearTimeout(timer);
-    }
-  }, [isLoaded, isLoggedIn, authLoading, checkoutItems.length, finalTotal, tossWidgets]);
-
-  // 결제 금액 변경 시 토스 위젯 금액 실시간 연동
-  useEffect(() => {
-    if (tossWidgets) {
-      tossWidgets.setAmount({ currency: "KRW", value: finalTotal }).catch((e: any) => {
-        console.error("토스 위젯 금액 업데이트 실패:", e);
-      });
-    }
-  }, [finalTotal, tossWidgets]);
-
   useEffect(() => {
     if (isLoggedIn) {
       fetch("/api/coupons")
@@ -157,9 +133,6 @@ export default function CheckoutPage() {
         .catch((e) => console.error("쿠폰 정보 로딩 실패:", e));
     }
   }, [isLoggedIn]);
-
-  const paymentRef = useRef<HTMLDivElement>(null);
-  const agreementRef = useRef<HTMLDivElement>(null);
 
   const handleInput = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     setForm((f) => ({ ...f, [e.target.name]: e.target.value }));
@@ -234,11 +207,6 @@ export default function CheckoutPage() {
       return;
     }
 
-    if (!tossWidgets) {
-      setError("결제 모듈이 아직 로드되지 않았습니다. 잠시 후 다시 시도해주세요.");
-      return;
-    }
-
     setIsSubmitting(true);
     try {
       // 1. 주문 상품 객체 생성
@@ -288,85 +256,50 @@ export default function CheckoutPage() {
         sessionStorage.removeItem("save_address_on_success");
       }
 
-      // 3. 주문 생성 즉시 2페이지 전환 없이 그 자리에서 바로 토스 결제 모듈 팝업(혹은 리다이렉트) 호출!
-      await tossWidgets.requestPayment({
-        orderId: data.orderId,
-        orderName: checkoutItems.length === 1
-          ? (checkoutItems[0].product?.name ?? "상품")
-          : `${checkoutItems[0].product?.name ?? "상품"} 외 ${checkoutItems.length - 1}건`,
-        successUrl: `${window.location.origin}/checkout/success`,
-        failUrl: `${window.location.origin}/checkout/fail`,
-        customerEmail: undefined,
-        customerName: form.recipientName,
-        customerMobilePhone: form.recipientPhone.replace(/-/g, ""),
-      });
-
-    } catch (err) {
-      console.error("결제 진행 중 실패:", err);
-      // 사용자가 결제창을 취소(닫기)한 경우는 에러로 간주하지 않고 멈춤
-      if (err && typeof err === "object" && "code" in err && (err as { code: string }).code === "USER_CANCEL") {
-        return;
-      }
-      setError("결제 요청 중 오류가 발생했습니다. 다시 시도해 주세요.");
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  // 토스페이먼츠 결제위젯 마운트 시 즉각 초기화 (렌더링만 수행)
-  const initTossWidget = async (amount: number) => {
-    try {
-      if (!paymentRef.current || !agreementRef.current) {
-        throw new Error("결제 위젯 컨테이너 엘리먼트가 존재하지 않습니다.");
-      }
-
+      // 3. 토스 SDK 로드 및 결제창 직접 호출
       const { loadTossPayments } = await import("@tosspayments/tosspayments-sdk");
       const cleanClientKey = (process.env.NEXT_PUBLIC_TOSS_CLIENT_KEY || "")
         .trim()
         .replace(/^["']|["']$/g, "")
         .replace(/[\u200B-\u200D\uFEFF\u0000-\u001F]/g, "");
 
-      // 클라이언트 키 누락 체크
       if (!cleanClientKey) {
-        throw new Error("[설정 오류] NEXT_PUBLIC_TOSS_CLIENT_KEY 환경변수가 비어있습니다. Vercel 대시보드에서 환경변수를 확인해 주세요.");
-      }
-
-      // 디버깅을 위해 키의 길이와 시작 부분 확인
-      const keyPrefix = cleanClientKey.substring(0, 14);
-      const keyLength = cleanClientKey.length;
-      console.log(`[디버그] Toss Client Key 로드됨: prefix=${keyPrefix}, length=${keyLength}`);
-
-      if (!cleanClientKey.startsWith("widget_client_")) {
-        throw new Error(`[키 설정 오류] 현재 키 앞부분: "${keyPrefix}..." (총 ${keyLength}자). 토스 대시보드 → 결제위젯 탭 → 클라이언트 키 (widget_client_로 시작하는 값)를 Vercel에 입력해 주세요.`);
+        throw new Error("[설정 오류] NEXT_PUBLIC_TOSS_CLIENT_KEY 환경변수가 비어있습니다.");
       }
 
       const tossPayments = await loadTossPayments(cleanClientKey);
-
-      const widgets = tossPayments.widgets({
+      const payment = tossPayments.payment({
         customerKey: masterUser?.masterUserId ?? "GUEST",
       });
 
-      await widgets.setAmount({ currency: "KRW", value: amount });
+      const orderName = checkoutItems.length === 1
+        ? (checkoutItems[0].product?.name ?? "상품")
+        : `${checkoutItems[0].product?.name ?? "상품"} 외 ${checkoutItems.length - 1}건`;
 
-      // 결제수단 렌더링
-      await widgets.renderPaymentMethods({
-        selector: "#payment-method",
-        variantKey: "DEFAULT",
+      await payment.requestPayment({
+        method: "CARD",
+        amount: {
+          currency: "KRW",
+          value: finalTotal,
+        },
+        orderId: data.orderId,
+        orderName: orderName,
+        successUrl: `${window.location.origin}/checkout/success`,
+        failUrl: `${window.location.origin}/checkout/fail`,
+        customerName: form.recipientName,
+        customerMobilePhone: form.recipientPhone.replace(/-/g, ""),
       });
 
-      // 약관동의 렌더링
-      await widgets.renderAgreement({
-        selector: "#payment-agreement",
-        variantKey: "AGREEMENT",
-      });
-
-      setTossWidgets(widgets);
-      setError(""); // 에러 클리어
     } catch (err: unknown) {
+      console.error("결제 진행 중 실패:", err);
+      // 사용자가 결제창을 취소(닫기)한 경우는 에러로 간주하지 않고 멈춤
+      if (err && typeof err === "object" && "code" in err && (err as { code: string }).code === "USER_CANCEL") {
+        return;
+      }
       const errMsg = err instanceof Error ? err.message : String(err);
-      const keyForDebug = (process.env.NEXT_PUBLIC_TOSS_CLIENT_KEY || "").substring(0, 16);
-      console.error("토스 위젯 초기화 실패:", errMsg);
-      setError(`결제 모듈 초기화 실패: ${errMsg} \n[디버그] 현재 키 앞 16자: "${keyForDebug}"`);
+      setError(`결제 요청 중 오류가 발생했습니다: ${errMsg}`);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -606,14 +539,7 @@ export default function CheckoutPage() {
             </div>
           </section>
 
-          {/* ── 토스 결제위젯 렌더 영역 (1페이지 상시 노출) ── */}
-          <section style={{ background: "#fff", borderRadius: "16px", padding: "1.25rem", border: "1px solid var(--mb-gray-100)" }}>
-            <h2 style={{ fontSize: "1rem", fontWeight: 700, margin: "0 0 1rem", color: "var(--mb-gray-900)" }}>
-              결제 수단 선택
-            </h2>
-            <div id="payment-method" ref={paymentRef} style={{ minHeight: "150px" }} />
-            <div id="payment-agreement" ref={agreementRef} style={{ marginTop: "1rem" }} />
-          </section>
+
 
           {/* 결제 금액 요약 */}
           <section style={{ background: "#fff", borderRadius: "16px", padding: "1.25rem", border: "1px solid var(--mb-gray-100)" }}>
@@ -657,39 +583,17 @@ export default function CheckoutPage() {
           {error && (
             <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
               <p style={{ color: "#ef4444", fontSize: "0.875rem", margin: 0, fontWeight: 600 }}>{error}</p>
-              {!tossWidgets && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setError("");
-                    initTossWidget(finalTotal);
-                  }}
-                  style={{
-                    padding: "0.5rem 1rem",
-                    borderRadius: "10px",
-                    border: "1px solid #db2777",
-                    background: "transparent",
-                    color: "#db2777",
-                    fontSize: "0.8125rem",
-                    fontWeight: 600,
-                    cursor: "pointer",
-                    alignSelf: "flex-start"
-                  }}
-                >
-                  🔄 결제 모듈 재시도
-                </button>
-              )}
             </div>
           )}
 
-          <button type="submit" disabled={isSubmitting || !tossWidgets}
+          <button type="submit" disabled={isSubmitting}
             style={{
               padding: "1rem", borderRadius: "14px", border: "none", cursor: "pointer",
               background: "linear-gradient(135deg, #db2777, #9333ea)",
               color: "#fff", fontSize: "1rem", fontWeight: 700,
-              opacity: (isSubmitting || !tossWidgets) ? 0.7 : 1,
+              opacity: isSubmitting ? 0.7 : 1,
             }}>
-            {isSubmitting ? "결제 진행 중..." : (!tossWidgets ? "결제 모듈 로딩 중..." : `${fmt(finalTotal)} 결제하기`)}
+            {isSubmitting ? "결제 진행 중..." : `${fmt(finalTotal)} 결제하기`}
           </button>
         </form>
       </div>

@@ -300,6 +300,54 @@ export default function MypagePage() {
 
   return (
     <>
+      {/* 배송지 누락 연동 회원 경고 배너 */}
+      {masterUser && (!masterUser.shipping_address || !masterUser.shipping_zipcode) && (
+        <div style={{
+          background: "linear-gradient(135deg, #fdf2f8, #fce7f3)",
+          border: "1px solid #fbcfe8",
+          borderRadius: "16px",
+          padding: "1.25rem",
+          marginBottom: "1.5rem",
+          display: "flex",
+          flexDirection: "column",
+          gap: "0.75rem",
+          boxShadow: "0 4px 12px rgba(219, 39, 119, 0.05)"
+        }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "0.625rem" }}>
+            <span style={{ fontSize: "1.5rem" }}>⚠️</span>
+            <div>
+              <div style={{ fontWeight: 800, fontSize: "0.9375rem", color: "#9d174d" }}>배송 정보 기입 필요</div>
+              <div style={{ fontSize: "0.8125rem", color: "#be185d", marginTop: 2 }}>
+                모델뷰티 쇼핑몰에서 상품을 주문하시려면 배송지 주소와 연락처 정보가 필수적입니다.
+              </div>
+            </div>
+          </div>
+          <button
+            onClick={() => {
+              handleStartEditAddress();
+              setTimeout(() => {
+                document.getElementById("address-card-section")?.scrollIntoView({ behavior: "smooth" });
+              }, 100);
+            }}
+            style={{
+              alignSelf: "flex-start",
+              background: "var(--mb-pink-500)",
+              color: "#fff",
+              border: "none",
+              borderRadius: "8px",
+              padding: "0.5rem 1rem",
+              fontSize: "0.8125rem",
+              fontWeight: 700,
+              cursor: "pointer",
+              transition: "all 0.2s",
+              boxShadow: "0 2px 6px rgba(236, 72, 153, 0.3)"
+            }}
+          >
+            지금 배송지 주소 등록하기 ➔
+          </button>
+        </div>
+      )}
+
       <div style={{
         display: "flex",
         alignItems: "center",
@@ -458,14 +506,19 @@ export default function MypagePage() {
       )}
 
       {/* 내 주소 설정 카드 */}
-      <div style={{
-        background: "#fff",
-        borderRadius: "20px",
-        padding: "1.5rem",
-        boxShadow: "0 4px 20px rgba(0, 0, 0, 0.05)",
-        border: "1px solid var(--mb-gray-100)",
-        marginBottom: "2rem"
-      }}>
+      <div 
+        id="address-card-section"
+        style={{
+          background: "#fff",
+          borderRadius: "20px",
+          padding: "1.5rem",
+          boxShadow: "0 4px 20px rgba(0, 0, 0, 0.05)",
+          border: masterUser && (!masterUser.shipping_address || !masterUser.shipping_zipcode)
+            ? "2px solid var(--mb-pink-500)"
+            : "1px solid var(--mb-gray-100)",
+          marginBottom: "2rem"
+        }}
+      >
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}>
           <h2 style={{ fontSize: "1.0625rem", fontWeight: 800, color: "var(--mb-gray-900)", margin: 0 }}>
             내 주소 설정 <span style={{ color: "var(--mb-pink-500)", fontSize: "0.8rem", fontWeight: 600 }}>(필수)</span>

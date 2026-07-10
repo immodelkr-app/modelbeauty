@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/auth-admin";
 import { createSupabaseAdmin } from "@/lib/supabase/server";
+import { getBulkMasterUsers } from "@/lib/core-auth";
 
 export async function GET(request: NextRequest) {
   const notAllowed = await requireAdmin();
@@ -19,26 +20,33 @@ export async function GET(request: NextRequest) {
     
     if (error) throw error;
 
-    // 멤버십 등급 일괄 조회
+    // 아임모델 공화국 통합 등급 일괄 조회
     const masterUserIds = users.map((u) => u.user_metadata?.master_user_id || u.id);
-    const { data: memberships } = await admin
-      .from("user_memberships")
-      .select("master_user_id, tier_id, is_locked")
-      .in("master_user_id", masterUserIds);
+    let memberships: any[] = [];
+    try {
+      memberships = await getBulkMasterUsers(masterUserIds);
+    } catch (bulkErr) {
+      console.warn("[/api/admin/users] 아임모델 공화국 등급 벌크 조회 실패, 기본값 대체:", bulkErr);
+    }
 
-    const { data: tiers } = await admin
-      .from("membership_tiers")
-      .select("id, name, badge_emoji, sort_order");
+    const ALL_TIERS = [
+      { id: "normal", name: "일반", badge_emoji: "🩶", sort_order: 1 },
+      { id: "silver", name: "실버", badge_emoji: "🥈", sort_order: 2 },
+      { id: "gold", name: "골드", badge_emoji: "🥇", sort_order: 3 },
+      { id: "imodel", name: "아임모델", badge_emoji: "⭐", sort_order: 4 },
+      { id: "vip", name: "VIP", badge_emoji: "💎", sort_order: 5 },
+    ];
 
-    const membershipMap = new Map((memberships ?? []).map((m) => [m.master_user_id, m]));
-    const tierMap = new Map((tiers ?? []).map((t) => [t.id, t]));
-    const defaultTier = { id: "normal", name: "일반", badge_emoji: "🦤", sort_order: 1 };
+    const membershipMap = new Map((memberships ?? []).map((m) => [m.id, m]));
+    const tierMap = new Map(ALL_TIERS.map((t) => [t.id, t]));
+    const defaultTier = ALL_TIERS[0];
 
     // 데이터를 가공하여 필요한 정보만 전송
     const formattedUsers = users.map((u) => {
       const masterUserId = u.user_metadata?.master_user_id || u.id;
       const membership = membershipMap.get(masterUserId);
-      const tier = membership ? (tierMap.get(membership.tier_id) ?? defaultTier) : defaultTier;
+      const gradeCode = (membership?.grade || "NORMAL").toLowerCase();
+      const tier = tierMap.get(gradeCode) ?? defaultTier;
       return {
         id: u.id,
         email: u.email || null,
@@ -48,7 +56,7 @@ export async function GET(request: NextRequest) {
         createdAt: u.created_at,
         lastSignInAt: u.last_sign_in_at || null,
         tier,
-        isLocked: membership?.is_locked ?? false,
+        isLocked: membership?.grade_locked ?? false,
       };
     });
 

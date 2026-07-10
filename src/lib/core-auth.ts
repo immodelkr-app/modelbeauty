@@ -172,6 +172,9 @@ export async function updateMasterUser(
     shipping_zipcode?: string | null;
     shipping_address?: string | null;
     shipping_detail?: string | null;
+    grade?: string;
+    grade_locked?: boolean;
+    grade_locked_reason?: string | null;
   }
 ): Promise<MasterUser> {
   const res = await coreAuthFetch(`/api/auth/user/${masterUserId}`, {
@@ -206,6 +209,26 @@ export async function getPointBalance(
   }
 
   return res.json();
+}
+
+/**
+ * 여러 마스터 유저 ID에 대한 통합 정보(등급 등) 벌크 조회
+ */
+export async function getBulkMasterUsers(
+  masterUserIds: string[]
+): Promise<{ id: string; grade: string; grade_locked: boolean; grade_locked_reason: string | null }[]> {
+  const res = await coreAuthFetch("/api/auth/user/bulk", {
+    method: "POST",
+    body: JSON.stringify({ masterUserIds }),
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || `벌크 유저 정보 조회 실패: ${res.status}`);
+  }
+
+  const data = await res.json();
+  return data.users ?? [];
 }
 
 /**
@@ -311,4 +334,23 @@ export async function restoreCoupon(
     const err = await res.json().catch(() => ({}));
     throw new Error(err.error || `쿠폰 복원 실패: ${res.status}`);
   }
+}
+
+/**
+ * 아임모델 공화국 전체 마스터 회원 목록 가져오기 (어드민 등급 일괄 재산정용)
+ */
+export async function getAllMasterUsers(): Promise<{ id: string; grade: string; grade_locked: boolean }[]> {
+  const res = await coreAuthFetch("/api/admin/members?limit=1000");
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || `전체 회원 목록 조회 실패: ${res.status}`);
+  }
+
+  const data = await res.json();
+  return (data.members ?? []).map((m: any) => ({
+    id: m.id,
+    grade: m.grade || "NORMAL",
+    grade_locked: m.grade_locked || false,
+  }));
 }

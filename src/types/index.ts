@@ -18,6 +18,9 @@ export interface MasterUser {
   shipping_zipcode?: string | null;
   shipping_address?: string | null;
   shipping_detail?: string | null;
+  grade?: string;
+  grade_locked?: boolean;
+  grade_locked_reason?: string | null;
 }
 
 /** im-core-auth 포인트 잔액 응답 */

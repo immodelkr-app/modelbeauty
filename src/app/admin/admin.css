@@ -311,6 +311,7 @@
   font-size: 1.25rem;
   overflow: hidden;
   flex-shrink: 0;
+  position: relative; /* Next.js Image fill layout absolute overflow fix */
 }
 
 .admin-table-thumb img {

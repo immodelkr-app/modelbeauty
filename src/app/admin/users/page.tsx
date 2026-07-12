@@ -58,6 +58,18 @@ export default function AdminUsersPage() {
   const [savingGrade, setSavingGrade] = useState(false);
   const [gradeForm, setGradeForm] = useState({ tierId: "normal", isLocked: false, lockReason: "" });
 
+  // ── 적립금 조정 모달 ──────────────────────────────────────
+  const [showPointModal, setShowPointModal] = useState(false);
+  const [pointForm, setPointForm] = useState({ type: "reward", amount: "", description: "" });
+  const [pointSaving, setPointSaving] = useState(false);
+
+  // ── 쿠폰 발급 모달 ──────────────────────────────────────
+  const [showCouponModal, setShowCouponModal] = useState(false);
+  const [couponTemplates, setCouponTemplates] = useState<{ id: string; name: string; discountType: string; discountValue: number }[]>([]);
+  const [selectedTemplateId, setSelectedTemplateId] = useState("");
+  const [couponIssuing, setCouponIssuing] = useState(false);
+  const [couponTemplatesLoading, setCouponTemplatesLoading] = useState(false);
+
   useEffect(() => {
     fetchUsers();
   }, []);
@@ -173,6 +185,95 @@ export default function AdminUsersPage() {
       alert("네트워크 오류가 발생했습니다.");
     } finally {
       setDeleting(false);
+    }
+  };
+
+  // ── 적립금 수동 지급/차감 ─────────────────────────────────
+  const handleAdjustPoints = async () => {
+    if (!selectedUser) return;
+    const amount = parseInt(pointForm.amount, 10);
+    if (isNaN(amount) || amount <= 0) {
+      alert("올바른 포인트 금액을 입력해 주세요.");
+      return;
+    }
+    if (!pointForm.description.trim()) {
+      alert("지급/차감 사유를 입력해 주세요.");
+      return;
+    }
+    setPointSaving(true);
+    try {
+      const finalAmount = pointForm.type === "reward" ? amount : -amount;
+      const res = await fetch(`/api/admin/users/${selectedUser.masterUserId}/points`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ amount: finalAmount, description: pointForm.description }),
+      });
+      const result = await res.json();
+      if (result.success) {
+        alert(`✅ 적립금 ${pointForm.type === "reward" ? "지급" : "차감"}이 완료되었습니다.`);
+        setShowPointModal(false);
+        setPointForm({ type: "reward", amount: "", description: "" });
+        // 회원 상세 정보 새로고침
+        const userRes = await fetch(`/api/admin/users/${selectedUser.id}`);
+        const userData = await userRes.json();
+        if (userData.success) setSelectedUser(userData.user);
+      } else {
+        alert(result.error ?? "처리 실패");
+      }
+    } catch (e) {
+      console.error("적립금 조정 실패:", e);
+      alert("네트워크 오류가 발생했습니다.");
+    } finally {
+      setPointSaving(false);
+    }
+  };
+
+  // ── 쿠폰 발급 ─────────────────────────────────────────────
+  const handleOpenCouponModal = async () => {
+    setShowCouponModal(true);
+    setCouponTemplatesLoading(true);
+    setSelectedTemplateId("");
+    try {
+      const res = await fetch("/api/admin/coupons/templates");
+      const data = await res.json();
+      setCouponTemplates(data.templates ?? []);
+    } catch (e) {
+      console.error("쿠폰 템플릿 로드 실패:", e);
+      setCouponTemplates([]);
+    } finally {
+      setCouponTemplatesLoading(false);
+    }
+  };
+
+  const handleIssueCoupon = async () => {
+    if (!selectedUser || !selectedTemplateId) {
+      alert("발급할 쿠폰을 선택해 주세요.");
+      return;
+    }
+    setCouponIssuing(true);
+    try {
+      const res = await fetch(`/api/admin/users/${selectedUser.masterUserId}/coupons`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ couponTemplateId: selectedTemplateId }),
+      });
+      const result = await res.json();
+      if (result.success) {
+        alert("✅ 쿠폰이 성공적으로 발급되었습니다.");
+        setShowCouponModal(false);
+        setSelectedTemplateId("");
+        // 회원 상세 정보 새로고침 (쿠폰 목록 반영)
+        const userRes = await fetch(`/api/admin/users/${selectedUser.id}`);
+        const userData = await userRes.json();
+        if (userData.success) setSelectedUser(userData.user);
+      } else {
+        alert(result.error ?? "쿠폰 발급 실패");
+      }
+    } catch (e) {
+      console.error("쿠폰 발급 실패:", e);
+      alert("네트워크 오류가 발생했습니다.");
+    } finally {
+      setCouponIssuing(false);
     }
   };
 
@@ -353,7 +454,19 @@ export default function AdminUsersPage() {
                 <section style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
                   {/* 포인트 */}
                   <div style={{ background: "rgba(236,72,153,0.03)", border: "1px solid rgba(236,72,153,0.15)", padding: "1rem", borderRadius: "12px" }}>
-                    <div style={{ fontSize: "0.8125rem", color: "#fbcfe8", fontWeight: 600 }}>통합 포인트 잔액</div>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                      <div style={{ fontSize: "0.8125rem", color: "#fbcfe8", fontWeight: 600 }}>통합 포인트 잔액</div>
+                      <button
+                        onClick={() => { setShowPointModal(true); setPointForm({ type: "reward", amount: "", description: "" }); }}
+                        style={{
+                          fontSize: "0.6875rem", fontWeight: 700, padding: "3px 8px",
+                          background: "rgba(236,72,153,0.2)", border: "1px solid rgba(236,72,153,0.4)",
+                          color: "#ec4899", borderRadius: "6px", cursor: "pointer", lineHeight: 1.4,
+                        }}
+                      >
+                        ✏️ 조정
+                      </button>
+                    </div>
                     <div style={{ fontSize: "1.625rem", fontWeight: 900, color: "#ec4899", marginTop: "0.25rem" }}>
                       {selectedUser.points.toLocaleString()} <span style={{ fontSize: "0.875rem", fontWeight: 500 }}>P</span>
                     </div>
@@ -364,7 +477,19 @@ export default function AdminUsersPage() {
 
                   {/* 보유 쿠폰 수 */}
                   <div style={{ background: "rgba(147,51,234,0.03)", border: "1px solid rgba(147,51,234,0.15)", padding: "1rem", borderRadius: "12px" }}>
-                    <div style={{ fontSize: "0.8125rem", color: "#e9d5ff", fontWeight: 600 }}>사용 가능한 쿠폰</div>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                      <div style={{ fontSize: "0.8125rem", color: "#e9d5ff", fontWeight: 600 }}>사용 가능한 쿠폰</div>
+                      <button
+                        onClick={handleOpenCouponModal}
+                        style={{
+                          fontSize: "0.6875rem", fontWeight: 700, padding: "3px 8px",
+                          background: "rgba(147,51,234,0.2)", border: "1px solid rgba(147,51,234,0.4)",
+                          color: "#a855f7", borderRadius: "6px", cursor: "pointer", lineHeight: 1.4,
+                        }}
+                      >
+                        🎁 발급
+                      </button>
+                    </div>
                     <div style={{ fontSize: "1.625rem", fontWeight: 900, color: "#a855f7", marginTop: "0.25rem" }}>
                       {selectedUser.coupons.length} <span style={{ fontSize: "0.875rem", fontWeight: 500 }}>장</span>
                     </div>
@@ -553,6 +678,218 @@ export default function AdminUsersPage() {
                 ❌ 상세 정보를 불러오는 과정에서 오류가 발생했습니다.
               </div>
             )}
+          </div>
+        </div>
+      )}
+      {/* ══════════════════════════════════════════════════════
+            적립금 수동 조정 모달
+      ══════════════════════════════════════════════════════ */}
+      {showPointModal && selectedUser && (
+        <div
+          style={{
+            position: "fixed", inset: 0, background: "rgba(0,0,0,0.75)", zIndex: 60,
+            display: "flex", alignItems: "center", justifyContent: "center", padding: "1rem",
+          }}
+          onClick={() => setShowPointModal(false)}
+        >
+          <div
+            style={{
+              background: "#0f172a", color: "#f8fafc", width: "100%", maxWidth: "420px",
+              borderRadius: "16px", padding: "1.5rem", border: "1px solid rgba(236,72,153,0.25)",
+              boxShadow: "0 25px 50px -12px rgba(0,0,0,0.7)",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.25rem" }}>
+              <h3 style={{ margin: 0, fontSize: "1.1rem", fontWeight: 800, color: "#ec4899" }}>
+                ✏️ 적립금 수동 조정
+              </h3>
+              <button
+                onClick={() => setShowPointModal(false)}
+                style={{ background: "transparent", border: "none", color: "#94a3b8", fontSize: "1.4rem", cursor: "pointer" }}
+              >✕</button>
+            </div>
+
+            <p style={{ fontSize: "0.8125rem", color: "#94a3b8", margin: "0 0 1rem" }}>
+              <strong style={{ color: "#f1f5f9" }}>{selectedUser.name || selectedUser.phone}</strong> 회원의 통합 포인트를 수동으로 지급하거나 차감합니다.
+            </p>
+
+            {/* 지급 / 차감 선택 */}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.5rem", marginBottom: "1rem" }}>
+              {(["reward", "deduct"] as const).map((t) => (
+                <button
+                  key={t}
+                  onClick={() => setPointForm((p) => ({ ...p, type: t }))}
+                  style={{
+                    padding: "0.625rem", borderRadius: "10px", fontWeight: 700, fontSize: "0.9rem",
+                    cursor: "pointer", transition: "all 0.15s",
+                    background: pointForm.type === t ? (t === "reward" ? "rgba(236,72,153,0.25)" : "rgba(239,68,68,0.25)") : "rgba(255,255,255,0.04)",
+                    border: pointForm.type === t ? `1px solid ${t === "reward" ? "#ec4899" : "#ef4444"}` : "1px solid rgba(255,255,255,0.08)",
+                    color: pointForm.type === t ? (t === "reward" ? "#ec4899" : "#f87171") : "#64748b",
+                  }}
+                >
+                  {t === "reward" ? "🎁 지급 (적립)" : "💸 차감 (회수)"}
+                </button>
+              ))}
+            </div>
+
+            {/* 금액 */}
+            <div style={{ marginBottom: "0.75rem" }}>
+              <label style={{ fontSize: "0.8125rem", fontWeight: 600, color: "#94a3b8", display: "block", marginBottom: "0.375rem" }}>금액 (P)</label>
+              <input
+                type="number"
+                min="1"
+                value={pointForm.amount}
+                onChange={(e) => setPointForm((p) => ({ ...p, amount: e.target.value }))}
+                placeholder="예) 5000"
+                style={{
+                  width: "100%", padding: "0.625rem 0.875rem", borderRadius: "8px",
+                  background: "#1e293b", border: "1px solid #475569", color: "#f8fafc",
+                  fontSize: "1rem", outline: "none", boxSizing: "border-box",
+                }}
+              />
+            </div>
+
+            {/* 사유 */}
+            <div style={{ marginBottom: "1.25rem" }}>
+              <label style={{ fontSize: "0.8125rem", fontWeight: 600, color: "#94a3b8", display: "block", marginBottom: "0.375rem" }}>사유</label>
+              <input
+                type="text"
+                value={pointForm.description}
+                onChange={(e) => setPointForm((p) => ({ ...p, description: e.target.value }))}
+                placeholder="예) 이벤트 당첨 적립, 운영자 보상 등"
+                style={{
+                  width: "100%", padding: "0.625rem 0.875rem", borderRadius: "8px",
+                  background: "#1e293b", border: "1px solid #475569", color: "#f8fafc",
+                  fontSize: "0.9375rem", outline: "none", boxSizing: "border-box",
+                }}
+              />
+            </div>
+
+            <div style={{ display: "flex", gap: "0.75rem", justifyContent: "flex-end" }}>
+              <button
+                onClick={() => setShowPointModal(false)}
+                style={{
+                  padding: "0.625rem 1rem", borderRadius: "8px", fontWeight: 600, fontSize: "0.875rem",
+                  background: "transparent", border: "1px solid #475569", color: "#94a3b8", cursor: "pointer",
+                }}
+              >
+                취소
+              </button>
+              <button
+                onClick={handleAdjustPoints}
+                disabled={pointSaving}
+                style={{
+                  padding: "0.625rem 1.25rem", borderRadius: "8px", fontWeight: 700, fontSize: "0.9rem",
+                  background: pointForm.type === "reward" ? "#ec4899" : "#ef4444",
+                  border: "none", color: "#fff", cursor: pointSaving ? "not-allowed" : "pointer",
+                  opacity: pointSaving ? 0.6 : 1,
+                }}
+              >
+                {pointSaving ? "⏳ 처리 중..." : pointForm.type === "reward" ? "✅ 지급하기" : "✅ 차감하기"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ══════════════════════════════════════════════════════
+            쿠폰 수동 발급 모달
+      ══════════════════════════════════════════════════════ */}
+      {showCouponModal && selectedUser && (
+        <div
+          style={{
+            position: "fixed", inset: 0, background: "rgba(0,0,0,0.75)", zIndex: 60,
+            display: "flex", alignItems: "center", justifyContent: "center", padding: "1rem",
+          }}
+          onClick={() => setShowCouponModal(false)}
+        >
+          <div
+            style={{
+              background: "#0f172a", color: "#f8fafc", width: "100%", maxWidth: "420px",
+              borderRadius: "16px", padding: "1.5rem", border: "1px solid rgba(147,51,234,0.25)",
+              boxShadow: "0 25px 50px -12px rgba(0,0,0,0.7)",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.25rem" }}>
+              <h3 style={{ margin: 0, fontSize: "1.1rem", fontWeight: 800, color: "#a855f7" }}>
+                🎁 쿠폰 수동 발급
+              </h3>
+              <button
+                onClick={() => setShowCouponModal(false)}
+                style={{ background: "transparent", border: "none", color: "#94a3b8", fontSize: "1.4rem", cursor: "pointer" }}
+              >✕</button>
+            </div>
+
+            <p style={{ fontSize: "0.8125rem", color: "#94a3b8", margin: "0 0 1rem" }}>
+              <strong style={{ color: "#f1f5f9" }}>{selectedUser.name || selectedUser.phone}</strong> 회원에게 쿠폰을 수동으로 발급합니다.
+            </p>
+
+            {/* 쿠폰 템플릿 선택 */}
+            <div style={{ marginBottom: "1.25rem" }}>
+              <label style={{ fontSize: "0.8125rem", fontWeight: 600, color: "#94a3b8", display: "block", marginBottom: "0.375rem" }}>발급할 쿠폰 선택</label>
+              {couponTemplatesLoading ? (
+                <div style={{ padding: "1rem", textAlign: "center", color: "#94a3b8", fontSize: "0.875rem" }}>
+                  ⏳ 쿠폰 목록 불러오는 중...
+                </div>
+              ) : couponTemplates.length === 0 ? (
+                <div style={{
+                  padding: "1rem", background: "rgba(147,51,234,0.05)", border: "1px solid rgba(147,51,234,0.15)",
+                  borderRadius: "8px", color: "#94a3b8", fontSize: "0.8125rem", textAlign: "center",
+                }}>
+                  <div style={{ fontSize: "1.5rem", marginBottom: "0.5rem" }}>📋</div>
+                  <div>등록된 쿠폰 템플릿이 없습니다.</div>
+                  <div style={{ marginTop: "0.25rem", fontSize: "0.75rem", color: "#64748b" }}>
+                    아임모델 공화국 서버에서 쿠폰 템플릿을 먼저 등록해 주세요.
+                  </div>
+                </div>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem", maxHeight: "200px", overflowY: "auto" }}>
+                  {couponTemplates.map((t) => (
+                    <div
+                      key={t.id}
+                      onClick={() => setSelectedTemplateId(t.id)}
+                      style={{
+                        padding: "0.75rem 1rem", borderRadius: "8px", cursor: "pointer", transition: "all 0.15s",
+                        background: selectedTemplateId === t.id ? "rgba(147,51,234,0.2)" : "rgba(255,255,255,0.03)",
+                        border: selectedTemplateId === t.id ? "1px solid #a855f7" : "1px solid rgba(255,255,255,0.06)",
+                        display: "flex", justifyContent: "space-between", alignItems: "center",
+                      }}
+                    >
+                      <span style={{ fontWeight: 600, color: "#e2e8f0", fontSize: "0.875rem" }}>🏷️ {t.name}</span>
+                      <span style={{ fontWeight: 800, color: "#a855f7", fontSize: "0.875rem" }}>
+                        {t.discountType === "fixed" ? `${t.discountValue.toLocaleString()}원` : `${t.discountValue}%`} 할인
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div style={{ display: "flex", gap: "0.75rem", justifyContent: "flex-end" }}>
+              <button
+                onClick={() => setShowCouponModal(false)}
+                style={{
+                  padding: "0.625rem 1rem", borderRadius: "8px", fontWeight: 600, fontSize: "0.875rem",
+                  background: "transparent", border: "1px solid #475569", color: "#94a3b8", cursor: "pointer",
+                }}
+              >
+                취소
+              </button>
+              <button
+                onClick={handleIssueCoupon}
+                disabled={couponIssuing || !selectedTemplateId || couponTemplates.length === 0}
+                style={{
+                  padding: "0.625rem 1.25rem", borderRadius: "8px", fontWeight: 700, fontSize: "0.9rem",
+                  background: "#a855f7", border: "none", color: "#fff",
+                  cursor: (couponIssuing || !selectedTemplateId) ? "not-allowed" : "pointer",
+                  opacity: (couponIssuing || !selectedTemplateId) ? 0.5 : 1,
+                }}
+              >
+                {couponIssuing ? "⏳ 발급 중..." : "🎁 쿠폰 발급"}
+              </button>
+            </div>
           </div>
         </div>
       )}

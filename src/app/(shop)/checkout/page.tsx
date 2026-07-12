@@ -25,7 +25,6 @@ export default function CheckoutPage() {
   const router = useRouter();
   const { items, clearCart } = useCartStore();
   const { masterUser, isLoggedIn, isLoading: authLoading } = useAuthStore();
-  const [saveAsDefault, setSaveAsDefault] = useState(false);
 
   const [isDirect, setIsDirect] = useState(false);
   const [directItemId, setDirectItemId] = useState<string | null>(null);

@@ -25,6 +25,7 @@ export default function CheckoutPage() {
   const router = useRouter();
   const { items, clearCart } = useCartStore();
   const { masterUser, isLoggedIn, isLoading: authLoading } = useAuthStore();
+  const [saveAsDefault, setSaveAsDefault] = useState(false);
 
   const [isDirect, setIsDirect] = useState(false);
   const [directItemId, setDirectItemId] = useState<string | null>(null);
@@ -217,6 +218,32 @@ export default function CheckoutPage() {
 
     setIsSubmitting(true);
     try {
+      // 만약 "기본 배송지로 저장" 체크박스가 체크되어 있다면 im-core-auth에 업데이트 수행!
+      if (saveAsDefault && masterUser?.masterUserId) {
+        await fetch("/api/auth/sync", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            masterUserId: masterUser.masterUserId,
+            shipping_recipient: form.recipientName,
+            shipping_phone: form.recipientPhone,
+            shipping_zipcode: form.addressZipcode,
+            shipping_address: form.addressMain,
+            shipping_detail: form.addressDetail,
+          }),
+        });
+
+        // 로컬 auth state/store의 masterUser 정보도 즉시 갱신
+        const updatedUser = {
+          ...masterUser,
+          shipping_recipient: form.recipientName,
+          shipping_phone: form.recipientPhone,
+          shipping_zipcode: form.addressZipcode,
+          shipping_address: form.addressMain,
+          shipping_detail: form.addressDetail,
+        };
+        useAuthStore.getState().setMasterUser(updatedUser);
+      }
       // 1. 주문 상품 객체 생성
       const orderItems = checkoutItems.map((item) => {
         return {

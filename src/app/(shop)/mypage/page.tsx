@@ -67,6 +67,11 @@ export default function MypagePage() {
   const [addressError, setAddressError] = useState("");
   const [isSavingAddress, setIsSavingAddress] = useState(false);
 
+  // 회원 탈퇴(계정 삭제) 상태 변수
+  const [isWithdrawOpen, setIsWithdrawOpen] = useState(false);
+  const [isWithdrawing, setIsWithdrawing] = useState(false);
+  const [withdrawAgree, setWithdrawAgree] = useState(false);
+
   const formatPhone = (v: string) => {
     const d = v.replace(/\D/g, "").slice(0, 11);
     if (d.length <= 3) return d;
@@ -228,6 +233,33 @@ export default function MypagePage() {
       } finally {
         setIsLoggingOut(false);
       }
+    }
+  };
+
+  const handleWithdraw = async () => {
+    if (!withdrawAgree) {
+      alert("탈퇴 유의사항을 확인하고 동의 체크박스에 동의해 주세요.");
+      return;
+    }
+
+    setIsWithdrawing(true);
+    try {
+      const res = await fetch("/api/auth/withdraw", { method: "POST" });
+      const data = await res.json();
+      
+      if (res.ok && data.success) {
+        alert("회원 탈퇴가 완료되었습니다. 이용해 주셔서 감사합니다.");
+        setMasterUser(null);
+        window.location.href = "/";
+      } else {
+        alert(data.error || "회원 탈퇴 처리 중 오류가 발생했습니다. 고객센터로 문의 바랍니다.");
+      }
+    } catch (e) {
+      console.error(e);
+      alert("네트워크 통신 오류가 발생했습니다. 다시 시도해 주세요.");
+    } finally {
+      setIsWithdrawing(false);
+      setIsWithdrawOpen(false);
     }
   };
 
@@ -431,6 +463,9 @@ export default function MypagePage() {
           {isLoggingOut ? "로그아웃 중..." : "로그아웃"}
         </button>
       </div>
+
+      {/* 회원 탈퇴(계정 삭제) 비동기 제출 핸들러 */}
+      {async () => {}} {/* 타입 인터페이스용 구조 주입 대비 */}
 
       {/* 요약 카드 그리드 */}
       <div className="mypage-summary-grid">
@@ -734,6 +769,103 @@ export default function MypagePage() {
           </div>
         )}
       </div>
+
+      {/* 회원 탈퇴(계정 삭제) 버튼 링크 */}
+      <div style={{ marginTop: "4rem", borderTop: "1px solid var(--mb-gray-100)", paddingTop: "1.5rem", textAlign: "right" }}>
+        <button
+          type="button"
+          onClick={() => {
+            setWithdrawAgree(false);
+            setIsWithdrawOpen(true);
+          }}
+          style={{
+            background: "transparent",
+            border: "none",
+            color: "var(--mb-gray-400)",
+            fontSize: "0.8125rem",
+            textDecoration: "underline",
+            cursor: "pointer",
+            padding: "0.25rem"
+          }}
+        >
+          회원 탈퇴 (계정 삭제)
+        </button>
+      </div>
+
+      {/* 회원 탈퇴 안내 및 최종 동의 모달 */}
+      {isWithdrawOpen && (
+        <div style={{
+          position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
+          background: "rgba(0, 0, 0, 0.4)", display: "flex",
+          alignItems: "center", justifyContent: "center", zIndex: 1000,
+          padding: "1rem"
+        }}>
+          <div style={{
+            background: "#fff", borderRadius: "20px", maxWidth: "480px",
+            width: "100%", padding: "1.5rem", boxShadow: "0 20px 25px -5px rgba(0,0,0,0.1), 0 10px 10px -5px rgba(0,0,0,0.04)"
+          }}>
+            <h3 style={{ fontSize: "1.125rem", fontWeight: 800, color: "var(--mb-gray-900)", margin: "0 0 1rem 0" }}>
+              회원 탈퇴 안내 (계정 삭제)
+            </h3>
+            
+            <div style={{
+              background: "var(--mb-gray-50)", padding: "1rem", borderRadius: "12px",
+              fontSize: "0.8125rem", lineHeight: "1.6", color: "var(--mb-gray-600)",
+              marginBottom: "1.25rem", maxHeight: "240px", overflowY: "auto"
+            }}>
+              <p style={{ margin: "0 0 0.75rem 0", fontWeight: 700, color: "#ef4444" }}>
+                ※ 탈퇴 전 반드시 아래 유의사항을 확인해 주시기 바랍니다.
+              </p>
+              <ul style={{ margin: 0, paddingLeft: "1.15rem", display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+                <li>탈퇴 시 고객님의 회원 정보와 위시리스트, 적립된 포인트 정보는 **즉시 영구 삭제되며 복구가 불가능**합니다.</li>
+                <li>단, 전자상거래 등에서의 소비자보호에 관한 법률 등 관련 법령의 규정에 의하여 **구매/결제 및 배송 관련 기록은 5년간 보관**된 후 자동으로 파기됩니다.</li>
+                <li>이미 결제가 완료되어 배송 대기 중이거나 배송 중인 상품이 있는 경우, 배송 완료 후 탈퇴 처리가 완료됩니다.</li>
+                <li>회원 탈퇴와 동시에 연동된 아임모델 공화국 통합 계정 정보의 모델뷰티 연동 내역이 해제되며, 기기 내의 로컬 로그인 토큰은 파기됩니다.</li>
+              </ul>
+            </div>
+
+            <div style={{ display: "flex", alignItems: "flex-start", gap: "0.5rem", marginBottom: "1.5rem" }}>
+              <input
+                type="checkbox"
+                id="agree-withdraw"
+                checked={withdrawAgree}
+                onChange={(e) => setWithdrawAgree(e.target.checked)}
+                style={{ cursor: "pointer", marginTop: "0.2rem" }}
+              />
+              <label htmlFor="agree-withdraw" style={{ fontSize: "0.8125rem", color: "var(--mb-gray-800)", cursor: "pointer", fontWeight: 600, lineHeight: "1.4" }}>
+                안내 사항을 모두 확인하였으며, 이에 동의하고 계정을 영구 삭제하겠습니다.
+              </label>
+            </div>
+
+            <div style={{ display: "flex", gap: "0.75rem" }}>
+              <button
+                type="button"
+                onClick={() => setIsWithdrawOpen(false)}
+                disabled={isWithdrawing}
+                style={{
+                  flex: 1, padding: "0.75rem", borderRadius: "10px", border: "1px solid var(--mb-gray-200)",
+                  background: "#fff", color: "var(--mb-gray-700)", fontWeight: 600, cursor: "pointer", fontSize: "0.875rem"
+                }}
+              >
+                취소
+              </button>
+              <button
+                type="button"
+                onClick={handleWithdraw}
+                disabled={isWithdrawing || !withdrawAgree}
+                style={{
+                  flex: 1, padding: "0.75rem", borderRadius: "10px", border: "none",
+                  background: withdrawAgree ? "#ef4444" : "var(--mb-gray-300)",
+                  color: "#fff", fontWeight: 700, cursor: withdrawAgree ? "pointer" : "not-allowed", fontSize: "0.875rem",
+                  transition: "background 0.2s"
+                }}
+              >
+                {isWithdrawing ? "탈퇴 처리 중..." : "회원 탈퇴"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }

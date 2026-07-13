@@ -70,6 +70,12 @@ export default function AdminUsersPage() {
   const [couponIssuing, setCouponIssuing] = useState(false);
   const [couponTemplatesLoading, setCouponTemplatesLoading] = useState(false);
 
+
+  // ── 솔라피 설정 확인 모달 ───────────────────────────────
+  const [showSolapiCheckModal, setShowSolapiCheckModal] = useState(false);
+  const [solapiConfig, setSolapiConfig] = useState<any>(null);
+  const [solapiCheckLoading, setSolapiCheckLoading] = useState(false);
+
   useEffect(() => {
     fetchUsers();
   }, []);
@@ -277,6 +283,28 @@ export default function AdminUsersPage() {
     }
   };
 
+  // ── 솔라피 설정 확인 ──────────────────────────────────────
+  const handleCheckSolapi = async () => {
+    setShowSolapiCheckModal(true);
+    setSolapiCheckLoading(true);
+    try {
+      const res = await fetch("/api/admin/solapi-check");
+      const data = await res.json();
+      if (data.success) {
+        setSolapiConfig(data.config);
+      } else {
+        alert(data.error || "솔라피 설정을 불러오지 못했습니다.");
+        setShowSolapiCheckModal(false);
+      }
+    } catch (e) {
+      console.error(e);
+      alert("오류가 발생했습니다.");
+      setShowSolapiCheckModal(false);
+    } finally {
+      setSolapiCheckLoading(false);
+    }
+  };
+
   const formatDate = (dStr: string | null) => {
     if (!dStr) return "-";
     const d = new Date(dStr);
@@ -301,6 +329,13 @@ export default function AdminUsersPage() {
           style={{ display: "flex", alignItems: "center", gap: "0.25rem", padding: "0.625rem 1rem", fontSize: "0.875rem" }}
         >
           🔄 새로고침
+        </button>
+        <button
+          onClick={handleCheckSolapi}
+          className="admin-btn-secondary"
+          style={{ display: "flex", alignItems: "center", gap: "0.25rem", padding: "0.625rem 1rem", fontSize: "0.875rem", border: "1px solid rgba(236,72,153,0.3)", color: "#ec4899" }}
+        >
+          ⚙️ 솔라피 설정 확인
         </button>
       </div>
 
@@ -888,6 +923,79 @@ export default function AdminUsersPage() {
                 }}
               >
                 {couponIssuing ? "⏳ 발급 중..." : "🎁 쿠폰 발급"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ══════════════════════════════════════════════════════
+            솔라피 설정 확인 모달
+      ══════════════════════════════════════════════════════ */}
+      {showSolapiCheckModal && (
+        <div
+          style={{
+            position: "fixed", inset: 0, background: "rgba(0,0,0,0.75)", zIndex: 70,
+            display: "flex", alignItems: "center", justifyContent: "center", padding: "1rem",
+          }}
+          onClick={() => setShowSolapiCheckModal(false)}
+        >
+          <div
+            style={{
+              background: "#0f172a", color: "#f8fafc", width: "100%", maxWidth: "480px",
+              borderRadius: "16px", padding: "1.5rem", border: "1px solid rgba(255,255,255,0.08)",
+              boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.5)",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid rgba(255,255,255,0.05)", paddingBottom: "1rem", marginBottom: "1.25rem" }}>
+              <h3 style={{ fontSize: "1.1rem", fontWeight: 800, margin: 0, color: "#ec4899" }}>
+                ⚙️ 솔라피(Solapi) 연동 설정 확인
+              </h3>
+              <button
+                onClick={() => setShowSolapiCheckModal(false)}
+                style={{ background: "transparent", border: "none", color: "#94a3b8", fontSize: "1.4rem", cursor: "pointer" }}
+              >
+                ✕
+              </button>
+            </div>
+            
+            {solapiCheckLoading ? (
+              <div style={{ padding: "2rem", textAlign: "center", color: "#94a3b8" }}>
+                ⏳ Vercel 서버 환경 변수 확인 중...
+              </div>
+            ) : solapiConfig ? (
+              <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+                <p style={{ fontSize: "0.875rem", color: "#94a3b8", margin: 0 }}>
+                  실서버(Vercel)에 로드된 환경 변수 설정 상태입니다.
+                </p>
+                <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem", background: "rgba(15,23,42,0.6)", padding: "1rem", borderRadius: "10px", border: "1px solid rgba(255,255,255,0.03)" }}>
+                  {Object.entries(solapiConfig).map(([key, val]: any) => (
+                    <div key={key} style={{ display: "flex", justifyContent: "space-between", fontSize: "0.875rem", borderBottom: "1px solid rgba(255,255,255,0.02)", paddingBottom: "0.5rem" }}>
+                      <span style={{ color: "#94a3b8", fontFamily: "monospace" }}>{key}</span>
+                      <strong style={{ color: val.includes("❌") ? "#ef4444" : "#10b981" }}>
+                        {val}
+                      </strong>
+                    </div>
+                  ))}
+                </div>
+                <p style={{ fontSize: "0.75rem", color: "#64748b", margin: 0 }}>
+                  * API Secret 등 보안 정보는 길이만 표시되며, 값 자체는 외부에 유출되지 않습니다.
+                </p>
+              </div>
+            ) : (
+              <div style={{ color: "#ef4444", fontSize: "0.875rem", textAlign: "center", padding: "1rem" }}>
+                설정을 불러오지 못했습니다. 관리자 권한이 만료되었을 수 있으니 다시 시도해 주세요.
+              </div>
+            )}
+            
+            <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "1.5rem" }}>
+              <button
+                onClick={() => setShowSolapiCheckModal(false)}
+                className="admin-btn admin-btn-primary"
+                style={{ padding: "0.5rem 1rem", fontSize: "0.875rem", borderRadius: "8px" }}
+              >
+                닫기
               </button>
             </div>
           </div>

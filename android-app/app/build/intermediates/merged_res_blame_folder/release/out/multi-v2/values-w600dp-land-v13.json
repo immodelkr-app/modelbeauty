@@ -4,7 +4,7 @@
             "outputFile": "com.modelbeauty.app-mergeReleaseResources-2:/values-w600dp-land-v13/values-w600dp-land-v13.xml",
             "map": [
                 {
-                    "source": "C:\\Users\\myday\\.gradle\\caches\\9.0.0\\transforms\\e25d91a4b29beea44580bd05856894cf\\transformed\\material-1.11.0\\res\\values-w600dp-land-v13\\values-w600dp-land-v13.xml",
+                    "source": "C:\\Users\\myday\\.gradle\\caches\\transforms-3\\375d77e3bac5523f6a4d9c17a7b2806c\\transformed\\material-1.11.0\\res\\values-w600dp-land-v13\\values-w600dp-land-v13.xml",
                     "from": {
                         "startLines": "2",
                         "startColumns": "4",

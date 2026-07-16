@@ -3,8 +3,8 @@
 # min_api: 24
 # common_typos_disable
 # {"id":"com.android.tools.r8.mapping","version":"2.2"}
-# pg_map_id: 2ecf265
-# pg_map_hash: SHA-256 2ecf2651b68ddbdbce73de58617c46ea74c1da22258e320f527be5349eca8cee
+# pg_map_id: 033ab47
+# pg_map_hash: SHA-256 033ab47dfbf681ff957c6f41dd941c6c9db9a8f99fc60865757602fba64ed1b2
 android.app.AppComponentFactory -> android.app.AppComponentFactory:
 # {"id":"com.android.tools.r8.synthesized"}
 android.support.v4.app.RemoteActionCompatParcelizer -> android.support.v4.app.RemoteActionCompatParcelizer:
@@ -680,16 +680,8 @@ androidx.activity.OnBackPressedDispatcher -> androidx.activity.a0:
     30:35:void onBackPressed():0 -> b
       # {"id":"com.android.tools.r8.rewriteFrame","conditions":["throws(Ljava/lang/NullPointerException;)"],"actions":["removeInnerFrames(1)"]}
     36:53:void onBackPressed():0:0 -> b
-    54:55:android.webkit.WebView com.modelbeauty.app.MainActivity.access$000(com.modelbeauty.app.MainActivity):0:0 -> b
-    54:55:void com.modelbeauty.app.MainActivity$1.handleOnBackPressed():0 -> b
-    54:55:void onBackPressed():0 -> b
-    56:61:void com.modelbeauty.app.MainActivity$1.handleOnBackPressed():0:0 -> b
-    56:61:void onBackPressed():0 -> b
-    62:63:android.webkit.WebView com.modelbeauty.app.MainActivity.access$000(com.modelbeauty.app.MainActivity):0:0 -> b
-    62:63:void com.modelbeauty.app.MainActivity$1.handleOnBackPressed():0 -> b
-    62:63:void onBackPressed():0 -> b
-    64:74:void com.modelbeauty.app.MainActivity$1.handleOnBackPressed():0:0 -> b
-    64:74:void onBackPressed():0 -> b
+    54:74:void com.modelbeauty.app.MainActivity$1.handleOnBackPressed():0:0 -> b
+    54:74:void onBackPressed():0 -> b
     75:77:void androidx.fragment.app.FragmentManager.handleOnBackPressed():0:0 -> b
     75:77:void androidx.fragment.app.FragmentManager$1.handleOnBackPressed():0 -> b
       # {"id":"com.android.tools.r8.rewriteFrame","conditions":["throws(Ljava/lang/NullPointerException;)"],"actions":["removeInnerFrames(1)"]}
@@ -47102,14 +47094,7 @@ com.modelbeauty.app.MainActivity$3 -> z1.b:
 # {"id":"sourceFile","fileName":"MainActivity.java"}
     com.modelbeauty.app.MainActivity this$0 -> a
     1:1:void <init>(com.modelbeauty.app.MainActivity):0:0 -> <init>
-    3:7:android.webkit.ValueCallback com.modelbeauty.app.MainActivity.access$100(com.modelbeauty.app.MainActivity):0:0 -> onShowFileChooser
-    3:7:boolean onShowFileChooser(android.webkit.WebView,android.webkit.ValueCallback,android.webkit.WebChromeClient$FileChooserParams):0 -> onShowFileChooser
-    8:10:boolean onShowFileChooser(android.webkit.WebView,android.webkit.ValueCallback,android.webkit.WebChromeClient$FileChooserParams):0:0 -> onShowFileChooser
-    11:14:android.webkit.ValueCallback com.modelbeauty.app.MainActivity.access$102(com.modelbeauty.app.MainActivity,android.webkit.ValueCallback):0:0 -> onShowFileChooser
-    11:14:boolean onShowFileChooser(android.webkit.WebView,android.webkit.ValueCallback,android.webkit.WebChromeClient$FileChooserParams):0 -> onShowFileChooser
-    15:25:boolean onShowFileChooser(android.webkit.WebView,android.webkit.ValueCallback,android.webkit.WebChromeClient$FileChooserParams):0:0 -> onShowFileChooser
-    26:29:android.webkit.ValueCallback com.modelbeauty.app.MainActivity.access$102(com.modelbeauty.app.MainActivity,android.webkit.ValueCallback):0:0 -> onShowFileChooser
-    26:29:boolean onShowFileChooser(android.webkit.WebView,android.webkit.ValueCallback,android.webkit.WebChromeClient$FileChooserParams):0 -> onShowFileChooser
+    1:1:boolean onShowFileChooser(android.webkit.WebView,android.webkit.ValueCallback,android.webkit.WebChromeClient$FileChooserParams):0:0 -> onShowFileChooser
 kotlin.LazyKt__LazyJVMKt -> R8$$REMOVED$$CLASS$$396:
 # {"id":"sourceFile","fileName":"LazyJVM.kt"}
 kotlin.Pair -> a2.a:

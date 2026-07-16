@@ -23,4 +23,11 @@ This version has breaking changes — APIs, conventions, and file structure may 
 1. **통합 인증 및 포인트 시스템 명칭**
    - 프로젝트 내 통합 인증/포인트 서버를 가리키는 `im-core-auth`는 소통 시 **'아임모델 공화국'** (또는 '아임모델 광화국')으로 지칭하여 이야기합니다.
 
+# 🔑 안드로이드 앱 서명 키 정보 (Android Keystore Metadata)
+향후 안드로이드 스튜디오에서 패키징(AAB 빌드) 업데이트 시 아래 서명 키 정보를 사용합니다:
+- **서명 키 파일 경로:** `C:\Users\myday\modelbeauty_key2.jks`
+- **Key Alias (별칭):** `key0`
+- **비밀번호:** 사용자가 지정한 통합 비밀번호 (예: `modelbeauty123!`)
+
+
 

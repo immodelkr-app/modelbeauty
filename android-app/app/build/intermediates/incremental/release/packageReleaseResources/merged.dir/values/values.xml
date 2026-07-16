@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">모델뷰티</string>
+    <style name="Theme.ModelBeauty" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+        
+        <item name="colorPrimary">#ec4899</item>
+        <item name="colorPrimaryVariant">#db2777</item>
+        <item name="colorOnPrimary">#ffffff</item>
+        
+        
+        <item name="android:statusBarColor">#0f172a</item>
+        <item name="android:windowLightStatusBar">false</item>
+    </style>
+</resources>

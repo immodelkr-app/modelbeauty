@@ -70,6 +70,13 @@ export default function AdminUsersPage() {
   const [couponIssuing, setCouponIssuing] = useState(false);
   const [couponTemplatesLoading, setCouponTemplatesLoading] = useState(false);
 
+  // ── 아임모델 공화국 회원 동기화 ──────────────────────────
+  const [syncing, setSyncing] = useState(false);
+  const [syncResult, setSyncResult] = useState<{
+    total: number; created: number; updated: number; skipped: number; failed: number;
+  } | null>(null);
+  const [syncError, setSyncError] = useState<string | null>(null);
+
   useEffect(() => {
     fetchUsers();
   }, []);
@@ -87,6 +94,28 @@ export default function AdminUsersPage() {
       console.error("회원 목록 로드 실패:", e);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleSyncImMembers = async () => {
+    setSyncing(true);
+    setSyncResult(null);
+    setSyncError(null);
+    try {
+      const res = await fetch("/api/admin/users/sync-im-members", { method: "POST" });
+      const data = await res.json();
+      if (data.success) {
+        setSyncResult(data.result);
+        // 동기화 완료 후 회원 목록 새로고침
+        await fetchUsers();
+      } else {
+        setSyncError(data.error ?? "동기화에 실패했습니다.");
+      }
+    } catch (e) {
+      console.error("동기화 요청 실패:", e);
+      setSyncError("네트워크 오류가 발생했습니다.");
+    } finally {
+      setSyncing(false);
     }
   };
 
@@ -286,7 +315,7 @@ export default function AdminUsersPage() {
   return (
     <div className="admin-content-inner">
       {/* 상단 툴바 */}
-      <div className="admin-toolbar" style={{ display: "flex", gap: "1rem", marginBottom: "1.5rem", flexWrap: "wrap", alignItems: "center" }}>
+      <div className="admin-toolbar" style={{ display: "flex", gap: "1rem", marginBottom: "1rem", flexWrap: "wrap", alignItems: "center" }}>
         <input
           type="text"
           placeholder="🔍 이름, 이메일, 전화번호 검색..."
@@ -302,7 +331,73 @@ export default function AdminUsersPage() {
         >
           🔄 새로고침
         </button>
+        <button
+          onClick={handleSyncImMembers}
+          disabled={syncing}
+          style={{
+            display: "flex", alignItems: "center", gap: "0.375rem",
+            padding: "0.625rem 1.125rem", fontSize: "0.875rem", fontWeight: 700,
+            background: syncing ? "rgba(99,102,241,0.15)" : "rgba(99,102,241,0.2)",
+            border: "1px solid rgba(99,102,241,0.5)",
+            color: syncing ? "#a5b4fc" : "#818cf8",
+            borderRadius: "8px", cursor: syncing ? "not-allowed" : "pointer",
+            transition: "all 0.2s",
+          }}
+          onMouseEnter={(e) => {
+            if (!syncing) {
+              e.currentTarget.style.background = "rgba(99,102,241,0.35)";
+              e.currentTarget.style.color = "#c7d2fe";
+            }
+          }}
+          onMouseLeave={(e) => {
+            if (!syncing) {
+              e.currentTarget.style.background = "rgba(99,102,241,0.2)";
+              e.currentTarget.style.color = "#818cf8";
+            }
+          }}
+        >
+          {syncing ? "⏳ 동기화 중..." : "🏛️ 아임모델 공화국 회원 가져오기"}
+        </button>
       </div>
+
+      {/* 동기화 결과 배너 */}
+      {syncResult && (
+        <div style={{
+          marginBottom: "1rem", padding: "0.875rem 1.25rem",
+          background: "rgba(34, 197, 94, 0.08)", border: "1px solid rgba(34, 197, 94, 0.3)",
+          borderRadius: "10px", fontSize: "0.875rem", color: "#86efac",
+          display: "flex", gap: "1.5rem", flexWrap: "wrap", alignItems: "center",
+        }}>
+          <span style={{ fontWeight: 700, color: "#4ade80", fontSize: "0.9375rem" }}>✅ 동기화 완료</span>
+          <span>전체 <strong style={{ color: "#f1f5f9" }}>{syncResult.total}명</strong></span>
+          <span>🆕 신규 등록 <strong style={{ color: "#86efac" }}>{syncResult.created}명</strong></span>
+          <span>🔄 정보 업데이트 <strong style={{ color: "#7dd3fc" }}>{syncResult.updated}명</strong></span>
+          <span>⏭️ 변경없음 <strong style={{ color: "#94a3b8" }}>{syncResult.skipped}명</strong></span>
+          {syncResult.failed > 0 && (
+            <span>❌ 실패 <strong style={{ color: "#f87171" }}>{syncResult.failed}명</strong></span>
+          )}
+          <button
+            onClick={() => setSyncResult(null)}
+            style={{ marginLeft: "auto", background: "transparent", border: "none", color: "#64748b", cursor: "pointer", fontSize: "1.1rem" }}
+          >✕</button>
+        </div>
+      )}
+
+      {/* 동기화 오류 배너 */}
+      {syncError && (
+        <div style={{
+          marginBottom: "1rem", padding: "0.875rem 1.25rem",
+          background: "rgba(239, 68, 68, 0.08)", border: "1px solid rgba(239, 68, 68, 0.3)",
+          borderRadius: "10px", fontSize: "0.875rem", color: "#f87171",
+          display: "flex", alignItems: "center", justifyContent: "space-between",
+        }}>
+          <span>⚠️ {syncError}</span>
+          <button
+            onClick={() => setSyncError(null)}
+            style={{ background: "transparent", border: "none", color: "#64748b", cursor: "pointer", fontSize: "1.1rem" }}
+          >✕</button>
+        </div>
+      )}
 
       {/* 테이블 목록 */}
       {loading ? (

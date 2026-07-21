@@ -336,6 +336,20 @@ export async function restoreCoupon(
   }
 }
 
+/** 아임모델 공화국 마스터 회원 전체 상세 정보 */
+export interface MasterMemberDetail {
+  id: string;
+  phoneNumber: string;
+  email: string | null;
+  name: string | null;          // 닉네임
+  realName: string | null;      // 실명
+  grade: string;
+  grade_locked: boolean;
+  grade_locked_reason: string | null;
+  linkedApps: string[];
+  createdAt: string | null;
+}
+
 /**
  * 아임모델 공화국 전체 마스터 회원 목록 가져오기 (어드민 등급 일괄 재산정용)
  */
@@ -353,4 +367,43 @@ export async function getAllMasterUsers(): Promise<{ id: string; grade: string; 
     grade: m.grade || "NORMAL",
     grade_locked: m.grade_locked || false,
   }));
+}
+
+/**
+ * 아임모델 공화국 전체 회원 상세 목록 조회 (어드민 회원 동기화용)
+ * 닉네임·이메일·휴대폰번호·실명·등급·가입일 등 전체 메타데이터 포함
+ */
+export async function listMasterMembers(params: {
+  limit?: number;
+  offset?: number;
+} = {}): Promise<{ members: MasterMemberDetail[]; total: number }> {
+  const qs = new URLSearchParams();
+  if (params.limit !== undefined) qs.set("limit", String(params.limit));
+  if (params.offset !== undefined) qs.set("offset", String(params.offset));
+
+  const res = await coreAuthFetch(`/api/admin/members?${qs.toString()}`);
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || `전체 회원 목록 조회 실패: ${res.status}`);
+  }
+
+  const data = await res.json();
+  const members: MasterMemberDetail[] = (data.members ?? []).map((m: any) => ({
+    id: m.id,
+    phoneNumber: m.phoneNumber ?? m.phone_number ?? "",
+    email: m.email ?? null,
+    name: m.name ?? m.nickname ?? null,
+    realName: m.realName ?? m.real_name ?? null,
+    grade: m.grade || "NORMAL",
+    grade_locked: m.grade_locked || false,
+    grade_locked_reason: m.grade_locked_reason ?? null,
+    linkedApps: m.linkedApps ?? m.linked_apps ?? [],
+    createdAt: m.createdAt ?? m.created_at ?? null,
+  }));
+
+  return {
+    members,
+    total: data.total ?? members.length,
+  };
 }

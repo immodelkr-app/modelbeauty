@@ -1,0 +1,13 @@
+<resources>
+    <!-- 타이틀바가 없는 앱 테마 정의 (웹뷰를 화면 가득 채우기 위함) -->
+    <style name="Theme.ModelBeauty" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+        <!-- 기본 브랜드 색상 -->
+        <item name="colorPrimary">#ec4899</item>
+        <item name="colorPrimaryVariant">#db2777</item>
+        <item name="colorOnPrimary">#ffffff</item>
+        
+        <!-- 상태바 색상을 다크네이비(#0f172a)로 통일하여 통일감 부여 -->
+        <item name="android:statusBarColor">#0f172a</item>
+        <item name="android:windowLightStatusBar">false</item>
+    </style>
+</resources>

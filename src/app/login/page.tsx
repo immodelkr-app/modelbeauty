@@ -163,6 +163,7 @@ function FindNicknameModal({ onClose }: { onClose: () => void }) {
 function ResetPasswordModal({ onClose }: { onClose: () => void }) {
   const [step, setStep] = useState<1 | 2>(1);
   const [uid, setUid] = useState("");
+  const [masterUserId, setMasterUserId] = useState("");
   const [verifiedNickname, setVerifiedNickname] = useState("");
   const [verifiedPhone, setVerifiedPhone] = useState("");
   const [verifiedRealName, setVerifiedRealName] = useState("");
@@ -205,7 +206,8 @@ function ResetPasswordModal({ onClose }: { onClose: () => void }) {
         setError(data.error || "일치하는 회원 정보를 찾을 수 없습니다.");
         return;
       }
-      setUid(data.uid);
+      setUid(data.uid ?? "");
+      setMasterUserId(data.masterUserId ?? "");
       setVerifiedNickname(data.nickname || nickname.trim());
       setVerifiedPhone(data.phoneNumber || phoneNumber.replace(/\D/g, ""));
       setVerifiedRealName(data.realName || realName.trim());
@@ -233,12 +235,14 @@ function ResetPasswordModal({ onClose }: { onClose: () => void }) {
       const res = await fetch("/api/auth/reset-password", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ 
-          uid, 
+        body: JSON.stringify({
+          // masterUserId 우선 전달 (크로스앱 지원), uid는 하위 호환용
+          masterUserId: masterUserId || undefined,
+          uid: uid || undefined,
           newPassword,
           phoneNumber: verifiedPhone,
           nickname: verifiedNickname,
-          realName: verifiedRealName
+          realName: verifiedRealName,
         }),
       });
       const data = await res.json();

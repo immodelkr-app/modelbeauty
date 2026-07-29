@@ -13,11 +13,14 @@ interface UserSummary {
   email: string | null;
   phone: string | null;
   name: string | null;
+  realName: string | null;
   masterUserId: string;
   createdAt: string;
   lastSignInAt: string | null;
   tier: { id: string; name: string; badge_emoji: string; sort_order: number };
   isLocked: boolean;
+  linkedApps: string[];
+  hasModelBeautyAccount: boolean;
 }
 
 interface UserDetail extends UserSummary {
@@ -29,6 +32,34 @@ interface UserDetail extends UserSummary {
   };
   orders: any[];
   _coreAuthOffline?: boolean;
+}
+
+// 연동 앱 뱃지 렌더러
+const APP_BADGE: Record<string, { emoji: string; label: string; color: string }> = {
+  MODEL_BEAUTY: { emoji: "🩷", label: "모델뷰티", color: "rgba(236,72,153,0.2)" },
+  MOCA:         { emoji: "🟠", label: "MOCA",    color: "rgba(249,115,22,0.2)" },
+  IMFF:         { emoji: "🔵", label: "IMFF",    color: "rgba(59,130,246,0.2)" },
+};
+
+function LinkedAppBadges({ apps }: { apps: string[] }) {
+  if (!apps || apps.length === 0) return <span style={{ color: "#475569", fontSize: "0.75rem" }}>-</span>;
+  return (
+    <div style={{ display: "flex", gap: "4px", flexWrap: "wrap" }}>
+      {apps.map((app) => {
+        const b = APP_BADGE[app];
+        if (!b) return null;
+        return (
+          <span key={app} style={{
+            fontSize: "0.6875rem", fontWeight: 700, padding: "2px 7px",
+            background: b.color, borderRadius: "5px", color: "#e2e8f0",
+            whiteSpace: "nowrap",
+          }}>
+            {b.emoji} {b.label}
+          </span>
+        );
+      })}
+    </div>
+  );
 }
 
 interface MembershipInfo {
@@ -46,6 +77,7 @@ export default function AdminUsersPage() {
   const [filteredUsers, setFilteredUsers] = useState<UserSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [appFilter, setAppFilter] = useState<"all" | "mb_only" | "no_mb">("all");
   
   // 모달 상세 정보
   const [selectedUser, setSelectedUser] = useState<UserDetail | null>(null);
@@ -127,19 +159,25 @@ export default function AdminUsersPage() {
 
   useEffect(() => {
     const q = search.toLowerCase().trim();
-    if (!q) {
-      setFilteredUsers(users);
-      return;
+    let result = [...users];
+
+    // 앱 필터
+    if (appFilter === "mb_only") result = result.filter((u) => u.hasModelBeautyAccount);
+    if (appFilter === "no_mb")   result = result.filter((u) => !u.hasModelBeautyAccount);
+
+    // 검색 필터
+    if (q) {
+      result = result.filter((u) => {
+        const name  = (u.name || "").toLowerCase();
+        const email = (u.email || "").toLowerCase();
+        const phone = (u.phone || "").replace(/-/g, "");
+        const cleanQ = q.replace(/-/g, "");
+        return name.includes(q) || email.includes(q) || phone.includes(cleanQ);
+      });
     }
-    const filtered = users.filter((u) => {
-      const name = (u.name || "").toLowerCase();
-      const email = (u.email || "").toLowerCase();
-      const phone = (u.phone || "").replace(/-/g, "");
-      const cleanQ = q.replace(/-/g, "");
-      return name.includes(q) || email.includes(q) || phone.includes(cleanQ);
-    });
-    setFilteredUsers(filtered);
-  }, [search, users]);
+
+    setFilteredUsers(result);
+  }, [search, users, appFilter]);
 
   const handleViewDetail = async (userId: string) => {
     setModalLoading(true);
@@ -359,6 +397,19 @@ export default function AdminUsersPage() {
         >
           🔄 새로고침
         </button>
+        <select
+          value={appFilter}
+          onChange={(e) => setAppFilter(e.target.value as any)}
+          style={{
+            padding: "0.625rem 0.875rem", fontSize: "0.875rem", fontWeight: 600,
+            background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)",
+            color: "#cbd5e1", borderRadius: "8px", cursor: "pointer", outline: "none",
+          }}
+        >
+          <option value="all">전체 회원</option>
+          <option value="mb_only">모델뷰티 가입자만</option>
+          <option value="no_mb">모델뷰티 미가입자</option>
+        </select>
         <button
           onClick={handleSyncImMembers}
           disabled={syncing}
@@ -449,6 +500,7 @@ export default function AdminUsersPage() {
             <thead>
               <tr>
                 <th>닉네임</th>
+                <th>연동 앱</th>
                 <th>이메일 주소</th>
                 <th>휴대폰 번호</th>
                 <th>가입일시</th>
@@ -460,13 +512,17 @@ export default function AdminUsersPage() {
               {filteredUsers.map((u) => (
                 <tr key={u.id}>
                   <td style={{ fontWeight: 700, color: "var(--mb-pink-500)" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", flexWrap: "wrap" }}>
                       {u.name || <span style={{ color: "var(--mb-gray-600)" }}>(미설정)</span>}
                       <span style={{ fontSize: "0.75rem", background: "rgba(255,255,255,0.05)", padding: "2px 6px", borderRadius: "4px" }}>
                         {u.tier.badge_emoji} {u.tier.name}
                       </span>
+                      {!u.hasModelBeautyAccount && (
+                        <span style={{ fontSize: "0.65rem", fontWeight: 700, padding: "2px 6px", background: "rgba(239,68,68,0.15)", color: "#f87171", borderRadius: "4px" }}>미가입</span>
+                      )}
                     </div>
                   </td>
+                  <td><LinkedAppBadges apps={u.linkedApps} /></td>
                   <td>{u.email || <span style={{ color: "var(--mb-gray-600)" }}>-</span>}</td>
                   <td>{u.phone || <span style={{ color: "var(--mb-gray-600)" }}>-</span>}</td>
                   <td>{formatDate(u.createdAt)}</td>
@@ -474,7 +530,7 @@ export default function AdminUsersPage() {
                   <td>
                     <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
                       <button
-                        onClick={() => handleViewDetail(u.id)}
+                        onClick={() => handleViewDetail(u.masterUserId)}
                         className="admin-btn-primary"
                         style={{ padding: "6px 12px", fontSize: "0.8125rem", borderRadius: "6px", cursor: "pointer" }}
                       >
@@ -537,6 +593,10 @@ export default function AdminUsersPage() {
                       <strong style={{ fontSize: "0.9375rem", color: "#f1f5f9" }}>{selectedUser.name || "-"}</strong>
                     </div>
                     <div>
+                      <span style={{ fontSize: "0.75rem", color: "#64748b", display: "block" }}>실명</span>
+                      <strong style={{ fontSize: "0.9375rem", color: "#f1f5f9" }}>{(selectedUser as any).realName || "-"}</strong>
+                    </div>
+                    <div>
                       <span style={{ fontSize: "0.75rem", color: "#64748b", display: "block" }}>이메일</span>
                       <strong style={{ fontSize: "0.9375rem", color: "#f1f5f9" }}>{selectedUser.email || "-"}</strong>
                     </div>
@@ -548,7 +608,21 @@ export default function AdminUsersPage() {
                       <span style={{ fontSize: "0.75rem", color: "#64748b", display: "block" }}>가입일시</span>
                       <span style={{ fontSize: "0.875rem", color: "#cbd5e1" }}>{formatDate(selectedUser.createdAt)}</span>
                     </div>
+                    <div>
+                      <span style={{ fontSize: "0.75rem", color: "#64748b", display: "block" }}>연동 앱</span>
+                      <LinkedAppBadges apps={(selectedUser as any).linkedApps ?? []} />
+                    </div>
                   </div>
+                  {/* 모델뷰티 미가입자 안내 */}
+                  {!(selectedUser as any).hasModelBeautyAccount && (
+                    <div style={{
+                      marginTop: "0.75rem", padding: "0.75rem 1rem",
+                      background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.25)",
+                      borderRadius: "8px", fontSize: "0.8125rem", color: "#fca5a5",
+                    }}>
+                      ⚠️ 이 회원은 모델뷰티에 아직 직접 가입하지 않았습니다. (MOCA·IMFF 통합 회원) 비밀번호 찾기를 통해 모델뷰티 계정을 생성할 수 있습니다.
+                    </div>
+                  )}
                   {/* 강제 탈퇴 위험 버튼 */}
                   <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "0.75rem" }}>
                     <button

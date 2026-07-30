@@ -8,6 +8,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseServerClient, createSupabaseAdmin } from "@/lib/supabase/server";
 import { generateOrderNumber } from "@/lib/tosspayments";
+import { getMembershipStatus } from "@/lib/membership";
 
 const SHIPPING_FREE_THRESHOLD = 50000;
 const SHIPPING_FEE = 3000;
@@ -50,26 +51,15 @@ export async function POST(request: NextRequest) {
     );
     const shippingFee = subtotal >= SHIPPING_FREE_THRESHOLD ? 0 : SHIPPING_FEE;
 
-    // 회원 등급 할인 계산 (subtotal 기준 자동 적용)
+    // 회원 등급 할인 계산 (subtotal 기준 자동 적용, 모델뷰티 로컬 등급 기준)
     const admin = createSupabaseAdmin();
     let membershipDiscount = 0;
     let membershipTierId = "normal";
     try {
-      const { data: membership } = await admin
-        .from("user_memberships")
-        .select("tier_id")
-        .eq("master_user_id", masterUserId)
-        .maybeSingle();
-      if (membership?.tier_id) {
-        const { data: tier } = await admin
-          .from("membership_tiers")
-          .select("id, discount_rate")
-          .eq("id", membership.tier_id)
-          .maybeSingle();
-        if (tier && tier.discount_rate > 0) {
-          membershipTierId = tier.id;
-          membershipDiscount = Math.floor(subtotal * (tier.discount_rate / 100));
-        }
+      const { tier } = await getMembershipStatus(masterUserId);
+      if (tier.discountRate > 0) {
+        membershipTierId = tier.id;
+        membershipDiscount = Math.floor(subtotal * (tier.discountRate / 100));
       }
     } catch {
       // 등급 조회 실패 시 할인 없이 진행

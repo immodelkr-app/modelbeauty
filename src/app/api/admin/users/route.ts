@@ -9,6 +9,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/auth-admin";
 import { createSupabaseAdmin } from "@/lib/supabase/server";
 import { listMasterMembers } from "@/lib/core-auth";
+import { getBulkTierMap, toTierDto } from "@/lib/membership";
 
 export async function GET(request: NextRequest) {
   const notAllowed = await requireAdmin();
@@ -49,26 +50,18 @@ export async function GET(request: NextRequest) {
       if (phone) supabaseByPhone.set(phone, u);
     }
 
-    const ALL_TIERS = [
-      { id: "normal",  name: "일반",    badge_emoji: "🩶", sort_order: 1 },
-      { id: "silver",  name: "실버",    badge_emoji: "🥈", sort_order: 2 },
-      { id: "gold",    name: "골드",    badge_emoji: "🥇", sort_order: 3 },
-      { id: "imodel",  name: "아임모델", badge_emoji: "⭐", sort_order: 4 },
-      { id: "vip",     name: "VIP",     badge_emoji: "💎", sort_order: 5 },
-    ];
-    const tierMap = new Map(ALL_TIERS.map((t) => [t.id, t]));
-    const defaultTier = ALL_TIERS[0];
-
     // ── 3. im-core-auth 회원이 있으면 그것을 기준으로, 없으면 Supabase 기준 폴백 ──
+    // 등급(tier)/잠금 상태는 im-core-auth와 무관하게 모델뷰티 로컬 DB(주문 이력) 기준으로만 계산합니다.
     if (masterMembers.length > 0) {
+      const tierMap = await getBulkTierMap(masterMembers.map((m) => m.id));
+
       const formattedUsers = masterMembers.map((m) => {
         const normalizedPhone = m.phoneNumber.replace(/\D/g, "");
         const supabaseUser =
           supabaseByMasterId.get(m.id) ??
           (normalizedPhone ? supabaseByPhone.get(normalizedPhone) : undefined);
 
-        const gradeCode = (m.grade || "NORMAL").toLowerCase();
-        const tier = tierMap.get(gradeCode) ?? defaultTier;
+        const membership = tierMap.get(m.id);
 
         return {
           // 상세 조회 시 사용할 식별자: masterUserId 우선
@@ -80,8 +73,8 @@ export async function GET(request: NextRequest) {
           realName: m.realName ?? supabaseUser?.user_metadata?.real_name ?? null,
           createdAt: supabaseUser?.created_at ?? m.createdAt ?? new Date().toISOString(),
           lastSignInAt: supabaseUser?.last_sign_in_at ?? null,
-          tier,
-          isLocked: m.grade_locked,
+          tier: membership ? toTierDto(membership.tier) : null,
+          isLocked: membership?.isLocked ?? false,
           linkedApps: m.linkedApps,
           hasModelBeautyAccount: !!supabaseUser,
         };
@@ -93,8 +86,12 @@ export async function GET(request: NextRequest) {
     }
 
     // ── 폴백: im-core-auth 연결 실패 시 기존 Supabase 기준 표시 ──
+    const fallbackIds = supabaseUsers.map((u) => u.user_metadata?.master_user_id || u.id);
+    const fallbackTierMap = await getBulkTierMap(fallbackIds);
+
     const formattedUsers = supabaseUsers.map((u) => {
       const masterUserId = u.user_metadata?.master_user_id || u.id;
+      const membership = fallbackTierMap.get(masterUserId);
       return {
         id: u.id,
         masterUserId,
@@ -104,8 +101,8 @@ export async function GET(request: NextRequest) {
         realName: u.user_metadata?.real_name ?? null,
         createdAt: u.created_at,
         lastSignInAt: u.last_sign_in_at || null,
-        tier: defaultTier,
-        isLocked: false,
+        tier: membership ? toTierDto(membership.tier) : null,
+        isLocked: membership?.isLocked ?? false,
         linkedApps: ["MODEL_BEAUTY"],
         hasModelBeautyAccount: true,
       };

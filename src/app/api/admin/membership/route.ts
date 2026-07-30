@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/auth-admin";
 import { createSupabaseAdmin } from "@/lib/supabase/server";
-import { getAllMasterUsers, updateMasterUser } from "@/lib/core-auth";
+import { recalculateAllMemberships } from "@/lib/membership";
 
 /**
  * GET /api/admin/membership — 등급 정의 목록 조회
@@ -62,95 +62,19 @@ export async function PUT(request: NextRequest) {
 }
 
 /**
- * POST /api/admin/membership/recalculate — 전체 회원 등급 일괄 재산정
- * 1월/7월 재산정 시 관리자가 클릭
+ * POST /api/admin/membership — 전체 회원 등급 일괄 재산정
+ * 1월/7월 재산정 시 관리자가 클릭. 모델뷰티 로컬 주문 이력만 기준으로 계산하며
+ * im-core-auth와는 무관합니다 (grade_locked가 아니라 로컬 user_memberships.is_locked로 잠금 판정).
  */
 export async function POST() {
   const notAllowed = await requireAdmin();
   if (notAllowed) return notAllowed;
 
   try {
-    const admin = createSupabaseAdmin();
-
-    // 1. 등급 기준 조회
-    const { data: tiers, error: tiersErr } = await admin
-      .from("membership_tiers")
-      .select("id, min_amount, sort_order")
-      .order("sort_order", { ascending: false }); // 높은 등급부터
-
-    if (tiersErr || !tiers) throw tiersErr;
-
-    // 2. 아임모델 공화국에서 전체 회원 가져오기
-    let masterUsers = [];
-    try {
-      masterUsers = await getAllMasterUsers();
-    } catch (err) {
-      console.error("[POST /api/admin/membership/recalculate] 전체 회원 목록 로드 실패:", err);
-      return NextResponse.json({ success: false, error: "통합 회원 목록 로드 실패" }, { status: 500 });
-    }
-
-    // 등급 자동 갱신 잠금(grade_locked)이 false인 회원만 필터링
-    const targetUsers = masterUsers.filter(u => !u.grade_locked);
-
-    // 3. 재산정 기간: 최근 6개월
-    const now = new Date();
-    const sixMonthsAgo = new Date(now);
-    sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
-
-    let upgraded = 0;
-    let downgraded = 0;
-    let unchanged = 0;
-
-    for (const user of targetUsers) {
-      // 해당 회원의 최근 6개월 confirmed 주문 합산
-      const { data: orders } = await admin
-        .from("orders")
-        .select("total_amount")
-        .eq("master_user_id", user.id)
-        .eq("status", "confirmed")
-        .gte("created_at", sixMonthsAgo.toISOString());
-
-      const totalPurchased = (orders ?? []).reduce((s, o) => s + (o.total_amount ?? 0), 0);
-
-      // 해당 누적 구매액에 맞는 가장 높은 등급 결정
-      let newGrade = "NORMAL";
-      for (const tier of tiers) {
-        const tierCode = tier.id.toUpperCase();
-        if (totalPurchased >= tier.min_amount) {
-          newGrade = tierCode;
-          break;
-        }
-      }
-
-      const currentGrade = (user.grade || "NORMAL").toUpperCase();
-
-      // 등급 변경 업데이트
-      if (newGrade !== currentGrade) {
-        const { sort_order: newSort } = tiers.find((t) => t.id.toUpperCase() === newGrade) ?? { sort_order: 1 };
-        const { sort_order: oldSort } = tiers.find((t) => t.id.toUpperCase() === currentGrade) ?? { sort_order: 1 };
-        if (newSort > oldSort) upgraded++;
-        else downgraded++;
-
-        // 아임모델 공화국 API 연동
-        try {
-          await updateMasterUser(user.id, { grade: newGrade });
-        } catch (updateErr) {
-          console.error(`[POST /api/admin/membership/recalculate] 유저 ${user.id} 등급 변경 실패:`, updateErr);
-        }
-      } else {
-        unchanged++;
-      }
-    }
-
+    const result = await recalculateAllMemberships();
     return NextResponse.json({
       success: true,
-      result: {
-        total: targetUsers.length,
-        upgraded,
-        downgraded,
-        unchanged,
-        recalcAt: now.toISOString(),
-      },
+      result: { ...result, recalcAt: new Date().toISOString() },
     });
   } catch (err) {
     console.error("[POST /api/admin/membership/recalculate]", err);

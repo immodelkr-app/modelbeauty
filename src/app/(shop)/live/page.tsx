@@ -245,7 +245,7 @@ export default async function LiveShoppingPage() {
                       </div>
                       <div className="upcoming-products-preview">
                         {stream.products.map((p) => (
-                          <Link key={p.id} href={`/products/${p.slug}`} className="upcoming-prod-pill" title={p.name}>
+                          <Link key={p.id} href={`/products/${p.slug}?stream_id=${stream.id}`} className="upcoming-prod-pill" title={p.name}>
                             {p.name}
                           </Link>
                         ))}
@@ -290,7 +290,7 @@ export default async function LiveShoppingPage() {
                       </h3>
                       <div className="replay-products-bar">
                         {stream.products.slice(0, 3).map((p) => (
-                          <Link key={p.id} href={`/products/${p.slug}`} className="replay-prod-link" title={p.name}>
+                          <Link key={p.id} href={`/products/${p.slug}?stream_id=${stream.id}`} className="replay-prod-link" title={p.name}>
                             {p.name}
                           </Link>
                         ))}

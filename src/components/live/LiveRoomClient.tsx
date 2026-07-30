@@ -7,7 +7,6 @@
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { useAuthStore } from "@/store/auth.store";
 
 interface Product {
@@ -116,63 +115,74 @@ export default function LiveRoomClient({ initialStream, initialChats }: LiveRoom
     }
   }, [stream.activeProductId, stream.products]);
 
-  // ── Supabase 실시간 연동 ────────────────────────────────
+  // ── 폴링 방식 실시간 연동 (Supabase Realtime이 커스텀 스키마 미지원으로 폴링으로 대체) ──
+  // 어드민 제어실(/admin/live/[id]/control)과 동일한 방식: 채팅 5초, 방송 상태 10초 주기 폴링
   useEffect(() => {
-    const supabase = createSupabaseBrowserClient();
+    if (!stream.id) return;
 
-    // 1. 실시간 채팅 수신 리스너
-    const chatChannel = supabase
-      .channel(`live-chats-room-${stream.id}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "INSERT",
-          schema: "model_beauty",
-          table: "live_stream_chats",
-          filter: `stream_id=eq.${stream.id}`,
-        },
-        (payload: any) => {
-          const newChat: ChatMessage = {
-            id: payload.new.id,
-            nickname: payload.new.nickname,
-            message: payload.new.message,
-            createdAt: payload.new.created_at,
-          };
-          setChats((prev) => [...prev, newChat]);
+    // 채팅 폴링: 5초마다 최신 메시지 목록으로 갱신
+    const chatTimer = setInterval(async () => {
+      try {
+        const res = await fetch(`/api/live/${stream.id}/chat`);
+        const { data, success } = await res.json();
+        if (success && data) {
+          setChats(data);
         }
-      )
-      .subscribe();
+      } catch (e) {
+        console.error("[ChatPoll]", e);
+      }
+    }, 5000);
 
-    // 2. 실시간 방송 상태 및 activeProductId 감지 리스너
-    const streamChannel = supabase
-      .channel(`live-stream-room-${stream.id}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "UPDATE",
-          schema: "model_beauty",
-          table: "live_streams",
-          filter: `id=eq.${stream.id}`,
-        },
-        (payload: any) => {
+    // 방송 상태 + 시청자 수 + 전시상품 폴링: 10초마다 갱신
+    const streamTimer = setInterval(async () => {
+      try {
+        const res = await fetch(`/api/live/${stream.id}`);
+        const { data, success } = await res.json();
+        if (success && data) {
           setStream((prev) => ({
             ...prev,
-            status: payload.new.status,
-            activeProductId: payload.new.active_product_id,
-            viewerCount: payload.new.viewer_count,
-            replayUrl: payload.new.replay_url,
-            startedAt: payload.new.started_at,
-            endedAt: payload.new.ended_at,
+            status: data.status,
+            activeProductId: data.activeProductId,
+            viewerCount: data.viewerCount,
+            replayUrl: data.replayUrl,
+            startedAt: data.startedAt,
+            endedAt: data.endedAt,
           }));
         }
-      )
-      .subscribe();
+      } catch (e) {
+        console.error("[StreamPoll]", e);
+      }
+    }, 10000);
 
     return () => {
-      chatChannel.unsubscribe();
-      streamChannel.unsubscribe();
+      clearInterval(chatTimer);
+      clearInterval(streamTimer);
     };
   }, [stream.id]);
+
+  // ── 시청자 수 집계 (방송 입장/이탈 시 viewer_count 증감) ──────
+  useEffect(() => {
+    if (stream.status !== "live") return;
+
+    fetch(`/api/live/${stream.id}/view`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "join" }),
+    }).catch(() => {});
+
+    const leave = () => {
+      navigator.sendBeacon(
+        `/api/live/${stream.id}/view`,
+        new Blob([JSON.stringify({ action: "leave" })], { type: "application/json" })
+      );
+    };
+
+    window.addEventListener("pagehide", leave);
+    return () => {
+      leave();
+      window.removeEventListener("pagehide", leave);
+    };
+  }, [stream.id, stream.status]);
 
   // 채팅 스크롤 제어
   useEffect(() => {
@@ -272,6 +282,8 @@ export default function LiveRoomClient({ initialStream, initialChats }: LiveRoom
       });
       const result = await res.json();
       if (result.success) {
+        // 라이브 방송 유입 구매 귀속 추적 (정산/매출 분석용)
+        sessionStorage.setItem("last_live_stream_id", stream.id);
         // 토스트 추가
         const toastId = `${Date.now()}-${Math.random()}`;
         const nickname = masterUser?.name || "고객";
@@ -795,7 +807,7 @@ export default function LiveRoomClient({ initialStream, initialChats }: LiveRoom
                       {addingToCart ? "담는 중..." : "❤️ 장바구니 담기"}
                     </button>
                     <a
-                      href={`/products/${panelProduct.slug}`}
+                      href={`/products/${panelProduct.slug}?stream_id=${stream.id}`}
                       target="_blank"
                       rel="noreferrer"
                       className="panel-detail-btn"

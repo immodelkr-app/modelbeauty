@@ -76,6 +76,14 @@ interface AnalyticsData {
   } | null;
 }
 
+interface UserStats {
+  total: number;
+  byTier: { tierId: string; tierName: string; badgeEmoji: string; count: number }[];
+  hasModelBeauty: number;
+  noModelBeauty: number;
+  byApp: Record<string, number>;
+}
+
 function formatPrice(n: number) {
   if (n >= 100_000_000) return `${(n / 100_000_000).toFixed(1)}억원`;
   if (n >= 10_000) return `${(n / 10_000).toFixed(0)}만원`;
@@ -108,6 +116,8 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(true);
   const [analyticsLoading, setAnalyticsLoading] = useState(true);
   const [catTab, setCatTab] = useState<CatTab>("month");
+  const [memberStats, setMemberStats] = useState<UserStats | null>(null);
+  const [memberStatsLoading, setMemberStatsLoading] = useState(true);
 
   useEffect(() => {
     fetch("/api/admin/stats")
@@ -119,6 +129,11 @@ export default function AdminDashboard() {
       .then((r) => r.json())
       .then(({ data }) => setAnalytics(data))
       .finally(() => setAnalyticsLoading(false));
+
+    fetch("/api/admin/users/stats")
+      .then((r) => r.json())
+      .then(({ stats: s }) => { if (s) setMemberStats(s); })
+      .finally(() => setMemberStatsLoading(false));
   }, []);
 
   const STAT_CARDS = stats
@@ -166,6 +181,110 @@ export default function AdminDashboard() {
               </Link>
             ))}
       </div>
+
+      {/* ── 회원 현황 카드 ──────────────────────────────────── */}
+      <Link
+        href="/admin/users"
+        style={{ display: "block", textDecoration: "none", marginBottom: "1.5rem" }}
+      >
+        <div style={{
+          background: "rgba(255,255,255,0.025)",
+          border: "1px solid rgba(255,255,255,0.07)",
+          borderRadius: "14px",
+          padding: "1.125rem 1.5rem",
+          display: "flex", flexWrap: "wrap", gap: "0", alignItems: "stretch",
+          transition: "background 0.2s",
+        }}
+          onMouseEnter={(e) => { (e.currentTarget as HTMLDivElement).style.background = "rgba(255,255,255,0.04)"; }}
+          onMouseLeave={(e) => { (e.currentTarget as HTMLDivElement).style.background = "rgba(255,255,255,0.025)"; }}
+        >
+          {/* 제목 */}
+          <div style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.875rem" }}>
+            <span style={{ fontSize: "0.8125rem", fontWeight: 700, color: "#94a3b8", letterSpacing: "0.05em", textTransform: "uppercase" }}>
+              👥 회원 현황
+            </span>
+            <span style={{ fontSize: "0.75rem", color: "#ec4899", fontWeight: 600 }}>회원관리 →</span>
+          </div>
+
+          {memberStatsLoading ? (
+            <div style={{ display: "flex", gap: "0.75rem", width: "100%" }}>
+              {[1,2,3,4].map((i) => (
+                <div key={i} className="skeleton" style={{ height: "56px", flex: 1, borderRadius: "10px" }} />
+              ))}
+            </div>
+          ) : memberStats ? (
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "0.625rem", width: "100%" }}>
+              {/* 전체 인원 */}
+              <div style={{
+                display: "flex", flexDirection: "column",
+                padding: "0.5rem 1rem", borderRadius: "10px",
+                background: "rgba(236,72,153,0.12)",
+                border: "1px solid rgba(236,72,153,0.25)",
+                minWidth: "90px",
+              }}>
+                <span style={{ fontSize: "0.65rem", color: "#94a3b8", fontWeight: 600 }}>전체</span>
+                <span style={{ fontSize: "1.375rem", fontWeight: 900, color: "#f1f5f9", lineHeight: 1.2 }}>
+                  {memberStats.total.toLocaleString()}<span style={{ fontSize: "0.75rem", color: "#94a3b8", marginLeft: "2px" }}>명</span>
+                </span>
+              </div>
+
+              {/* 등급별 */}
+              {memberStats.byTier.map((t) => (
+                <div key={t.tierId} style={{
+                  display: "flex", flexDirection: "column",
+                  padding: "0.5rem 1rem", borderRadius: "10px",
+                  background: "rgba(99,102,241,0.08)",
+                  border: "1px solid rgba(99,102,241,0.18)",
+                  minWidth: "80px",
+                }}>
+                  <span style={{ fontSize: "0.65rem", color: "#94a3b8", fontWeight: 600 }}>{t.badgeEmoji} {t.tierName}</span>
+                  <span style={{ fontSize: "1.125rem", fontWeight: 800, color: "#c7d2fe", lineHeight: 1.2 }}>
+                    {t.count.toLocaleString()}<span style={{ fontSize: "0.7rem", color: "#94a3b8", marginLeft: "2px" }}>명</span>
+                  </span>
+                  <span style={{ fontSize: "0.6rem", color: "#6366f1", fontWeight: 600, marginTop: "1px" }}>
+                    {memberStats.total > 0 ? Math.round((t.count / memberStats.total) * 100) : 0}%
+                  </span>
+                </div>
+              ))}
+
+              {/* 구분선 */}
+              <div style={{ width: "1px", background: "rgba(255,255,255,0.07)", margin: "0 0.125rem", alignSelf: "stretch" }} />
+
+              {/* 모델뷰티 가입 */}
+              <div style={{
+                display: "flex", flexDirection: "column",
+                padding: "0.5rem 1rem", borderRadius: "10px",
+                background: "rgba(236,72,153,0.07)",
+                border: "1px solid rgba(236,72,153,0.18)",
+                minWidth: "80px",
+              }}>
+                <span style={{ fontSize: "0.65rem", color: "#94a3b8", fontWeight: 600 }}>🩷 모델뷰티</span>
+                <span style={{ fontSize: "1.125rem", fontWeight: 800, color: "#ec4899", lineHeight: 1.2 }}>
+                  {memberStats.hasModelBeauty.toLocaleString()}<span style={{ fontSize: "0.7rem", color: "#94a3b8", marginLeft: "2px" }}>명</span>
+                </span>
+              </div>
+
+              {/* 미가입 */}
+              {memberStats.noModelBeauty > 0 && (
+                <div style={{
+                  display: "flex", flexDirection: "column",
+                  padding: "0.5rem 1rem", borderRadius: "10px",
+                  background: "rgba(239,68,68,0.07)",
+                  border: "1px solid rgba(239,68,68,0.18)",
+                  minWidth: "80px",
+                }}>
+                  <span style={{ fontSize: "0.65rem", color: "#94a3b8", fontWeight: 600 }}>⚠️ 미가입</span>
+                  <span style={{ fontSize: "1.125rem", fontWeight: 800, color: "#f87171", lineHeight: 1.2 }}>
+                    {memberStats.noModelBeauty.toLocaleString()}<span style={{ fontSize: "0.7rem", color: "#94a3b8", marginLeft: "2px" }}>명</span>
+                  </span>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div style={{ color: "#475569", fontSize: "0.8125rem" }}>회원 통계를 불러오지 못했습니다.</div>
+          )}
+        </div>
+      </Link>
 
       {/* ── 매출 요약 카드 3개 ─── */}
       <div className="admin-analytics-section">

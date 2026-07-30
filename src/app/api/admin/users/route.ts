@@ -11,6 +11,44 @@ import { createSupabaseAdmin } from "@/lib/supabase/server";
 import { listMasterMembers } from "@/lib/core-auth";
 import { getBulkTierMap, toTierDto } from "@/lib/membership";
 
+// ─── 타입 ────────────────────────────────────────────────
+export interface UserStats {
+  total: number;
+  byTier: { tierId: string; tierName: string; badgeEmoji: string; count: number }[];
+  hasModelBeauty: number;
+  noModelBeauty: number;
+  byApp: Record<string, number>;
+}
+
+function aggregateStats(
+  users: { tier: ReturnType<typeof toTierDto> | null; hasModelBeautyAccount: boolean; linkedApps: string[] }[]
+): UserStats {
+  const tierCounts = new Map<string, { tierName: string; badgeEmoji: string; count: number }>();
+  const appCounts: Record<string, number> = {};
+  let hasModelBeauty = 0;
+  let noModelBeauty = 0;
+
+  for (const u of users) {
+    // 등급별
+    if (u.tier) {
+      const prev = tierCounts.get(u.tier.id) ?? { tierName: u.tier.name, badgeEmoji: u.tier.badge_emoji, count: 0 };
+      tierCounts.set(u.tier.id, { ...prev, count: prev.count + 1 });
+    }
+    // 모델뷰티 가입 여부
+    if (u.hasModelBeautyAccount) hasModelBeauty++; else noModelBeauty++;
+    // 앱별
+    for (const app of (u.linkedApps ?? [])) {
+      appCounts[app] = (appCounts[app] ?? 0) + 1;
+    }
+  }
+
+  const byTier = Array.from(tierCounts.entries())
+    .map(([tierId, v]) => ({ tierId, tierName: v.tierName, badgeEmoji: v.badgeEmoji, count: v.count }))
+    .sort((a, b) => b.count - a.count);
+
+  return { total: users.length, byTier, hasModelBeauty, noModelBeauty, byApp: appCounts };
+}
+
 export async function GET(request: NextRequest) {
   const notAllowed = await requireAdmin();
   if (notAllowed) return notAllowed;
@@ -82,7 +120,8 @@ export async function GET(request: NextRequest) {
 
       // 가입일 기준 최신순 정렬
       formattedUsers.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-      return NextResponse.json({ success: true, users: formattedUsers });
+      const stats = aggregateStats(formattedUsers);
+      return NextResponse.json({ success: true, users: formattedUsers, stats });
     }
 
     // ── 폴백: im-core-auth 연결 실패 시 기존 Supabase 기준 표시 ──
@@ -109,7 +148,8 @@ export async function GET(request: NextRequest) {
     });
 
     formattedUsers.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-    return NextResponse.json({ success: true, users: formattedUsers });
+    const stats = aggregateStats(formattedUsers);
+    return NextResponse.json({ success: true, users: formattedUsers, stats });
   } catch (error) {
     console.error("[GET /api/admin/users] Error:", error);
     return NextResponse.json(

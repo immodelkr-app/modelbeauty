@@ -5,6 +5,7 @@
 
 import { NextResponse } from "next/server";
 import { createSupabaseAdmin, createSupabaseServerClient } from "@/lib/supabase/server";
+import { anonymizeOrderPII } from "@/lib/privacy";
 
 export async function POST() {
   try {
@@ -20,32 +21,12 @@ export async function POST() {
     }
 
     const userId = user.id;
+    const masterUserId = (user.user_metadata?.master_user_id as string | undefined) ?? user.id;
     const adminClient = createSupabaseAdmin();
 
     // 2. 개인정보 파기 및 익명화 처리 (개인정보보호법 및 구글 플레이 가이드 준수)
-    // 주문서 등 법적 보관 데이터(5년)는 유지하되 식별 가능한 개인정보(닉네임, 연락처 등)를 익명화/파기합니다.
-    
-    // 2-1) user_metadata 등 프로필 테이블 갱신 (익명 정보로 대체)
-    const { error: profileUpdateError } = await adminClient
-      .from("users")
-      .update({
-        name: "탈퇴한 회원",
-        nickname: `withdrawn_${Date.now()}`,
-        phone_number: null,
-        email: `withdrawn_${userId.slice(0, 8)}@deleted.modelbeauty.kr`,
-        is_active: false,
-        shipping_recipient: null,
-        shipping_phone: null,
-        shipping_zipcode: null,
-        shipping_address: null,
-        shipping_detail: null
-      })
-      .eq("id", userId);
-
-    if (profileUpdateError) {
-      console.error("[회원탈퇴] users 테이블 업데이트 실패:", profileUpdateError);
-      // 프로필 테이블 오류가 있더라도 탈퇴 진행은 계속 수행할 수 있도록 무시하거나 처리합니다.
-    }
+    // 주문서 등 법적 보관 데이터(5년)는 유지하되 식별 가능한 개인정보(수령인명·연락처·주소)를 익명화합니다.
+    await anonymizeOrderPII(masterUserId);
 
     // 3. Supabase Auth 관리자 API를 통한 계정 영구 삭제 (계정 정보 영구 파기)
     const { error: deleteUserError } = await adminClient.auth.admin.deleteUser(userId);

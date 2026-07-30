@@ -9,6 +9,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/auth-admin";
 import { createSupabaseAdmin } from "@/lib/supabase/server";
 import { getPointBalance, getAvailableCoupons, getMasterUser } from "@/lib/core-auth";
+import { anonymizeOrderPII } from "@/lib/privacy";
 
 export async function GET(
   request: NextRequest,
@@ -111,6 +112,9 @@ export async function GET(
 
 /**
  * DELETE /api/admin/users/[id] — 관리자 권한 회원 강제 탈퇴/삭제
+ * [id]는 Supabase uid 또는 masterUserId 어느 쪽이 와도 처리합니다.
+ * (어드민 회원 목록은 모델뷰티 계정이 없는 MOCA·IMFF 전용 회원의 경우
+ * masterUserId를 id로 대신 내려주기 때문 — GET 핸들러와 동일한 방식)
  */
 export async function DELETE(
   request: NextRequest,
@@ -120,13 +124,36 @@ export async function DELETE(
   if (notAllowed) return notAllowed;
 
   try {
-    const { id: userId } = await params;
+    const { id } = await params;
     const admin = createSupabaseAdmin();
 
-    const { error } = await admin.auth.admin.deleteUser(userId);
+    // ── Supabase Auth 계정 탐색 (uid로 직접 조회 시도 → 실패 시 masterUserId 매핑 탐색) ──
+    let authUser: { id: string; user_metadata?: Record<string, unknown> } | null = null;
+    const { data: byIdData } = await admin.auth.admin.getUserById(id).catch(() => ({ data: { user: null } }));
+    if (byIdData?.user) {
+      authUser = byIdData.user;
+    } else {
+      const { data: { users: allUsers } } = await admin.auth.admin.listUsers({ perPage: 1000 });
+      authUser = allUsers.find((u) => u.user_metadata?.master_user_id === id) ?? null;
+    }
+
+    const masterUserId = (authUser?.user_metadata?.master_user_id as string | undefined) ?? id;
+
+    // 본인 탈퇴와 동일하게 주문에 남은 개인정보를 익명화
+    await anonymizeOrderPII(masterUserId);
+
+    if (!authUser) {
+      // 모델뷰티 로그인 계정이 애초에 없는 회원 (MOCA·IMFF 전용) — 삭제할 로컬 계정이 없음
+      return NextResponse.json({
+        success: true,
+        message: "이 회원은 모델뷰티 로그인 계정이 없어 별도로 삭제할 계정이 없습니다. 주문에 남아있던 개인정보는 익명화 처리되었습니다.",
+      });
+    }
+
+    const { error } = await admin.auth.admin.deleteUser(authUser.id);
 
     if (error) {
-      console.error(`[DELETE /api/admin/users/${userId}] Supabase Auth error:`, error);
+      console.error(`[DELETE /api/admin/users/${id}] Supabase Auth error:`, error);
       return NextResponse.json({ success: false, error: "회원 삭제 중 오류가 발생했습니다." }, { status: 500 });
     }
 

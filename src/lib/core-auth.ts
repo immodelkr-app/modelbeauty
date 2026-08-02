@@ -74,13 +74,11 @@ export async function checkNicknameAvailable(nickname: string): Promise<boolean>
 export async function getMasterUserByNickname(
   nickname: string
 ): Promise<{ masterUserId: string; phoneNumber: string } | null> {
-  const path = `/api/auth/user/nickname/${encodeURIComponent(nickname)}`;
-  console.log("[DEBUG getMasterUserByNickname] url:", `${CORE_AUTH_URL}${path}`);
-  const res = await coreAuthFetch(path);
-  const bodyText = await res.text();
-  console.log("[DEBUG getMasterUserByNickname] status:", res.status, "body:", bodyText);
+  const res = await coreAuthFetch(
+    `/api/auth/user/nickname/${encodeURIComponent(nickname)}`
+  );
   if (res.status === 200) {
-    const data = JSON.parse(bodyText);
+    const data = await res.json();
     if (data.found) {
       return { masterUserId: data.masterUserId, phoneNumber: data.phoneNumber };
     }

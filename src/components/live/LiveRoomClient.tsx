@@ -59,6 +59,18 @@ interface ChatMessage {
   createdAt: string;
 }
 
+interface GameRound {
+  id: string;
+  status: "active" | "ended" | "cancelled";
+  minValue: number;
+  maxValue: number;
+  prizeLabel: string;
+  winnerNickname: string | null;
+  couponIssueStatus: "not_applicable" | "pending" | "issued" | "failed";
+  entryCount: number;
+  myEntry: { guess: number; isCorrect: boolean } | null;
+}
+
 interface LiveRoomClientProps {
   initialStream: LiveStream;
   initialChats: ChatMessage[];
@@ -94,6 +106,13 @@ export default function LiveRoomClient({ initialStream, initialChats }: LiveRoom
   const [subscribed, setSubscribed] = useState(!!initialStream.isSubscribed);
   const [subscribing, setSubscribing] = useState(false);
   const prevStatusRef = useRef(initialStream.status);
+
+  // ── 미니게임 (숫자 맞추기) ────────────────────────────────────
+  const [gameRound, setGameRound] = useState<GameRound | null>(null);
+  const [guessInput, setGuessInput] = useState("");
+  const [guessSubmitting, setGuessSubmitting] = useState(false);
+  const [guessResult, setGuessResult] = useState<{ isCorrect: boolean; isWinner: boolean; prizeLabel?: string } | null>(null);
+  const seenRoundIdRef = useRef<string | null>(null);
 
   const chatEndRef = useRef<HTMLDivElement>(null);
   const heartsContainerRef = useRef<HTMLDivElement>(null);
@@ -149,6 +168,25 @@ export default function LiveRoomClient({ initialStream, initialChats }: LiveRoom
       }
     }, 5000);
 
+    // 미니게임 라운드 폴링: 5초마다 갱신 (새 라운드 시작/종료를 빠르게 감지)
+    const gameTimer = setInterval(async () => {
+      try {
+        const res = await fetch(`/api/live/${stream.id}/game`);
+        const { data, success } = await res.json();
+        if (success) {
+          if (data && data.id !== seenRoundIdRef.current) {
+            // 새 라운드로 전환됨 — 이전 라운드의 결과 배너/입력값 초기화
+            setGuessInput("");
+            setGuessResult(null);
+            seenRoundIdRef.current = data.id;
+          }
+          setGameRound(data);
+        }
+      } catch (e) {
+        console.error("[GamePoll]", e);
+      }
+    }, 5000);
+
     // 방송 상태 + 시청자 수 + 전시상품 폴링: 10초마다 갱신
     const streamTimer = setInterval(async () => {
       try {
@@ -186,8 +224,23 @@ export default function LiveRoomClient({ initialStream, initialChats }: LiveRoom
 
     return () => {
       clearInterval(chatTimer);
+      clearInterval(gameTimer);
       clearInterval(streamTimer);
     };
+  }, [stream.id]);
+
+  // 최초 진입 시 진행 중인 게임이 있는지 즉시 확인 (5초 폴링 대기 없이)
+  useEffect(() => {
+    if (!stream.id) return;
+    fetch(`/api/live/${stream.id}/game`)
+      .then((res) => res.json())
+      .then(({ data, success }) => {
+        if (success && data) {
+          seenRoundIdRef.current = data.id;
+          setGameRound(data);
+        }
+      })
+      .catch(() => {});
   }, [stream.id]);
 
   // ── 시청자 수 집계 (방송 입장/이탈 시 viewer_count 증감) ──────
@@ -366,6 +419,42 @@ export default function LiveRoomClient({ initialStream, initialChats }: LiveRoom
       console.error(e);
     } finally {
       setSubscribing(false);
+    }
+  };
+
+  // ── 미니게임: 정답 제출 ─────────────────────────────────────
+  const handleSubmitGuess = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!isLoggedIn) {
+      window.location.href = `/login?redirect=/live/${stream.id}`;
+      return;
+    }
+    if (!gameRound || guessSubmitting) return;
+
+    const guess = parseInt(guessInput, 10);
+    if (Number.isNaN(guess) || guess < gameRound.minValue || guess > gameRound.maxValue) {
+      alert(`${gameRound.minValue}~${gameRound.maxValue} 사이의 숫자를 입력해 주세요.`);
+      return;
+    }
+
+    setGuessSubmitting(true);
+    try {
+      const res = await fetch(`/api/live/${stream.id}/game/guess`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ roundId: gameRound.id, guess }),
+      });
+      const { success, data, error } = await res.json();
+      if (success) {
+        setGuessResult(data);
+      } else {
+        alert(error ?? "제출에 실패했습니다.");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("네트워크 오류가 발생했습니다.");
+    } finally {
+      setGuessSubmitting(false);
     }
   };
 
@@ -809,6 +898,52 @@ export default function LiveRoomClient({ initialStream, initialChats }: LiveRoom
           <div className="chat-header">
             <h3>실시간 채팅</h3>
           </div>
+
+          {/* 미니게임: 숫자 맞추기 */}
+          {gameRound && gameRound.status === "active" && (
+            <div className="game-banner">
+              <div className="game-banner-title">
+                🎮 숫자 맞추기 진행 중! {gameRound.minValue}~{gameRound.maxValue} 중 하나를 맞혀보세요
+              </div>
+              <div className="game-banner-prize">🎁 경품: {gameRound.prizeLabel}</div>
+
+              {guessResult ? (
+                <div className={`game-result${guessResult.isWinner ? " winner" : ""}`}>
+                  {guessResult.isWinner
+                    ? `🎉 정답! 우승하셨습니다 — ${guessResult.prizeLabel ?? gameRound.prizeLabel}`
+                    : guessResult.isCorrect
+                    ? "😢 정답은 맞혔지만 다른 분이 먼저 맞혀서 마감됐어요."
+                    : "❌ 아쉽지만 오답이에요. 다음 게임을 기다려주세요!"}
+                </div>
+              ) : gameRound.myEntry ? (
+                <div className="game-result">
+                  이미 {gameRound.myEntry.guess}(으)로 참여하셨어요. 결과를 기다려주세요!
+                </div>
+              ) : (
+                <form onSubmit={handleSubmitGuess} className="game-guess-form">
+                  <input
+                    type="number"
+                    className="game-guess-input"
+                    value={guessInput}
+                    onChange={(e) => setGuessInput(e.target.value)}
+                    placeholder={`${gameRound.minValue}~${gameRound.maxValue}`}
+                    min={gameRound.minValue}
+                    max={gameRound.maxValue}
+                  />
+                  <button type="submit" disabled={guessSubmitting} className="game-guess-submit">
+                    {guessSubmitting ? "제출 중..." : "제출"}
+                  </button>
+                </form>
+              )}
+              <div className="game-banner-count">👥 {gameRound.entryCount}명 참여 중</div>
+            </div>
+          )}
+          {gameRound && gameRound.status === "ended" && gameRound.winnerNickname && !guessResult && (
+            <div className="game-banner ended">
+              <div className="game-banner-title">🏆 게임 종료! 우승자: {gameRound.winnerNickname}</div>
+              <div className="game-banner-prize">경품: {gameRound.prizeLabel}</div>
+            </div>
+          )}
 
           {/* 호스트 핀 공지 */}
           {stream.pinnedMessage && (
@@ -1385,6 +1520,76 @@ export default function LiveRoomClient({ initialStream, initialChats }: LiveRoom
           color: #fbcfe8;
           line-height: 1.4;
           word-break: break-word;
+        }
+
+        .game-banner {
+          margin: 0.75rem 1.5rem 0;
+          padding: 0.875rem 1rem;
+          background: linear-gradient(135deg, rgba(219, 39, 119, 0.18) 0%, rgba(124, 58, 237, 0.18) 100%);
+          border: 1px solid rgba(236, 72, 153, 0.35);
+          border-radius: 12px;
+        }
+        .game-banner.ended {
+          background: rgba(255,255,255,0.04);
+          border-color: rgba(255,255,255,0.12);
+        }
+        .game-banner-title {
+          font-size: 0.875rem;
+          font-weight: 800;
+          color: #fff;
+        }
+        .game-banner-prize {
+          font-size: 0.75rem;
+          color: #fbcfe8;
+          margin-top: 0.25rem;
+        }
+        .game-banner-count {
+          font-size: 0.6875rem;
+          color: #94a3b8;
+          margin-top: 0.5rem;
+        }
+        .game-guess-form {
+          display: flex;
+          gap: 0.5rem;
+          margin-top: 0.625rem;
+        }
+        .game-guess-input {
+          flex: 1;
+          min-width: 0;
+          background: rgba(0,0,0,0.3);
+          border: 1px solid rgba(255,255,255,0.2);
+          border-radius: 8px;
+          padding: 0.5rem 0.75rem;
+          color: #fff;
+          font-size: 0.875rem;
+        }
+        .game-guess-input:focus {
+          outline: none;
+          border-color: #ec4899;
+        }
+        .game-guess-submit {
+          flex-shrink: 0;
+          background: linear-gradient(135deg, #ec4899 0%, #a855f7 100%);
+          color: #fff;
+          border: none;
+          padding: 0.5rem 1rem;
+          border-radius: 8px;
+          font-size: 0.8125rem;
+          font-weight: 700;
+          cursor: pointer;
+        }
+        .game-guess-submit:disabled {
+          opacity: 0.6;
+          cursor: not-allowed;
+        }
+        .game-result {
+          margin-top: 0.625rem;
+          font-size: 0.8125rem;
+          font-weight: 700;
+          color: #e2e8f0;
+        }
+        .game-result.winner {
+          color: #fbbf24;
         }
 
         .chat-messages-box {

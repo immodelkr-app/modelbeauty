@@ -336,6 +336,28 @@ export async function restoreCoupon(
   }
 }
 
+/**
+ * 쿠폰 발급 (관리자 수동 발급 및 라이브 이벤트 자동 지급 공용)
+ */
+export async function issueCoupon(params: {
+  masterUserId: string;
+  couponTemplateId: string;
+  issuedBy: string;
+}): Promise<unknown> {
+  const res = await coreAuthFetch("/api/coupons/issue", {
+    method: "POST",
+    body: JSON.stringify(params),
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || `쿠폰 발급 실패: ${res.status}`);
+  }
+
+  const data = await res.json();
+  return data.coupon ?? null;
+}
+
 /** 아임모델 공화국 마스터 회원 전체 상세 정보 */
 export interface MasterMemberDetail {
   id: string;

@@ -51,6 +51,26 @@ interface ChatMessage {
   createdAt: string;
 }
 
+interface GameRound {
+  id: string;
+  status: "active" | "ended" | "cancelled";
+  minValue: number;
+  maxValue: number;
+  prizeLabel: string;
+  winnerNickname: string | null;
+  couponIssueStatus: "not_applicable" | "pending" | "issued" | "failed";
+  entryCount: number;
+  createdAt: string;
+  endedAt: string | null;
+}
+
+interface CouponTemplate {
+  id: string;
+  name: string;
+  discountType: string;
+  discountValue: number;
+}
+
 export default function AdminLiveControlPage({ params }: { params: Promise<{ id: string }> }) {
   const { id: streamId } = use(params);
   const router = useRouter();
@@ -69,6 +89,17 @@ export default function AdminLiveControlPage({ params }: { params: Promise<{ id:
 
   // 라이브 특가 토글 처리중인 상품 id
   const [dealUpdating, setDealUpdating] = useState<string | null>(null);
+
+  // 미니게임 (숫자 맞추기)
+  const [gameRound, setGameRound] = useState<GameRound | null>(null);
+  const [couponTemplates, setCouponTemplates] = useState<CouponTemplate[]>([]);
+  const [couponTemplatesLoading, setCouponTemplatesLoading] = useState(false);
+  const [gameMin, setGameMin] = useState("1");
+  const [gameMax, setGameMax] = useState("50");
+  const [gameAnswer, setGameAnswer] = useState("");
+  const [gamePrizeLabel, setGamePrizeLabel] = useState("");
+  const [gameCouponTemplateId, setGameCouponTemplateId] = useState("");
+  const [gameSubmitting, setGameSubmitting] = useState(false);
 
   // 5분 전 경고 배너 상태
   const [showAlertBanner, setShowAlertBanner] = useState(false);
@@ -106,10 +137,35 @@ export default function AdminLiveControlPage({ params }: { params: Promise<{ id:
     }
   }, [streamId]);
 
+  const fetchGameRound = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/live/${streamId}/game`);
+      const { data, success } = await res.json();
+      if (success) setGameRound(data);
+    } catch (e) {
+      console.error(e);
+    }
+  }, [streamId]);
+
+  const fetchCouponTemplates = useCallback(async () => {
+    setCouponTemplatesLoading(true);
+    try {
+      const res = await fetch("/api/admin/coupons/templates");
+      const data = await res.json();
+      setCouponTemplates(data.templates ?? []);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setCouponTemplatesLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     fetchStreamData();
     fetchChats();
-  }, [fetchStreamData, fetchChats]);
+    fetchGameRound();
+    fetchCouponTemplates();
+  }, [fetchStreamData, fetchChats, fetchGameRound, fetchCouponTemplates]);
 
   // ── 5분 전 커운트다운 타이머 및 웹 알림 유도 ─────────────────
   useEffect(() => {
@@ -213,6 +269,7 @@ export default function AdminLiveControlPage({ params }: { params: Promise<{ id:
             };
           });
         }
+        fetchGameRound();
       } catch (e) {
         console.error("[StreamPoll]", e);
       }
@@ -335,6 +392,78 @@ export default function AdminLiveControlPage({ params }: { params: Promise<{ id:
       alert("네트워크 오류가 발생했습니다.");
     } finally {
       setDealUpdating(null);
+    }
+  };
+
+  // ── 미니게임: 숫자 맞추기 라운드 시작 ────────────────────────
+  const handleStartGame = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const min = parseInt(gameMin, 10);
+    const max = parseInt(gameMax, 10);
+    const answer = parseInt(gameAnswer, 10);
+
+    if (Number.isNaN(min) || Number.isNaN(max) || Number.isNaN(answer)) {
+      alert("범위와 정답을 숫자로 입력해 주세요.");
+      return;
+    }
+    if (min >= max || answer < min || answer > max) {
+      alert("정답은 범위 안의 숫자여야 합니다.");
+      return;
+    }
+    if (!gamePrizeLabel.trim()) {
+      alert("경품 설명을 입력해 주세요. (예: 배송비 무료 쿠폰)");
+      return;
+    }
+    if (!confirm(`${min}~${max} 중 정답 [${answer}]로 게임을 시작할까요? 시청자 화면에 즉시 참여창이 뜹니다.`)) return;
+
+    setGameSubmitting(true);
+    try {
+      const res = await fetch(`/api/live/${streamId}/game`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          minValue: min,
+          maxValue: max,
+          answer,
+          prizeLabel: gamePrizeLabel.trim(),
+          couponTemplateId: gameCouponTemplateId || null,
+        }),
+      });
+      const { success, error } = await res.json();
+      if (success) {
+        setGameAnswer("");
+        await fetchGameRound();
+      } else {
+        alert(error ?? "게임 시작 실패");
+      }
+    } catch (e) {
+      console.error(e);
+      alert("네트워크 오류가 발생했습니다.");
+    } finally {
+      setGameSubmitting(false);
+    }
+  };
+
+  const handleCancelGame = async () => {
+    if (!gameRound || !confirm("진행 중인 게임을 취소할까요?")) return;
+    setGameSubmitting(true);
+    try {
+      const res = await fetch(`/api/live/${streamId}/game`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ roundId: gameRound.id }),
+      });
+      const { success, error } = await res.json();
+      if (success) {
+        await fetchGameRound();
+      } else {
+        alert(error ?? "게임 취소 실패");
+      }
+    } catch (e) {
+      console.error(e);
+      alert("네트워크 오류가 발생했습니다.");
+    } finally {
+      setGameSubmitting(false);
     }
   };
 
@@ -728,6 +857,88 @@ export default function AdminLiveControlPage({ params }: { params: Promise<{ id:
                 })
               )}
             </div>
+          </div>
+
+          {/* 미니게임: 숫자 맞추기 */}
+          <div className="admin-card control-card" style={{ marginTop: "1.5rem" }}>
+            <h2 className="admin-card-title">🎮 미니게임 — 숫자 맞추기</h2>
+            <p style={{ fontSize: "0.8125rem", color: "#6b7280", margin: "0.5rem 0 1rem" }}>
+              범위 안에서 정답을 정하고 시작하면 시청자 화면에 즉시 참여창이 뜹니다. 가장 먼저 맞힌 1명이 자동으로 우승 처리됩니다.
+            </p>
+
+            {gameRound && gameRound.status === "active" ? (
+              <div style={{ background: "#fdf2f8", border: "1px solid #fbcfe8", borderRadius: "10px", padding: "1rem" }}>
+                <div style={{ fontWeight: 700, marginBottom: "0.375rem" }}>
+                  진행 중: {gameRound.minValue}~{gameRound.maxValue} 사이 숫자 · 경품: {gameRound.prizeLabel}
+                </div>
+                <div style={{ fontSize: "0.8125rem", color: "#6b7280", marginBottom: "0.75rem" }}>
+                  참여자 {gameRound.entryCount}명
+                </div>
+                <button
+                  onClick={handleCancelGame}
+                  disabled={gameSubmitting}
+                  className="admin-btn admin-btn-secondary admin-btn-sm"
+                >
+                  게임 취소
+                </button>
+              </div>
+            ) : (
+              <>
+                {gameRound && gameRound.status === "ended" && (
+                  <div style={{
+                    background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: "10px",
+                    padding: "0.75rem 1rem", marginBottom: "1rem", fontSize: "0.8125rem",
+                  }}>
+                    🏆 지난 라운드 우승: <strong>{gameRound.winnerNickname}</strong> · 경품: {gameRound.prizeLabel}
+                    {gameRound.couponIssueStatus === "issued" && <span style={{ color: "#059669", marginLeft: "0.5rem" }}>✓ 쿠폰 자동 발급 완료</span>}
+                    {gameRound.couponIssueStatus === "failed" && <span style={{ color: "#dc2626", marginLeft: "0.5rem" }}>⚠ 쿠폰 발급 실패 — 수동 발급 필요 ({gameRound.winnerNickname})</span>}
+                  </div>
+                )}
+
+                <form onSubmit={handleStartGame} style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+                  <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
+                    <input className="admin-input" type="number" value={gameMin} onChange={(e) => setGameMin(e.target.value)} placeholder="최소값" style={{ width: "90px" }} />
+                    <span>~</span>
+                    <input className="admin-input" type="number" value={gameMax} onChange={(e) => setGameMax(e.target.value)} placeholder="최대값" style={{ width: "90px" }} />
+                    <input className="admin-input" type="number" value={gameAnswer} onChange={(e) => setGameAnswer(e.target.value)} placeholder="정답 숫자" style={{ width: "110px" }} />
+                  </div>
+                  <input
+                    className="admin-input"
+                    value={gamePrizeLabel}
+                    onChange={(e) => setGamePrizeLabel(e.target.value)}
+                    placeholder="경품 설명 (예: 배송비 무료 쿠폰, 20% 할인 쿠폰)"
+                    maxLength={60}
+                  />
+                  <div>
+                    <label style={{ fontSize: "0.75rem", fontWeight: 600, color: "#6b7280", display: "block", marginBottom: "0.375rem" }}>
+                      자동 발급할 쿠폰 (선택 — 아임모델 공화국 쿠폰 템플릿)
+                    </label>
+                    <select
+                      className="admin-input"
+                      value={gameCouponTemplateId}
+                      onChange={(e) => setGameCouponTemplateId(e.target.value)}
+                    >
+                      <option value="">쿠폰 자동발급 안 함 (수동 처리)</option>
+                      {couponTemplatesLoading ? (
+                        <option disabled>불러오는 중...</option>
+                      ) : (
+                        couponTemplates.map((t) => (
+                          <option key={t.id} value={t.id}>{t.name}</option>
+                        ))
+                      )}
+                    </select>
+                  </div>
+                  <button
+                    type="submit"
+                    disabled={gameSubmitting || stream.status !== "live"}
+                    className="admin-btn admin-btn-primary"
+                    style={{ alignSelf: "flex-end" }}
+                  >
+                    {stream.status !== "live" ? "방송 중에만 시작 가능" : "🎮 게임 시작"}
+                  </button>
+                </form>
+              </>
+            )}
           </div>
         </div>
 

@@ -8,13 +8,13 @@ import { createSupabaseAdmin } from "@/lib/supabase/server";
 
 export async function PATCH(
   request: Request,
-  { params }: { params: Promise<{ id: string; videoId: string }> }
+  { params }: { params: Promise<{ slug: string; videoId: string }> }
 ) {
   const notAllowed = await requireAdmin();
   if (notAllowed) return notAllowed;
 
   try {
-    const { id, videoId } = await params;
+    const { slug: id, videoId } = await params;
     const body = await request.json();
     const { title, videoUrl, thumbnailUrl, durationSec, sortOrder, isActive } = body;
 
@@ -49,13 +49,13 @@ export async function PATCH(
 
 export async function DELETE(
   _request: Request,
-  { params }: { params: Promise<{ id: string; videoId: string }> }
+  { params }: { params: Promise<{ slug: string; videoId: string }> }
 ) {
   const notAllowed = await requireAdmin();
   if (notAllowed) return notAllowed;
 
   try {
-    const { id, videoId } = await params;
+    const { slug: id, videoId } = await params;
     const admin = createSupabaseAdmin();
 
     const { error } = await admin

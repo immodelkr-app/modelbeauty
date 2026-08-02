@@ -269,7 +269,7 @@ export default async function HomePage() {
                   </Link>
                 ) : (
                   <Link href="/live" className="hero-cta-primary">
-                    지금 쇼핑하기
+                    라이브 보러가기
                     <svg
                       width="18"
                       height="18"
@@ -286,7 +286,7 @@ export default async function HomePage() {
                   </Link>
                 )}
                 <Link href="/products?featured=true" className="hero-cta-secondary">
-                  베스트 셀러 보기
+                  모델뷰티 아이템
                 </Link>
               </div>
             </div>

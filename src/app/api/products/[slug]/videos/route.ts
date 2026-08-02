@@ -8,10 +8,10 @@ import { createSupabaseServerClient, createSupabaseAdmin } from "@/lib/supabase/
 
 export async function GET(
   _request: Request,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ slug: string }> }
 ) {
   try {
-    const { id } = await params;
+    const { slug: id } = await params;
     const supabase = await createSupabaseServerClient();
 
     const { data: videos, error } = await supabase
@@ -47,13 +47,13 @@ export async function GET(
 
 export async function POST(
   request: Request,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ slug: string }> }
 ) {
   const notAllowed = await requireAdmin();
   if (notAllowed) return notAllowed;
 
   try {
-    const { id } = await params;
+    const { slug: id } = await params;
     const body = await request.json();
     const { title, videoUrl, thumbnailUrl, durationSec, sortOrder = 0 } = body;
 

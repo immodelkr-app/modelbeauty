@@ -236,10 +236,18 @@ export default async function HomePage() {
                 <span className="hero-title-accent">MODEL BEAUTY</span>
               </h1>
 
-              <p className="hero-desc">
-                모델들이 일상에서 직접 사용해보고<br />
-                깐깐하게 검증한 최고의 제품만 셀렉합니다.
-              </p>
+              <div className="hero-stats">
+                {[
+                  { value: "모델 실사용 검증", label: "깐깐하게 직접 써보고 셀렉한 프리미엄 제품" },
+                  { value: "아임모델 전용", label: "패션·광고 모델 회원만을 위한 특별한 가격과 혜택" },
+                  { value: "통합 포인트 결제", label: "MOCA 및 IMFF 앱 활동 적립금 사용 가능" },
+                ].map((stat) => (
+                  <div key={stat.value} style={{ flex: 1 }}>
+                    <div className="hero-stat-value">{stat.value}</div>
+                    <div className="hero-stat-label">{stat.label}</div>
+                  </div>
+                ))}
+              </div>
 
               <div className="hero-actions">
                 {activeStream ? (
@@ -280,19 +288,6 @@ export default async function HomePage() {
                 <Link href="/products?featured=true" className="hero-cta-secondary">
                   베스트 셀러 보기
                 </Link>
-              </div>
-
-              <div className="hero-stats">
-                {[
-                  { value: "모델 실사용 검증", label: "깐깐하게 직접 써보고 셀렉한 프리미엄 제품" },
-                  { value: "아임모델 전용", label: "패션·광고 모델 회원만을 위한 특별한 가격과 혜택" },
-                  { value: "통합 포인트 결제", label: "MOCA 및 IMFF 앱 활동 적립금 사용 가능" },
-                ].map((stat) => (
-                  <div key={stat.value} style={{ flex: 1 }}>
-                    <div className="hero-stat-value">{stat.value}</div>
-                    <div className="hero-stat-label">{stat.label}</div>
-                  </div>
-                ))}
               </div>
             </div>
 

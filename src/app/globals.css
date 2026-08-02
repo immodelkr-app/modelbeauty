@@ -505,6 +505,7 @@ body {
   -webkit-backdrop-filter: blur(20px);
   border-bottom: 1px solid var(--mb-gray-100);
   box-shadow: 0 1px 0 0 rgba(0,0,0,0.04);
+  padding-top: env(safe-area-inset-top, 0px);
 }
 
 .shop-header-inner {
@@ -897,9 +898,9 @@ body {
   display: flex;
   align-items: flex-start;
   gap: 1.5rem;
-  padding-top: 2rem;
-  border-top: 1px solid var(--mb-gray-100);
-  margin-top: 2rem;
+  padding-bottom: 2rem;
+  border-bottom: 1px solid var(--mb-gray-100);
+  margin-bottom: 2rem;
 }
 
 .hero-stat-value {
@@ -3865,8 +3866,8 @@ html, body {
     flex-direction: column;
     align-items: stretch;
     gap: 1rem;
-    padding-top: 1.5rem;
-    margin-top: 1.5rem;
+    padding-bottom: 1.5rem;
+    margin-bottom: 1.5rem;
   }
 
   .hero-stat-value {
@@ -3885,6 +3886,12 @@ html, body {
 
   .shop-header-actions {
     gap: 0.25rem;
+  }
+
+  /* 검색/장바구니/로그인 버튼 터치 영역 확대 (오탭 방지) */
+  .shop-icon-btn {
+    width: 44px;
+    height: 44px;
   }
 
   /* 회원가입 버튼 숨기기 (로그인을 통해 진입 가능하므로 공간 절약) */

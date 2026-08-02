@@ -67,6 +67,16 @@ export default function MypagePage() {
   const [addressError, setAddressError] = useState("");
   const [isSavingAddress, setIsSavingAddress] = useState(false);
 
+  // 프로필(생년월일/성별/마케팅 동의) 수정 상태
+  const [isEditingProfile, setIsEditingProfile] = useState(false);
+  const [isSavingProfile, setIsSavingProfile] = useState(false);
+  const [profileError, setProfileError] = useState("");
+  const [profileState, setProfileState] = useState({
+    birthYear: "", birthMonth: "", birthDay: "",
+    gender: "" as "" | "male" | "female" | "other",
+    marketingEmail: false, marketingSms: false,
+  });
+
   // 회원 탈퇴(계정 삭제) 상태 변수
   const [isWithdrawOpen, setIsWithdrawOpen] = useState(false);
   const [isWithdrawing, setIsWithdrawing] = useState(false);
@@ -102,6 +112,25 @@ export default function MypagePage() {
     }
   }, [masterUser ? masterUser.masterUserId : null]);
 
+  // 3. 프로필(생년월일/성별/마케팅 동의) 조회
+  useEffect(() => {
+    if (!masterUser) return;
+    fetch("/api/mypage/profile")
+      .then((r) => r.json())
+      .then((res) => {
+        if (!res.success) return;
+        const [y, m, d] = (res.data.birthDate ?? "").split("-");
+        setProfileState({
+          birthYear: y ?? "",
+          birthMonth: m ?? "",
+          birthDay: d ?? "",
+          gender: res.data.gender ?? "",
+          marketingEmail: !!res.data.marketingEmail,
+          marketingSms: !!res.data.marketingSms,
+        });
+      })
+      .catch(() => {});
+  }, [masterUser ? masterUser.masterUserId : null]);
 
   const handleAddressSearch = () => {
     const scriptId = "daum-postcode-script";
@@ -191,6 +220,39 @@ export default function MypagePage() {
       setAddressError("네트워크 오류가 발생했습니다.");
     } finally {
       setIsSavingAddress(false);
+    }
+  };
+
+  const handleSaveProfile = async () => {
+    const { birthYear, birthMonth, birthDay, gender, marketingEmail, marketingSms } = profileState;
+
+    if ((birthYear || birthMonth || birthDay) && !(birthYear && birthMonth && birthDay)) {
+      setProfileError("생년월일은 년/월/일을 모두 선택해 주세요.");
+      return;
+    }
+
+    const birthDate = birthYear && birthMonth && birthDay
+      ? `${birthYear}-${birthMonth.padStart(2, "0")}-${birthDay.padStart(2, "0")}`
+      : null;
+
+    setIsSavingProfile(true);
+    setProfileError("");
+    try {
+      const res = await fetch("/api/mypage/profile", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ birthDate, gender: gender || null, marketingEmail, marketingSms }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setIsEditingProfile(false);
+      } else {
+        setProfileError(data.error ?? "저장에 실패했습니다.");
+      }
+    } catch {
+      setProfileError("네트워크 오류가 발생했습니다.");
+    } finally {
+      setIsSavingProfile(false);
     }
   };
 
@@ -705,6 +767,151 @@ export default function MypagePage() {
                 >주소 등록</button>
               </div>
             )}
+          </div>
+        )}
+      </div>
+
+      {/* 프로필 정보 카드 (생년월일/성별/마케팅 동의) */}
+      <div style={{
+        background: "#fff",
+        borderRadius: "20px",
+        padding: "1.5rem",
+        boxShadow: "0 4px 20px rgba(0, 0, 0, 0.05)",
+        border: "1px solid var(--mb-gray-100)",
+        marginBottom: "2rem",
+      }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}>
+          <h2 style={{ fontSize: "1.0625rem", fontWeight: 800, color: "var(--mb-gray-900)", margin: 0 }}>
+            프로필 정보
+          </h2>
+          {!isEditingProfile && (
+            <button
+              onClick={() => setIsEditingProfile(true)}
+              style={{
+                background: "var(--mb-pink-500)", color: "#fff",
+                border: "none", borderRadius: "8px",
+                padding: "0.375rem 0.75rem", fontSize: "0.8125rem",
+                fontWeight: 600, cursor: "pointer",
+              }}
+            >수정</button>
+          )}
+        </div>
+
+        {isEditingProfile ? (
+          <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+            <div>
+              <p style={{ fontSize: "0.8125rem", color: "var(--mb-gray-500)", margin: "0 0 0.5rem 0" }}>
+                🎂 생년월일을 등록하시면 매년 생일에 쿠폰을 보내드려요. (선택 입력)
+              </p>
+              <div style={{ display: "grid", gridTemplateColumns: "2fr 1.2fr 1.2fr", gap: "0.5rem" }}>
+                <select
+                  value={profileState.birthYear}
+                  onChange={(e) => setProfileState((prev) => ({ ...prev, birthYear: e.target.value }))}
+                  style={{ border: "1px solid var(--mb-gray-300)", borderRadius: "8px", padding: "0.5rem", fontSize: "0.875rem", outline: "none", cursor: "pointer" }}
+                >
+                  <option value="">출생 연도</option>
+                  {Array.from({ length: new Date().getFullYear() - 14 - 1899 }, (_, i) => new Date().getFullYear() - 14 - i).map((y) => (
+                    <option key={y} value={String(y)}>{y}년</option>
+                  ))}
+                </select>
+                <select
+                  value={profileState.birthMonth}
+                  onChange={(e) => setProfileState((prev) => ({ ...prev, birthMonth: e.target.value }))}
+                  style={{ border: "1px solid var(--mb-gray-300)", borderRadius: "8px", padding: "0.5rem", fontSize: "0.875rem", outline: "none", cursor: "pointer" }}
+                >
+                  <option value="">월</option>
+                  {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
+                    <option key={m} value={String(m)}>{m}월</option>
+                  ))}
+                </select>
+                <select
+                  value={profileState.birthDay}
+                  onChange={(e) => setProfileState((prev) => ({ ...prev, birthDay: e.target.value }))}
+                  style={{ border: "1px solid var(--mb-gray-300)", borderRadius: "8px", padding: "0.5rem", fontSize: "0.875rem", outline: "none", cursor: "pointer" }}
+                >
+                  <option value="">일</option>
+                  {Array.from({ length: 31 }, (_, i) => i + 1).map((d) => (
+                    <option key={d} value={String(d)}>{d}일</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div>
+              <p style={{ fontSize: "0.8125rem", color: "var(--mb-gray-500)", margin: "0 0 0.5rem 0" }}>성별 (선택)</p>
+              <select
+                value={profileState.gender}
+                onChange={(e) => setProfileState((prev) => ({ ...prev, gender: e.target.value as typeof prev.gender }))}
+                style={{ border: "1px solid var(--mb-gray-300)", borderRadius: "8px", padding: "0.5rem", fontSize: "0.875rem", outline: "none", cursor: "pointer", width: "100%" }}
+              >
+                <option value="">선택 안 함</option>
+                <option value="female">여성</option>
+                <option value="male">남성</option>
+                <option value="other">기타</option>
+              </select>
+            </div>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+              <label style={{ display: "flex", alignItems: "center", gap: "0.5rem", fontSize: "0.8125rem", color: "var(--mb-gray-700)", cursor: "pointer" }}>
+                <input
+                  type="checkbox"
+                  checked={profileState.marketingEmail}
+                  onChange={(e) => setProfileState((prev) => ({ ...prev, marketingEmail: e.target.checked }))}
+                  style={{ width: "16px", height: "16px", accentColor: "var(--mb-pink-500)", cursor: "pointer" }}
+                />
+                마케팅 정보 이메일 수신 동의
+              </label>
+              <label style={{ display: "flex", alignItems: "center", gap: "0.5rem", fontSize: "0.8125rem", color: "var(--mb-gray-700)", cursor: "pointer" }}>
+                <input
+                  type="checkbox"
+                  checked={profileState.marketingSms}
+                  onChange={(e) => setProfileState((prev) => ({ ...prev, marketingSms: e.target.checked }))}
+                  style={{ width: "16px", height: "16px", accentColor: "var(--mb-pink-500)", cursor: "pointer" }}
+                />
+                마케팅 정보 SMS 수신 동의
+              </label>
+            </div>
+
+            {profileError && <p style={{ color: "#ef4444", fontSize: "0.8125rem", margin: 0 }}>{profileError}</p>}
+
+            <div style={{ display: "flex", gap: "0.5rem", marginTop: "0.5rem" }}>
+              <button
+                onClick={handleSaveProfile}
+                disabled={isSavingProfile}
+                style={{
+                  background: "var(--mb-pink-500)", color: "#fff",
+                  border: "none", borderRadius: "8px",
+                  padding: "0.5rem 1rem", fontSize: "0.875rem",
+                  fontWeight: 600, cursor: "pointer", flex: 1,
+                }}
+              >{isSavingProfile ? "저장 중..." : "저장"}</button>
+              <button
+                onClick={() => { setIsEditingProfile(false); setProfileError(""); }}
+                style={{
+                  background: "#fff", color: "var(--mb-gray-600)",
+                  border: "1px solid var(--mb-gray-300)", borderRadius: "8px",
+                  padding: "0.5rem 1rem", fontSize: "0.875rem",
+                  fontWeight: 600, cursor: "pointer",
+                }}
+              >취소</button>
+            </div>
+          </div>
+        ) : (
+          <div style={{ fontSize: "0.875rem", color: "var(--mb-gray-700)", lineHeight: 1.8 }}>
+            <p style={{ margin: 0 }}>
+              <span style={{ fontWeight: 600, color: "var(--mb-gray-500)" }}>[생년월일]</span>{" "}
+              {profileState.birthYear && profileState.birthMonth && profileState.birthDay
+                ? `${profileState.birthYear}년 ${profileState.birthMonth}월 ${profileState.birthDay}일`
+                : <span style={{ color: "var(--mb-pink-500)" }}>미등록 — 등록하시면 생일 쿠폰을 받으실 수 있어요 🎂</span>}
+            </p>
+            <p style={{ margin: 0 }}>
+              <span style={{ fontWeight: 600, color: "var(--mb-gray-500)" }}>[성별]</span>{" "}
+              {profileState.gender === "female" ? "여성" : profileState.gender === "male" ? "남성" : profileState.gender === "other" ? "기타" : "미등록"}
+            </p>
+            <p style={{ margin: 0 }}>
+              <span style={{ fontWeight: 600, color: "var(--mb-gray-500)" }}>[마케팅 수신]</span>{" "}
+              이메일 {profileState.marketingEmail ? "동의" : "미동의"} · SMS {profileState.marketingSms ? "동의" : "미동의"}
+            </p>
           </div>
         )}
       </div>

@@ -187,14 +187,17 @@ export default function SignupPage() {
       setError("실명을 입력해주세요.");
       return;
     }
-    if (!form.birthYear || !form.birthMonth || !form.birthDay) {
-      setError("생년월일을 모두 선택해주세요.");
+    const hasBirthInput = form.birthYear || form.birthMonth || form.birthDay;
+    if (hasBirthInput && !(form.birthYear && form.birthMonth && form.birthDay)) {
+      setError("생년월일은 년/월/일을 모두 선택해주세요. (선택 입력이므로 비워두셔도 됩니다)");
       return;
     }
-    const birthDateStr = `${form.birthYear}-${form.birthMonth.padStart(2, "0")}-${form.birthDay.padStart(2, "0")}`;
-    if (!isAgeValid(birthDateStr)) {
-      setError("만 14세 이상만 가입하실 수 있습니다.");
-      return;
+    if (form.birthYear && form.birthMonth && form.birthDay) {
+      const birthDateStr = `${form.birthYear}-${form.birthMonth.padStart(2, "0")}-${form.birthDay.padStart(2, "0")}`;
+      if (!isAgeValid(birthDateStr)) {
+        setError("만 14세 이상만 가입하실 수 있습니다.");
+        return;
+      }
     }
     if (!form.gender) {
       setError("성별을 선택해주세요.");
@@ -419,7 +422,7 @@ export default function SignupPage() {
           {/* 생년월일 */}
           <div className="login-field">
             <label>
-              생년월일 <span style={{ color: "#db2777", fontSize: "0.75rem" }}>*</span>
+              생년월일 <span style={{ color: "var(--mb-gray-400)", fontSize: "0.75rem", fontWeight: 400 }}>(선택)</span>
             </label>
             {/* 생일 쿠폰 혜택 배너 */}
             <div style={{
@@ -736,8 +739,10 @@ export default function SignupPage() {
                 이용약관 동의
               </span>
               <a
-                href="#"
-                onClick={(e) => e.preventDefault()}
+                href="/terms"
+                target="_blank"
+                rel="noreferrer"
+                onClick={(e) => e.stopPropagation()}
                 style={{ fontSize: "0.72rem", color: "var(--mb-gray-400)", textDecoration: "underline", whiteSpace: "nowrap" }}
               >
                 보기
@@ -758,8 +763,10 @@ export default function SignupPage() {
                 개인정보처리방침 동의
               </span>
               <a
-                href="#"
-                onClick={(e) => e.preventDefault()}
+                href="/privacy"
+                target="_blank"
+                rel="noreferrer"
+                onClick={(e) => e.stopPropagation()}
                 style={{ fontSize: "0.72rem", color: "var(--mb-gray-400)", textDecoration: "underline", whiteSpace: "nowrap" }}
               >
                 보기

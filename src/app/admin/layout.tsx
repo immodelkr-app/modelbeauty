@@ -24,6 +24,8 @@ const NAV = [
   { section: "정산" },
   { href: "/admin/settlements", label: "크루 정산", icon: "💰" },
   { href: "/admin/vendor-settlements", label: "업체 정산", icon: "📊" },
+  { section: "시스템" },
+  { href: "/admin/settings", label: "설정", icon: "⚙️" },
 ] as const;
 
 function AdminSidebar({ pathname }: { pathname: string }) {
@@ -108,6 +110,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       "/admin/vendors": "업체 관리",
       "/admin/settlements": "크루 정산",
       "/admin/vendor-settlements": "업체 정산",
+      "/admin/settings": "설정",
     };
     setPageTitle(
       Object.entries(titles).find(([k]) =>

@@ -921,6 +921,136 @@ export default function AdminUsersPage() {
                   </div>
                 </section>
 
+                {/* ── 확장 프로필 섹션 ──────────────────────────────── */}
+                <section>
+                  <h4 style={{ fontSize: "0.875rem", fontWeight: 700, color: "#94a3b8", marginBottom: "0.5rem", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                    📋 상세 프로필
+                  </h4>
+                  <div style={{ background: "rgba(15,23,42,0.6)", padding: "1rem", borderRadius: "10px", border: "1px solid rgba(255,255,255,0.03)", display: "flex", flexDirection: "column", gap: "0.875rem" }}>
+
+                    {/* 생년월일 + 성별 */}
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
+                      <div>
+                        <span style={{ fontSize: "0.75rem", color: "#64748b", display: "block" }}>🎂 생년월일</span>
+                        <strong style={{ fontSize: "0.9375rem", color: "#f1f5f9" }}>
+                          {(selectedUser as any).birthDate
+                            ? (() => {
+                                const [y, m, d] = ((selectedUser as any).birthDate as string).split("-");
+                                return `${y}년 ${parseInt(m)}월 ${parseInt(d)}일`;
+                              })()
+                            : <span style={{ color: "#475569" }}>미입력</span>}
+                        </strong>
+                        {(selectedUser as any).birthDate && (() => {
+                          const birth = new Date((selectedUser as any).birthDate);
+                          const today = new Date();
+                          const age = today.getFullYear() - birth.getFullYear()
+                            - (today < new Date(today.getFullYear(), birth.getMonth(), birth.getDate()) ? 1 : 0);
+                          const nextBirthday = new Date(today.getFullYear(), birth.getMonth(), birth.getDate());
+                          if (nextBirthday < today) nextBirthday.setFullYear(today.getFullYear() + 1);
+                          const daysLeft = Math.ceil((nextBirthday.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+                          return (
+                            <span style={{ fontSize: "0.72rem", color: "#94a3b8", marginTop: "2px", display: "block" }}>
+                              만 {age}세
+                              {daysLeft === 0
+                                ? <span style={{ color: "#f472b6", fontWeight: 700, marginLeft: "6px" }}>🎂 오늘 생일!</span>
+                                : <span style={{ color: "#64748b", marginLeft: "6px" }}>생일까지 {daysLeft}일</span>}
+                            </span>
+                          );
+                        })()}
+                      </div>
+                      <div>
+                        <span style={{ fontSize: "0.75rem", color: "#64748b", display: "block" }}>성별</span>
+                        <strong style={{ fontSize: "0.9375rem", color: "#f1f5f9" }}>
+                          {(selectedUser as any).gender === "female" && "👩 여성"}
+                          {(selectedUser as any).gender === "male" && "👨 남성"}
+                          {(selectedUser as any).gender === "other" && "🙍 선택 안함"}
+                          {!(selectedUser as any).gender && <span style={{ color: "#475569" }}>미입력</span>}
+                        </strong>
+                      </div>
+                    </div>
+
+                    {/* 주소 */}
+                    <div>
+                      <span style={{ fontSize: "0.75rem", color: "#64748b", display: "block", marginBottom: "0.25rem" }}>📍 주소</span>
+                      {(selectedUser as any).address ? (
+                        <div style={{ fontSize: "0.875rem", color: "#cbd5e1", lineHeight: 1.6 }}>
+                          {(selectedUser as any).zipcode && (
+                            <span style={{ fontSize: "0.75rem", background: "rgba(99,102,241,0.15)", border: "1px solid rgba(99,102,241,0.3)", borderRadius: "4px", padding: "1px 6px", marginRight: "0.5rem", color: "#a5b4fc" }}>
+                              [{(selectedUser as any).zipcode}]
+                            </span>
+                          )}
+                          {(selectedUser as any).address}
+                          {(selectedUser as any).addressDetail && (
+                            <span style={{ color: "#94a3b8" }}> {(selectedUser as any).addressDetail}</span>
+                          )}
+                        </div>
+                      ) : (
+                        <span style={{ fontSize: "0.875rem", color: "#475569" }}>미입력</span>
+                      )}
+                    </div>
+
+                    {/* 마케팅 동의 + 약관 동의 */}
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
+                      <div>
+                        <span style={{ fontSize: "0.75rem", color: "#64748b", display: "block", marginBottom: "0.375rem" }}>📣 마케팅 수신 동의</span>
+                        <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                          <span style={{ fontSize: "0.8125rem", display: "flex", alignItems: "center", gap: "0.4rem" }}>
+                            {(selectedUser as any).marketingEmail === true
+                              ? <span style={{ color: "#22c55e", fontWeight: 700 }}>✅ 이메일 동의</span>
+                              : (selectedUser as any).marketingEmail === false
+                                ? <span style={{ color: "#475569" }}>❌ 이메일 거부</span>
+                                : <span style={{ color: "#475569" }}>이메일 —</span>}
+                          </span>
+                          <span style={{ fontSize: "0.8125rem", display: "flex", alignItems: "center", gap: "0.4rem" }}>
+                            {(selectedUser as any).marketingSms === true
+                              ? <span style={{ color: "#22c55e", fontWeight: 700 }}>✅ SMS 동의</span>
+                              : (selectedUser as any).marketingSms === false
+                                ? <span style={{ color: "#475569" }}>❌ SMS 거부</span>
+                                : <span style={{ color: "#475569" }}>SMS —</span>}
+                          </span>
+                          {(selectedUser as any).marketingAgreedAt && (
+                            <span style={{ fontSize: "0.7rem", color: "#64748b", marginTop: "2px" }}>
+                              동의일: {new Date((selectedUser as any).marketingAgreedAt).toLocaleDateString("ko-KR")}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <div>
+                        <span style={{ fontSize: "0.75rem", color: "#64748b", display: "block", marginBottom: "0.375rem" }}>📜 약관 동의</span>
+                        <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                          <span style={{ fontSize: "0.8125rem", color: (selectedUser as any).termsAgreedAt ? "#22c55e" : "#475569" }}>
+                            {(selectedUser as any).termsAgreedAt ? "✅ 이용약관" : "— 이용약관"}
+                          </span>
+                          <span style={{ fontSize: "0.8125rem", color: (selectedUser as any).privacyAgreedAt ? "#22c55e" : "#475569" }}>
+                            {(selectedUser as any).privacyAgreedAt ? "✅ 개인정보처리방침" : "— 개인정보처리방침"}
+                          </span>
+                          {(selectedUser as any).termsAgreedAt && (
+                            <span style={{ fontSize: "0.7rem", color: "#64748b", marginTop: "2px" }}>
+                              동의일: {new Date((selectedUser as any).termsAgreedAt).toLocaleDateString("ko-KR")}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* 관리자 등록 여부 + 메모 */}
+                    {((selectedUser as any).adminCreated || (selectedUser as any).adminMemo) && (
+                      <div style={{ padding: "0.625rem 0.875rem", background: "rgba(99,102,241,0.08)", border: "1px solid rgba(99,102,241,0.2)", borderRadius: "8px" }}>
+                        {(selectedUser as any).adminCreated && (
+                          <span style={{ fontSize: "0.75rem", fontWeight: 700, color: "#818cf8", display: "block", marginBottom: "0.25rem" }}>
+                            🛡️ 관리자 직접 등록 계정
+                          </span>
+                        )}
+                        {(selectedUser as any).adminMemo && (
+                          <span style={{ fontSize: "0.8125rem", color: "#94a3b8", whiteSpace: "pre-wrap" }}>
+                            📝 {(selectedUser as any).adminMemo}
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </section>
+
                 {/* 실시간 통합 서비스 상태 */}
                 <section style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
                   {/* 포인트 */}

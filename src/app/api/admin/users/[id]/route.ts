@@ -99,6 +99,19 @@ export async function GET(
         linkedApps,
         hasModelBeautyAccount,
         _coreAuthOffline: isOffline,
+        // ── 확장 프로필 (user_metadata에서 추출) ──────────────
+        birthDate:        authUser?.user_metadata?.birth_date ?? null,
+        gender:           authUser?.user_metadata?.gender ?? null,
+        zipcode:          authUser?.user_metadata?.zipcode ?? null,
+        address:          authUser?.user_metadata?.address ?? null,
+        addressDetail:    authUser?.user_metadata?.address_detail ?? null,
+        marketingEmail:   authUser?.user_metadata?.marketing_email ?? null,
+        marketingSms:     authUser?.user_metadata?.marketing_sms ?? null,
+        termsAgreedAt:    authUser?.user_metadata?.terms_agreed_at ?? null,
+        privacyAgreedAt:  authUser?.user_metadata?.privacy_agreed_at ?? null,
+        marketingAgreedAt: authUser?.user_metadata?.marketing_agreed_at ?? null,
+        adminCreated:     authUser?.user_metadata?.admin_created ?? false,
+        adminMemo:        authUser?.user_metadata?.admin_memo ?? null,
       },
     });
   } catch (error) {

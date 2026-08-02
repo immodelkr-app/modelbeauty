@@ -6,8 +6,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseAdmin } from "@/lib/supabase/server";
 import { checkNicknameAvailable, syncMasterUser } from "@/lib/core-auth";
+import { requireAdmin } from "@/lib/auth-admin";
 
 export async function POST(request: NextRequest) {
+  const notAllowed = await requireAdmin();
+  if (notAllowed) return notAllowed;
+
   try {
     const body = await request.json();
     const {
@@ -39,11 +43,6 @@ export async function POST(request: NextRequest) {
     };
 
     const adminClient = createSupabaseAdmin();
-
-    // ── 관리자 권한 확인 ──────────────────────────────────────
-    const authHeader = request.headers.get("cookie") || "";
-    // 실제 권한 체크는 /api/admin/stats 패턴과 동일하게 supabase session으로 처리
-    // (admin layout이 이미 /api/admin/stats 403 체크를 하므로 여기서는 adminClient 사용)
 
     // ── 유효성 검사 ──────────────────────────────────────────
     if (!nickname?.trim()) {

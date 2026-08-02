@@ -185,16 +185,15 @@ export default function AdminDashboard() {
       {/* ── 회원 현황 카드 ──────────────────────────────────── */}
       <div style={{ marginBottom: "1.5rem" }}>
         <div style={{
-          background: "rgba(255,255,255,0.025)",
-          border: "1px solid rgba(255,255,255,0.07)",
+          background: "#fff",
+          border: "1px solid #e5e7eb",
           borderRadius: "14px",
           padding: "1.125rem 1.5rem",
           display: "flex", flexWrap: "wrap", gap: "0", alignItems: "stretch",
-          transition: "background 0.2s",
         }}>
           {/* 제목 + 버튼 */}
           <div style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.875rem" }}>
-            <span style={{ fontSize: "0.8125rem", fontWeight: 700, color: "#94a3b8", letterSpacing: "0.05em", textTransform: "uppercase" }}>
+            <span style={{ fontSize: "0.8125rem", fontWeight: 700, color: "#6b7280", letterSpacing: "0.05em", textTransform: "uppercase" }}>
               👥 회원 현황
             </span>
             <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
@@ -235,13 +234,13 @@ export default function AdminDashboard() {
               <div style={{
                 display: "flex", flexDirection: "column",
                 padding: "0.5rem 1rem", borderRadius: "10px",
-                background: "rgba(236,72,153,0.12)",
-                border: "1px solid rgba(236,72,153,0.25)",
+                background: "rgba(236,72,153,0.08)",
+                border: "1px solid rgba(236,72,153,0.2)",
                 minWidth: "90px",
               }}>
-                <span style={{ fontSize: "0.65rem", color: "#94a3b8", fontWeight: 600 }}>전체</span>
-                <span style={{ fontSize: "1.375rem", fontWeight: 900, color: "#f1f5f9", lineHeight: 1.2 }}>
-                  {memberStats.total.toLocaleString()}<span style={{ fontSize: "0.75rem", color: "#94a3b8", marginLeft: "2px" }}>명</span>
+                <span style={{ fontSize: "0.65rem", color: "#6b7280", fontWeight: 600 }}>전체</span>
+                <span style={{ fontSize: "1.375rem", fontWeight: 900, color: "#111827", lineHeight: 1.2 }}>
+                  {memberStats.total.toLocaleString()}<span style={{ fontSize: "0.75rem", color: "#6b7280", marginLeft: "2px" }}>명</span>
                 </span>
               </div>
 
@@ -250,34 +249,34 @@ export default function AdminDashboard() {
                 <div key={t.tierId} style={{
                   display: "flex", flexDirection: "column",
                   padding: "0.5rem 1rem", borderRadius: "10px",
-                  background: "rgba(99,102,241,0.08)",
-                  border: "1px solid rgba(99,102,241,0.18)",
+                  background: "rgba(99,102,241,0.06)",
+                  border: "1px solid rgba(99,102,241,0.16)",
                   minWidth: "80px",
                 }}>
-                  <span style={{ fontSize: "0.65rem", color: "#94a3b8", fontWeight: 600 }}>{t.badgeEmoji} {t.tierName}</span>
-                  <span style={{ fontSize: "1.125rem", fontWeight: 800, color: "#c7d2fe", lineHeight: 1.2 }}>
-                    {t.count.toLocaleString()}<span style={{ fontSize: "0.7rem", color: "#94a3b8", marginLeft: "2px" }}>명</span>
+                  <span style={{ fontSize: "0.65rem", color: "#6b7280", fontWeight: 600 }}>{t.badgeEmoji} {t.tierName}</span>
+                  <span style={{ fontSize: "1.125rem", fontWeight: 800, color: "#4338ca", lineHeight: 1.2 }}>
+                    {t.count.toLocaleString()}<span style={{ fontSize: "0.7rem", color: "#6b7280", marginLeft: "2px" }}>명</span>
                   </span>
-                  <span style={{ fontSize: "0.6rem", color: "#6366f1", fontWeight: 600, marginTop: "1px" }}>
+                  <span style={{ fontSize: "0.6rem", color: "#4f46e5", fontWeight: 600, marginTop: "1px" }}>
                     {memberStats.total > 0 ? Math.round((t.count / memberStats.total) * 100) : 0}%
                   </span>
                 </div>
               ))}
 
               {/* 구분선 */}
-              <div style={{ width: "1px", background: "rgba(255,255,255,0.07)", margin: "0 0.125rem", alignSelf: "stretch" }} />
+              <div style={{ width: "1px", background: "#e5e7eb", margin: "0 0.125rem", alignSelf: "stretch" }} />
 
               {/* 모델뷰티 가입 */}
               <div style={{
                 display: "flex", flexDirection: "column",
                 padding: "0.5rem 1rem", borderRadius: "10px",
-                background: "rgba(236,72,153,0.07)",
-                border: "1px solid rgba(236,72,153,0.18)",
+                background: "rgba(236,72,153,0.06)",
+                border: "1px solid rgba(236,72,153,0.16)",
                 minWidth: "80px",
               }}>
-                <span style={{ fontSize: "0.65rem", color: "#94a3b8", fontWeight: 600 }}>🩷 모델뷰티</span>
-                <span style={{ fontSize: "1.125rem", fontWeight: 800, color: "#ec4899", lineHeight: 1.2 }}>
-                  {memberStats.hasModelBeauty.toLocaleString()}<span style={{ fontSize: "0.7rem", color: "#94a3b8", marginLeft: "2px" }}>명</span>
+                <span style={{ fontSize: "0.65rem", color: "#6b7280", fontWeight: 600 }}>🩷 모델뷰티</span>
+                <span style={{ fontSize: "1.125rem", fontWeight: 800, color: "#db2777", lineHeight: 1.2 }}>
+                  {memberStats.hasModelBeauty.toLocaleString()}<span style={{ fontSize: "0.7rem", color: "#6b7280", marginLeft: "2px" }}>명</span>
                 </span>
               </div>
 
@@ -286,19 +285,19 @@ export default function AdminDashboard() {
                 <div style={{
                   display: "flex", flexDirection: "column",
                   padding: "0.5rem 1rem", borderRadius: "10px",
-                  background: "rgba(239,68,68,0.07)",
-                  border: "1px solid rgba(239,68,68,0.18)",
+                  background: "rgba(239,68,68,0.06)",
+                  border: "1px solid rgba(239,68,68,0.16)",
                   minWidth: "80px",
                 }}>
-                  <span style={{ fontSize: "0.65rem", color: "#94a3b8", fontWeight: 600 }}>⚠️ 미가입</span>
-                  <span style={{ fontSize: "1.125rem", fontWeight: 800, color: "#f87171", lineHeight: 1.2 }}>
-                    {memberStats.noModelBeauty.toLocaleString()}<span style={{ fontSize: "0.7rem", color: "#94a3b8", marginLeft: "2px" }}>명</span>
+                  <span style={{ fontSize: "0.65rem", color: "#6b7280", fontWeight: 600 }}>⚠️ 미가입</span>
+                  <span style={{ fontSize: "1.125rem", fontWeight: 800, color: "#dc2626", lineHeight: 1.2 }}>
+                    {memberStats.noModelBeauty.toLocaleString()}<span style={{ fontSize: "0.7rem", color: "#6b7280", marginLeft: "2px" }}>명</span>
                   </span>
                 </div>
               )}
             </div>
           ) : (
-            <div style={{ color: "#475569", fontSize: "0.8125rem" }}>회원 통계를 불러오지 못했습니다.</div>
+            <div style={{ color: "#6b7280", fontSize: "0.8125rem" }}>회원 통계를 불러오지 못했습니다.</div>
           )}
         </div>
       </div>

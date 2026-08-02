@@ -281,7 +281,7 @@ export default function ProductOptions({
           </span>
           <span
             style={{
-              fontSize: "1.5rem",
+              fontSize: "1.25rem",
               fontWeight: 900,
               color: "var(--mb-gray-900)",
               letterSpacing: "-0.03em",

@@ -1630,7 +1630,7 @@ body {
 }
 
 .product-info-price {
-  font-size: 2rem;
+  font-size: 1.75rem;
   font-weight: 900;
   color: var(--mb-gray-900);
   letter-spacing: -0.04em;

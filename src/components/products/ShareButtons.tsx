@@ -38,6 +38,13 @@ export default function ShareButtons({
 }: ShareButtonsProps) {
   const [copied, setCopied] = useState(false);
   const [kakaoReady, setKakaoReady] = useState(false);
+  const [nativeShareSupported, setNativeShareSupported] = useState(false);
+
+  // OS 공유시트(navigator.share) 지원 여부 — 미지원 환경(대부분의 데스크톱)에서는
+  // "더 보내기"가 링크 복사와 동일하게 동작해 버튼이 중복되므로 아예 숨긴다.
+  useEffect(() => {
+    setNativeShareSupported(typeof navigator !== "undefined" && !!navigator.share);
+  }, []);
 
   // 카카오 SDK 초기화
   useEffect(() => {
@@ -142,96 +149,103 @@ export default function ShareButtons({
   }, [productName, productUrl, crewNickname, handleCopy]);
 
   return (
-    <div
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: "0.625rem",
-        padding: "1rem 0",
-        flexWrap: "wrap",
-      }}
-    >
-      <span
+    <div style={{ padding: "1rem 0" }}>
+      <p
         style={{
           fontSize: "0.8125rem",
           color: "var(--mb-gray-500, #6b7280)",
-          marginRight: "0.25rem",
           fontWeight: 500,
+          margin: "0 0 0.625rem",
         }}
       >
         공유하기
-      </span>
+      </p>
 
-      {/* 링크 복사 */}
-      <button
-        onClick={handleCopy}
-        title="링크 복사"
+      <div
         style={{
           display: "flex",
           alignItems: "center",
-          gap: "0.375rem",
-          padding: "0.5rem 0.875rem",
-          background: copied ? "#d1fae5" : "#f3f4f6",
-          color: copied ? "#065f46" : "#374151",
-          border: "none",
-          borderRadius: "999px",
-          fontSize: "0.8125rem",
-          fontWeight: 600,
-          cursor: "pointer",
-          transition: "all 0.2s",
-          fontFamily: "inherit",
+          gap: "0.5rem",
         }}
       >
-        {copied ? "✅" : "🔗"} {copied ? "복사됨!" : "링크 복사"}
-      </button>
+        {/* 카카오톡 공유 — 국내 주 채널이라 가장 넓게, 항상 맨 앞에 노출 */}
+        {kakaoReady && (
+          <button
+            onClick={handleKakao}
+            title="카카오톡으로 공유"
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: "0.375rem",
+              flex: 1,
+              padding: "0.625rem 1rem",
+              background: "#FEE500",
+              color: "#191919",
+              border: "none",
+              borderRadius: "999px",
+              fontSize: "0.8125rem",
+              fontWeight: 700,
+              cursor: "pointer",
+              transition: "filter 0.2s",
+              fontFamily: "inherit",
+            }}
+          >
+            💬 카카오톡 공유
+          </button>
+        )}
 
-      {/* 카카오톡 공유 */}
-      {kakaoReady && (
+        {/* 링크 복사 (아이콘 버튼) */}
         <button
-          onClick={handleKakao}
-          title="카카오톡으로 공유"
+          onClick={handleCopy}
+          title="링크 복사"
+          aria-label={copied ? "링크가 복사되었습니다" : "링크 복사"}
           style={{
             display: "flex",
             alignItems: "center",
-            gap: "0.375rem",
-            padding: "0.5rem 0.875rem",
-            background: "#FEE500",
-            color: "#191919",
+            justifyContent: "center",
+            width: "42px",
+            height: "42px",
+            flexShrink: 0,
+            background: copied ? "#d1fae5" : "#f3f4f6",
+            color: copied ? "#065f46" : "#374151",
             border: "none",
-            borderRadius: "999px",
-            fontSize: "0.8125rem",
-            fontWeight: 600,
+            borderRadius: "50%",
+            fontSize: "1rem",
             cursor: "pointer",
-            transition: "all 0.2s",
-            fontFamily: "inherit",
+            transition: "background 0.2s",
           }}
         >
-          💬 카카오톡 공유
+          {copied ? "✅" : "🔗"}
         </button>
-      )}
 
-      {/* 더 보내기 (Web Share / 모바일) */}
-      <button
-        onClick={handleWebShare}
-        title="더 보내기"
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: "0.375rem",
-          padding: "0.5rem 0.875rem",
-          background: "#f3f4f6",
-          color: "#374151",
-          border: "none",
-          borderRadius: "999px",
-          fontSize: "0.8125rem",
-          fontWeight: 600,
-          cursor: "pointer",
-          transition: "all 0.2s",
-          fontFamily: "inherit",
-        }}
-      >
-        📤 더 보내기
-      </button>
+        {/* 더 보내기 — OS 공유시트가 실제로 있는 환경(주로 모바일)에서만 노출.
+            없는 환경에서는 링크 복사와 동작이 겹쳐 중복 버튼이 되므로 숨김. */}
+        {nativeShareSupported && (
+          <button
+            onClick={handleWebShare}
+            title="더 보내기"
+            aria-label="더 보내기"
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              width: "42px",
+              height: "42px",
+              flexShrink: 0,
+              background: "#f3f4f6",
+              color: "#374151",
+              border: "none",
+              borderRadius: "50%",
+              fontSize: "1rem",
+              cursor: "pointer",
+              transition: "background 0.2s",
+            }}
+          >
+            📤
+          </button>
+        )}
+      </div>
     </div>
   );
 }

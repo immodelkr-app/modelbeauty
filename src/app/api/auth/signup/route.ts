@@ -55,6 +55,12 @@ export async function POST(request: NextRequest) {
     if (!phoneNumber?.trim()) {
       return NextResponse.json({ error: "휴대폰 번호를 입력해주세요." }, { status: 400 });
     }
+    if (!zipcode?.trim() || !address?.trim()) {
+      return NextResponse.json({ error: "배송을 위해 주소를 입력해주세요." }, { status: 400 });
+    }
+    if (!addressDetail?.trim()) {
+      return NextResponse.json({ error: "상세 주소를 입력해주세요." }, { status: 400 });
+    }
 
     const cleanNickname = nickname.trim();
     const cleanRealName = realName.trim();

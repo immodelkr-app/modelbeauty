@@ -129,6 +129,10 @@ export async function verifyUserIdentity(params: {
 
 /**
  * masterUserId로 마스터 유저 조회
+ * im-core-auth의 /api/auth/user/:id는 스네이크케이스(phone_number, id 등)로 응답하지만
+ * 이 프로젝트 전역에서는 MasterUser 타입(camelCase)을 기대하므로 여기서 정규화한다.
+ * (정규화 누락 시 masterUserDetail.phoneNumber가 항상 undefined가 되어
+ *  비밀번호 재설정의 본인확인 단계가 항상 실패하는 버그가 있었음)
  */
 export async function getMasterUser(masterUserId: string): Promise<MasterUser> {
   const res = await coreAuthFetch(`/api/auth/user/${masterUserId}`);
@@ -138,7 +142,14 @@ export async function getMasterUser(masterUserId: string): Promise<MasterUser> {
     throw new Error(err.error || `마스터 유저 조회 실패: ${res.status}`);
   }
 
-  return res.json();
+  const data = await res.json();
+  return {
+    ...data,
+    masterUserId: data.masterUserId ?? data.id,
+    phoneNumber: data.phoneNumber ?? data.phone_number,
+    integratedPoints: data.integratedPoints ?? data.integrated_points ?? 0,
+    linkedApps: data.linkedApps ?? data.linked_apps ?? [],
+  } as MasterUser;
 }
 
 /**

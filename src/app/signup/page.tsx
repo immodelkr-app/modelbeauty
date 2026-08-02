@@ -215,6 +215,14 @@ export default function SignupPage() {
       setError("올바른 휴대폰 번호를 입력해주세요.");
       return;
     }
+    if (!form.zipcode || !form.address) {
+      setError("배송을 위해 주소를 입력해주세요.");
+      return;
+    }
+    if (!form.addressDetail.trim()) {
+      setError("상세 주소를 입력해주세요.");
+      return;
+    }
     if (!consents.terms) {
       setError("이용약관에 동의해주세요.");
       return;
@@ -642,7 +650,10 @@ export default function SignupPage() {
           {/* 주소 */}
           <div className="login-field">
             <label>
-              주소 <span style={{ fontSize: "0.72rem", color: "var(--mb-gray-400)", marginLeft: "0.5rem", fontWeight: 400 }}>(선택)</span>
+              주소 <span style={{ color: "#db2777", fontSize: "0.75rem" }}>*</span>
+              <span style={{ fontSize: "0.72rem", color: "var(--mb-gray-400)", marginLeft: "0.5rem", fontWeight: 400 }}>
+                (배송을 위해 꼭 필요해요)
+              </span>
             </label>
             <div style={{ display: "flex", gap: "0.5rem", marginBottom: "0.5rem" }}>
               <input

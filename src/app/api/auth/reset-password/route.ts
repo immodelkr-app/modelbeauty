@@ -180,6 +180,7 @@ export async function POST(request: NextRequest) {
 
     // 아임모델 공화국에서 닉네임으로 마스터 유저 조회
     const masterUserRef = await getMasterUserByNickname(nickname.trim());
+    console.log("[DEBUG reset-password] masterUserRef:", JSON.stringify(masterUserRef));
 
     if (!masterUserRef) {
       return NextResponse.json(
@@ -192,7 +193,9 @@ export async function POST(request: NextRequest) {
     let masterUserDetail;
     try {
       masterUserDetail = await getMasterUser(masterUserRef.masterUserId);
-    } catch {
+      console.log("[DEBUG reset-password] masterUserDetail:", JSON.stringify(masterUserDetail));
+    } catch (e) {
+      console.log("[DEBUG reset-password] getMasterUser threw:", e instanceof Error ? e.message : e);
       return NextResponse.json(
         { found: false, error: "회원 정보 조회에 실패했습니다." },
         { status: 200 }
@@ -201,6 +204,7 @@ export async function POST(request: NextRequest) {
 
     // 휴대폰번호 일치 확인 (숫자만 비교)
     const masterPhone = (masterUserDetail.phoneNumber || "").replace(/\D/g, "");
+    console.log("[DEBUG reset-password] masterPhone:", masterPhone, "phoneDigits:", phoneDigits);
     if (masterPhone !== phoneDigits) {
       return NextResponse.json(
         { found: false, error: "일치하는 회원 정보를 찾을 수 없습니다." },

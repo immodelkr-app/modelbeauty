@@ -89,6 +89,23 @@ async function getLiveStreams(): Promise<StreamItem[]> {
   });
 }
 
+// 실제 방송 화면(cover_image_url)이 없는 경우, 라이브 커머스 채팅창 느낌의 대체 비주얼에 쓸 샘플 댓글
+const REPLAY_FALLBACK_COMMENTS = [
+  "이거 완전 대박이에요 🔥",
+  "저도 방금 주문했어요!",
+  "색상 진짜 예뻐요 😍",
+  "가격 실화인가요?",
+  "재입고 언제 되나요?",
+  "친구한테 추천했어요",
+];
+
+function pickReplayComments(seed: string): string[] {
+  const offset = seed.split("").reduce((sum, ch) => sum + ch.charCodeAt(0), 0);
+  return [0, 1, 2].map(
+    (i) => REPLAY_FALLBACK_COMMENTS[(offset + i * 2) % REPLAY_FALLBACK_COMMENTS.length]
+  );
+}
+
 export default async function LiveShoppingPage() {
   const streams = await getLiveStreams();
 
@@ -277,7 +294,18 @@ export default async function LiveShoppingPage() {
                         {stream.coverImageUrl ? (
                           <Image src={stream.coverImageUrl} alt={stream.title} fill sizes="(max-width: 768px) 50vw, 25vw" style={{ objectFit: "cover" }} />
                         ) : (
-                          <div className="replay-visual-fallback">REPLAY</div>
+                          <div className="replay-visual-fallback">
+                            {stream.products[0]?.thumbnail && (
+                              <div className="replay-fallback-product">
+                                <Image src={stream.products[0].thumbnail} alt={stream.products[0].name} fill sizes="88px" style={{ objectFit: "cover" }} />
+                              </div>
+                            )}
+                            {pickReplayComments(stream.id).map((comment, i) => (
+                              <span key={i} className={`replay-comment-chip replay-comment-chip-${i + 1}`} aria-hidden="true">
+                                💬 {comment}
+                              </span>
+                            ))}
+                          </div>
                         )}
                         <span className="replay-play-icon">▶</span>
                         <span className="replay-duration-badge">다시보기</span>

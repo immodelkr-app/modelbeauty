@@ -6,6 +6,7 @@
 // ============================================================
 
 import { useState, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 
 interface UserSummary {
@@ -123,6 +124,126 @@ export default function AdminUsersPage() {
   const [solapiConfig, setSolapiConfig] = useState<any>(null);
   const [solapiCheckLoading, setSolapiCheckLoading] = useState(false);
 
+  // ── 회원 직접 등록 모달 ──────────────────────────────────
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [createForm, setCreateForm] = useState({
+    nickname: "", realName: "", password: "", phoneNumber: "",
+    birthYear: "", birthMonth: "", birthDay: "",
+    gender: "" as "" | "male" | "female" | "other",
+    zipcode: "", address: "", addressDetail: "",
+    marketingEmail: false, marketingSms: false, memo: "",
+  });
+  const [createError, setCreateError] = useState("");
+  const [createLoading, setCreateLoading] = useState(false);
+  const [nicknameCheck, setNicknameCheck] = useState<"idle"|"checking"|"available"|"taken"|"invalid">("idle");
+
+  // URL ?action=create 감지 → 모달 자동 열기
+  const searchParams = useSearchParams();
+  useEffect(() => {
+    if (searchParams.get("action") === "create") {
+      setShowCreateModal(true);
+    }
+  }, [searchParams]);
+
+  // 닉네임 중복 체크 (디바운스)
+  useEffect(() => {
+    const nick = createForm.nickname.trim();
+    if (!nick) { setNicknameCheck("idle"); return; }
+    if (nick.length < 2 || nick.length > 12) { setNicknameCheck("invalid"); return; }
+    const t = setTimeout(async () => {
+      setNicknameCheck("checking");
+      try {
+        const res = await fetch(`/api/auth/check-nickname?nickname=${encodeURIComponent(nick)}`);
+        const data = await res.json();
+        setNicknameCheck(data.available ? "available" : "taken");
+      } catch { setNicknameCheck("idle"); }
+    }, 600);
+    return () => clearTimeout(t);
+  }, [createForm.nickname]);
+
+  // 다음 주소 검색 (등록 모달용)
+  const handleCreateAddressSearch = () => {
+    const scriptId = "daum-postcode-script";
+    const open = () => {
+      if ((window as any).daum?.Postcode) {
+        new (window as any).daum.Postcode({
+          oncomplete: (data: any) => {
+            let addr = data.address;
+            let extra = "";
+            if (data.addressType === "R") {
+              if (data.bname) extra += data.bname;
+              if (data.buildingName) extra += (extra ? `, ${data.buildingName}` : data.buildingName);
+              addr += extra ? ` (${extra})` : "";
+            }
+            setCreateForm(f => ({ ...f, zipcode: data.zonecode, address: addr }));
+          },
+        }).open();
+      }
+    };
+    if (!document.getElementById(scriptId)) {
+      const s = document.createElement("script");
+      s.id = scriptId;
+      s.src = "//t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js";
+      s.async = true;
+      s.onload = open;
+      document.head.appendChild(s);
+    } else { open(); }
+  };
+
+  const formatCreatePhone = (v: string) => {
+    const d = v.replace(/\D/g, "").slice(0, 11);
+    if (d.length <= 3) return d;
+    if (d.length <= 7) return `${d.slice(0,3)}-${d.slice(3)}`;
+    return `${d.slice(0,3)}-${d.slice(3,7)}-${d.slice(7)}`;
+  };
+
+  const handleCreateSubmit = async () => {
+    setCreateError("");
+    const nick = createForm.nickname.trim();
+    const phone = createForm.phoneNumber.replace(/\D/g, "");
+    if (!nick || nick.length < 2) { setCreateError("닉네임을 2자 이상 입력해주세요."); return; }
+    if (nicknameCheck !== "available") { setCreateError("닉네임 중복 확인이 필요합니다."); return; }
+    if (!createForm.realName.trim()) { setCreateError("실명을 입력해주세요."); return; }
+    if (createForm.password.length < 6) { setCreateError("임시 비밀번호는 6자 이상 입력해주세요."); return; }
+    if (phone.length < 10) { setCreateError("올바른 휴대폰 번호를 입력해주세요."); return; }
+
+    const birthDate = (createForm.birthYear && createForm.birthMonth && createForm.birthDay)
+      ? `${createForm.birthYear}-${createForm.birthMonth.padStart(2,"0")}-${createForm.birthDay.padStart(2,"0")}`
+      : undefined;
+
+    setCreateLoading(true);
+    try {
+      const res = await fetch("/api/admin/users/create", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          nickname: nick,
+          realName: createForm.realName.trim(),
+          password: createForm.password,
+          phoneNumber: phone,
+          birthDate,
+          gender: createForm.gender || undefined,
+          zipcode: createForm.zipcode || undefined,
+          address: createForm.address || undefined,
+          addressDetail: createForm.addressDetail || undefined,
+          marketingEmail: createForm.marketingEmail,
+          marketingSms: createForm.marketingSms,
+          memo: createForm.memo || undefined,
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        alert(`✅ ${data.message}`);
+        setShowCreateModal(false);
+        setCreateForm({ nickname:"", realName:"", password:"", phoneNumber:"", birthYear:"", birthMonth:"", birthDay:"", gender:"", zipcode:"", address:"", addressDetail:"", marketingEmail:false, marketingSms:false, memo:"" });
+        setNicknameCheck("idle");
+        fetchUsers();
+      } else {
+        setCreateError(data.error || "등록에 실패했습니다.");
+      }
+    } catch { setCreateError("네트워크 오류가 발생했습니다."); }
+    finally { setCreateLoading(false); }
+  };
 
   useEffect(() => {
     fetchUsers();
@@ -513,6 +634,21 @@ export default function AdminUsersPage() {
 
       {/* 상단 툴바 */}
       <div className="admin-toolbar" style={{ display: "flex", gap: "1rem", marginBottom: "1rem", flexWrap: "wrap", alignItems: "center" }}>
+        <button
+          onClick={() => { setCreateError(""); setShowCreateModal(true); }}
+          style={{
+            display: "flex", alignItems: "center", gap: "0.4rem",
+            padding: "0.625rem 1.125rem", fontSize: "0.875rem", fontWeight: 700,
+            background: "linear-gradient(135deg, #ec4899, #a855f7)",
+            border: "none", color: "#fff", borderRadius: "8px", cursor: "pointer",
+            boxShadow: "0 2px 10px rgba(236,72,153,0.35)",
+            transition: "opacity 0.15s",
+          }}
+          onMouseEnter={(e) => (e.currentTarget.style.opacity = "0.85")}
+          onMouseLeave={(e) => (e.currentTarget.style.opacity = "1")}
+        >
+          ➕ 회원 직접 등록
+        </button>
         <input
           type="text"
           placeholder="🔍 이름, 이메일, 전화번호 검색..."
@@ -1298,6 +1434,228 @@ export default function AdminUsersPage() {
                 닫기
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ══════════════════════════════════════════════════
+          회원 직접 등록 모달
+      ══════════════════════════════════════════════════ */}
+      {showCreateModal && (
+        <div style={{
+          position: "fixed", inset: 0, zIndex: 2000,
+          background: "rgba(0,0,0,0.75)", backdropFilter: "blur(6px)",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          padding: "1rem",
+        }}
+          onClick={(e) => { if (e.target === e.currentTarget) setShowCreateModal(false); }}
+        >
+          <div style={{
+            background: "#1e293b", border: "1px solid rgba(255,255,255,0.1)",
+            borderRadius: "18px", padding: "1.75rem",
+            width: "100%", maxWidth: "520px",
+            maxHeight: "90vh", overflowY: "auto",
+            boxShadow: "0 24px 64px rgba(0,0,0,0.6)",
+          }}>
+            {/* 헤더 */}
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "1.5rem" }}>
+              <div>
+                <h2 style={{ margin: 0, fontSize: "1.125rem", fontWeight: 800, color: "#f1f5f9" }}>➕ 회원 직접 등록</h2>
+                <p style={{ margin: "0.25rem 0 0", fontSize: "0.8rem", color: "#64748b" }}>관리자가 신규 회원 계정을 생성합니다.</p>
+              </div>
+              <button onClick={() => setShowCreateModal(false)}
+                style={{ background: "none", border: "none", color: "#64748b", fontSize: "1.25rem", cursor: "pointer", padding: "0.25rem" }}>
+                ✕
+              </button>
+            </div>
+
+            {/* 입력 필드 공통 스타일 */}
+            {(() => {
+              const inp: React.CSSProperties = {
+                width: "100%", padding: "0.6rem 0.875rem",
+                background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)",
+                borderRadius: "8px", color: "#e2e8f0", fontSize: "0.875rem",
+                outline: "none", boxSizing: "border-box",
+              };
+              const lbl: React.CSSProperties = {
+                display: "block", fontSize: "0.8rem", fontWeight: 600,
+                color: "#94a3b8", marginBottom: "0.35rem",
+              };
+              const sec: React.CSSProperties = {
+                fontSize: "0.7rem", fontWeight: 700, color: "#64748b",
+                letterSpacing: "0.05em", textTransform: "uppercase",
+                marginTop: "1.25rem", marginBottom: "0.75rem",
+                paddingBottom: "0.375rem", borderBottom: "1px solid rgba(255,255,255,0.06)",
+              };
+              return (
+                <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+                  <div style={sec}>📋 기본 정보</div>
+
+                  {/* 닉네임 */}
+                  <div>
+                    <label style={lbl}>닉네임 <span style={{ color: "#ec4899" }}>*</span></label>
+                    <input style={inp} placeholder="2~12자" maxLength={12}
+                      value={createForm.nickname}
+                      onChange={(e) => setCreateForm(f => ({ ...f, nickname: e.target.value }))} />
+                    {nicknameCheck !== "idle" && (
+                      <span style={{ fontSize: "0.75rem", marginTop: "0.2rem", display: "block",
+                        color: nicknameCheck === "available" ? "#22c55e" : nicknameCheck === "checking" ? "#9ca3af" : "#ef4444" }}>
+                        {nicknameCheck === "available" && "✅ 사용 가능"}
+                        {nicknameCheck === "taken" && "❌ 이미 사용 중"}
+                        {nicknameCheck === "invalid" && "⚠️ 2~12자로 입력"}
+                        {nicknameCheck === "checking" && "⏳ 확인 중..."}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* 실명 */}
+                  <div>
+                    <label style={lbl}>실명 <span style={{ color: "#ec4899" }}>*</span></label>
+                    <input style={inp} placeholder="홍길동"
+                      value={createForm.realName}
+                      onChange={(e) => setCreateForm(f => ({ ...f, realName: e.target.value }))} />
+                  </div>
+
+                  {/* 생년월일 */}
+                  <div>
+                    <label style={lbl}>생년월일</label>
+                    <div style={{ display: "grid", gridTemplateColumns: "2fr 1.2fr 1.2fr", gap: "0.5rem" }}>
+                      <select style={inp} value={createForm.birthYear}
+                        onChange={(e) => setCreateForm(f => ({ ...f, birthYear: e.target.value }))}>
+                        <option value="">출생 연도</option>
+                        {Array.from({ length: new Date().getFullYear() - 1899 }, (_, i) => new Date().getFullYear() - i).map(y => (
+                          <option key={y} value={String(y)}>{y}년</option>
+                        ))}
+                      </select>
+                      <select style={inp} value={createForm.birthMonth}
+                        onChange={(e) => setCreateForm(f => ({ ...f, birthMonth: e.target.value }))}>
+                        <option value="">월</option>
+                        {Array.from({ length: 12 }, (_, i) => i + 1).map(m => <option key={m} value={String(m)}>{m}월</option>)}
+                      </select>
+                      <select style={inp} value={createForm.birthDay}
+                        onChange={(e) => setCreateForm(f => ({ ...f, birthDay: e.target.value }))}>
+                        <option value="">일</option>
+                        {Array.from({ length: 31 }, (_, i) => i + 1).map(d => <option key={d} value={String(d)}>{d}일</option>)}
+                      </select>
+                    </div>
+                    <span style={{ fontSize: "0.7rem", color: "#64748b", marginTop: "0.2rem", display: "block" }}>
+                      🎂 생일날 모델뷰티 생일 쿠폰이 자동 발행됩니다.
+                    </span>
+                  </div>
+
+                  {/* 성별 */}
+                  <div>
+                    <label style={lbl}>성별</label>
+                    <select style={inp} value={createForm.gender}
+                      onChange={(e) => setCreateForm(f => ({ ...f, gender: e.target.value as any }))}>
+                      <option value="">선택 안함</option>
+                      <option value="female">여성</option>
+                      <option value="male">남성</option>
+                      <option value="other">기타</option>
+                    </select>
+                  </div>
+
+                  <div style={sec}>🔒 계정 정보</div>
+
+                  {/* 임시 비밀번호 */}
+                  <div>
+                    <label style={lbl}>임시 비밀번호 <span style={{ color: "#ec4899" }}>*</span></label>
+                    <input style={inp} type="text" placeholder="6자 이상 (회원에게 전달 필요)"
+                      value={createForm.password}
+                      onChange={(e) => setCreateForm(f => ({ ...f, password: e.target.value }))} />
+                  </div>
+
+                  {/* 전화번호 */}
+                  <div>
+                    <label style={lbl}>휴대폰 번호 <span style={{ color: "#ec4899" }}>*</span></label>
+                    <input style={inp} type="tel" inputMode="numeric" placeholder="010-0000-0000"
+                      value={createForm.phoneNumber}
+                      onChange={(e) => setCreateForm(f => ({ ...f, phoneNumber: formatCreatePhone(e.target.value) }))} />
+                  </div>
+
+                  <div style={sec}>📍 주소 (선택)</div>
+
+                  {/* 주소 */}
+                  <div>
+                    <div style={{ display: "flex", gap: "0.5rem", marginBottom: "0.5rem" }}>
+                      <input readOnly style={{ ...inp, flex: "0 0 100px", cursor: "default" }}
+                        placeholder="우편번호" value={createForm.zipcode} />
+                      <button type="button" onClick={handleCreateAddressSearch}
+                        style={{
+                          flex: 1, padding: "0.6rem 0.75rem", fontSize: "0.8rem", fontWeight: 700,
+                          background: "rgba(219,39,119,0.15)", border: "1px solid rgba(219,39,119,0.35)",
+                          borderRadius: "8px", color: "#ec4899", cursor: "pointer",
+                        }}>
+                        🔍 주소 검색
+                      </button>
+                    </div>
+                    <input readOnly style={{ ...inp, marginBottom: "0.5rem", cursor: "default" }}
+                      placeholder="기본 주소" value={createForm.address} />
+                    <input style={inp} placeholder="상세 주소"
+                      value={createForm.addressDetail}
+                      onChange={(e) => setCreateForm(f => ({ ...f, addressDetail: e.target.value }))} />
+                  </div>
+
+                  <div style={sec}>📣 마케팅 동의</div>
+
+                  <div style={{ display: "flex", gap: "1.5rem" }}>
+                    <label style={{ display: "flex", alignItems: "center", gap: "0.5rem", cursor: "pointer", fontSize: "0.875rem", color: "#cbd5e1" }}>
+                      <input type="checkbox" checked={createForm.marketingEmail}
+                        onChange={(e) => setCreateForm(f => ({ ...f, marketingEmail: e.target.checked }))}
+                        style={{ width: "16px", height: "16px", accentColor: "#ec4899" }} />
+                      이메일 수신 동의
+                    </label>
+                    <label style={{ display: "flex", alignItems: "center", gap: "0.5rem", cursor: "pointer", fontSize: "0.875rem", color: "#cbd5e1" }}>
+                      <input type="checkbox" checked={createForm.marketingSms}
+                        onChange={(e) => setCreateForm(f => ({ ...f, marketingSms: e.target.checked }))}
+                        style={{ width: "16px", height: "16px", accentColor: "#ec4899" }} />
+                      SMS 수신 동의
+                    </label>
+                  </div>
+
+                  <div style={sec}>📝 관리자 메모 (선택)</div>
+                  <textarea
+                    placeholder="내부용 메모 (회원에게 노출 안됨)"
+                    value={createForm.memo}
+                    onChange={(e) => setCreateForm(f => ({ ...f, memo: e.target.value }))}
+                    rows={2}
+                    style={{ ...inp, resize: "vertical", fontFamily: "inherit" }}
+                  />
+
+                  {createError && (
+                    <div style={{
+                      background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.35)",
+                      borderRadius: "8px", padding: "0.625rem 1rem",
+                      color: "#f87171", fontSize: "0.8375rem",
+                    }}>
+                      ⚠️ {createError}
+                    </div>
+                  )}
+
+                  {/* 버튼 */}
+                  <div style={{ display: "flex", gap: "0.75rem", marginTop: "0.5rem" }}>
+                    <button onClick={() => setShowCreateModal(false)}
+                      style={{
+                        flex: 1, padding: "0.75rem",
+                        background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)",
+                        borderRadius: "10px", color: "#94a3b8", fontWeight: 600, cursor: "pointer",
+                      }}>
+                      취소
+                    </button>
+                    <button onClick={handleCreateSubmit} disabled={createLoading}
+                      style={{
+                        flex: 2, padding: "0.75rem",
+                        background: createLoading ? "rgba(236,72,153,0.4)" : "linear-gradient(135deg, #ec4899, #a855f7)",
+                        border: "none", borderRadius: "10px", color: "#fff",
+                        fontWeight: 800, fontSize: "0.9375rem", cursor: createLoading ? "not-allowed" : "pointer",
+                        boxShadow: createLoading ? "none" : "0 4px 16px rgba(236,72,153,0.4)",
+                      }}>
+                      {createLoading ? "⏳ 등록 중..." : "✅ 회원 등록하기"}
+                    </button>
+                  </div>
+                </div>
+              );
+            })()}
           </div>
         </div>
       )}

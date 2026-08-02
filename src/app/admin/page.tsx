@@ -183,10 +183,7 @@ export default function AdminDashboard() {
       </div>
 
       {/* ── 회원 현황 카드 ──────────────────────────────────── */}
-      <Link
-        href="/admin/users"
-        style={{ display: "block", textDecoration: "none", marginBottom: "1.5rem" }}
-      >
+      <div style={{ marginBottom: "1.5rem" }}>
         <div style={{
           background: "rgba(255,255,255,0.025)",
           border: "1px solid rgba(255,255,255,0.07)",
@@ -194,16 +191,36 @@ export default function AdminDashboard() {
           padding: "1.125rem 1.5rem",
           display: "flex", flexWrap: "wrap", gap: "0", alignItems: "stretch",
           transition: "background 0.2s",
-        }}
-          onMouseEnter={(e) => { (e.currentTarget as HTMLDivElement).style.background = "rgba(255,255,255,0.04)"; }}
-          onMouseLeave={(e) => { (e.currentTarget as HTMLDivElement).style.background = "rgba(255,255,255,0.025)"; }}
-        >
-          {/* 제목 */}
+        }}>
+          {/* 제목 + 버튼 */}
           <div style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.875rem" }}>
             <span style={{ fontSize: "0.8125rem", fontWeight: 700, color: "#94a3b8", letterSpacing: "0.05em", textTransform: "uppercase" }}>
               👥 회원 현황
             </span>
-            <span style={{ fontSize: "0.75rem", color: "#ec4899", fontWeight: 600 }}>회원관리 →</span>
+            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+              <Link
+                href="/admin/users?action=create"
+                style={{
+                  fontSize: "0.75rem",
+                  fontWeight: 700,
+                  color: "#fff",
+                  background: "linear-gradient(135deg, #ec4899, #a855f7)",
+                  padding: "0.3rem 0.75rem",
+                  borderRadius: "7px",
+                  textDecoration: "none",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "0.25rem",
+                  boxShadow: "0 2px 8px rgba(236,72,153,0.35)",
+                  transition: "opacity 0.15s",
+                }}
+              >
+                ➕ 회원 등록
+              </Link>
+              <Link href="/admin/users" style={{ fontSize: "0.75rem", color: "#ec4899", fontWeight: 600, textDecoration: "none" }}>
+                회원관리 →
+              </Link>
+            </div>
           </div>
 
           {memberStatsLoading ? (
@@ -284,7 +301,7 @@ export default function AdminDashboard() {
             <div style={{ color: "#475569", fontSize: "0.8125rem" }}>회원 통계를 불러오지 못했습니다.</div>
           )}
         </div>
-      </Link>
+      </div>
 
       {/* ── 매출 요약 카드 3개 ─── */}
       <div className="admin-analytics-section">

@@ -16,6 +16,10 @@ interface Product {
   salePrice: number | null;
   images: { url: string }[];
   isActive: boolean;
+  stockQuantity?: number;
+  soldCount?: number;
+  isLiveDeal?: boolean;
+  dealEndsAt?: string | null;
 }
 
 interface LiveStream {
@@ -30,7 +34,9 @@ interface LiveStream {
   ingestEndpoint: string | null;
   streamKey: string | null;
   activeProductId: string | null;
+  pinnedMessage: string | null;
   viewerCount: number;
+  subscriberCount?: number;
   createdAt: string;
   startedAt: string | null;
   endedAt: string | null;
@@ -57,6 +63,13 @@ export default function AdminLiveControlPage({ params }: { params: Promise<{ id:
   const [adminMessage, setAdminMessage] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
+  // 채팅 핀 공지
+  const [pinnedInput, setPinnedInput] = useState("");
+  const [pinnedSaving, setPinnedSaving] = useState(false);
+
+  // 라이브 특가 토글 처리중인 상품 id
+  const [dealUpdating, setDealUpdating] = useState<string | null>(null);
+
   // 5분 전 경고 배너 상태
   const [showAlertBanner, setShowAlertBanner] = useState(false);
   const [minsLeft, setMinsLeft] = useState<number | null>(null);
@@ -69,6 +82,7 @@ export default function AdminLiveControlPage({ params }: { params: Promise<{ id:
       if (success && data) {
         setStream(data);
         setReplayUrl(data.replayUrl ?? "");
+        setPinnedInput(data.pinnedMessage ?? "");
       } else {
         alert("방송 정보를 불러오지 못했습니다.");
         router.push("/admin/live");
@@ -187,12 +201,15 @@ export default function AdminLiveControlPage({ params }: { params: Promise<{ id:
               ...prev,
               status: data.status,
               viewerCount: data.viewerCount,
+              subscriberCount: data.subscriberCount,
               activeProductId: data.activeProductId,
+              pinnedMessage: data.pinnedMessage,
               replayUrl: data.replayUrl,
               ingestEndpoint: data.ingestEndpoint,
               streamKey: data.streamKey,
               startedAt: data.startedAt,
               endedAt: data.endedAt,
+              products: data.products ?? prev.products,
             };
           });
         }
@@ -259,6 +276,65 @@ export default function AdminLiveControlPage({ params }: { params: Promise<{ id:
     } catch (e) {
       console.error(e);
       alert("오류가 발생했습니다.");
+    }
+  };
+
+  // ── 채팅 핀 공지 저장/해제 ──────────────────────────────
+  const handleSavePinnedMessage = async (value: string | null) => {
+    setPinnedSaving(true);
+    try {
+      const res = await fetch(`/api/live/${streamId}/status`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pinnedMessage: value }),
+      });
+      const { success, error } = await res.json();
+      if (success) {
+        setStream((prev) => (prev ? { ...prev, pinnedMessage: value } : prev));
+        if (value === null) setPinnedInput("");
+      } else {
+        alert(error ?? "공지 저장 실패");
+      }
+    } catch (e) {
+      console.error(e);
+      alert("네트워크 오류가 발생했습니다.");
+    } finally {
+      setPinnedSaving(false);
+    }
+  };
+
+  // ── 상품별 라이브 특가(타임세일) 토글 ────────────────────────
+  const handleToggleDeal = async (productId: string, isLiveDeal: boolean, minutesFromNow?: number) => {
+    setDealUpdating(productId);
+    try {
+      const dealEndsAt = isLiveDeal && minutesFromNow
+        ? new Date(Date.now() + minutesFromNow * 60000).toISOString()
+        : null;
+
+      const res = await fetch(`/api/live/${streamId}/deal`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ productId, isLiveDeal, dealEndsAt }),
+      });
+      const { success, error } = await res.json();
+      if (success) {
+        setStream((prev) => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            products: prev.products.map((p) =>
+              p.id === productId ? { ...p, isLiveDeal, dealEndsAt } : p
+            ),
+          };
+        });
+      } else {
+        alert(error ?? "라이브 특가 설정 실패");
+      }
+    } catch (e) {
+      console.error(e);
+      alert("네트워크 오류가 발생했습니다.");
+    } finally {
+      setDealUpdating(null);
     }
   };
 
@@ -340,6 +416,11 @@ export default function AdminLiveControlPage({ params }: { params: Promise<{ id:
           <h1 className="admin-section-title">🎙️ 라이브 방송 제어실</h1>
           <p style={{ color: "#6b7280", fontSize: "0.875rem", marginTop: "4px" }}>
             {stream.title} ({stream.streamerName})
+            {typeof stream.subscriberCount === "number" && stream.subscriberCount > 0 && (
+              <span style={{ marginLeft: "0.75rem", color: "#db2777", fontWeight: 700 }}>
+                🔔 알림 신청 {stream.subscriberCount}명
+              </span>
+            )}
           </p>
         </div>
         <div style={{ display: "flex", gap: "0.5rem" }}>
@@ -564,28 +645,82 @@ export default function AdminLiveControlPage({ params }: { params: Promise<{ id:
               ) : (
                 stream.products.map((p) => {
                   const isFeatured = stream.activeProductId === p.id;
+                  const dealActive = !!p.isLiveDeal && (!p.dealEndsAt || new Date(p.dealEndsAt).getTime() > Date.now());
                   return (
                     <div
                       key={p.id}
                       className={`control-product-card${isFeatured ? " featured" : ""}`}
+                      style={{ flexDirection: "column", alignItems: "stretch", gap: "0.625rem" }}
                     >
-                      <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
-                        <div style={{ fontWeight: 600 }}>{p.name}</div>
-                        <div style={{ fontSize: "0.75rem", color: "#6b7280" }}>
-                          정가: {p.basePrice.toLocaleString()}원
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
+                          <div style={{ fontWeight: 600 }}>{p.name}</div>
+                          <div style={{ fontSize: "0.75rem", color: "#6b7280" }}>
+                            정가: {p.basePrice.toLocaleString()}원
+                            {typeof p.stockQuantity === "number" && (
+                              <span style={{ marginLeft: "0.5rem" }}>· 재고 {p.stockQuantity}개</span>
+                            )}
+                            {typeof p.soldCount === "number" && p.soldCount > 0 && (
+                              <span style={{ marginLeft: "0.5rem", color: "#db2777" }}>· 이 방송 판매 {p.soldCount}개</span>
+                            )}
+                          </div>
+                        </div>
+                        <div>
+                          {isFeatured ? (
+                            <span className="live-badge-styled">🖥️ 노출 중</span>
+                          ) : (
+                            <button
+                              onClick={() => handleFeaturedProductChange(p.id)}
+                              disabled={stream.status !== "live"}
+                              className="admin-btn admin-btn-primary admin-btn-sm"
+                            >
+                              화면 노출
+                            </button>
+                          )}
                         </div>
                       </div>
-                      <div>
-                        {isFeatured ? (
-                          <span className="live-badge-styled">🖥️ 노출 중</span>
+
+                      {/* 라이브 특가(타임세일) 표시 제어 */}
+                      <div style={{ display: "flex", alignItems: "center", gap: "0.375rem", borderTop: "1px dashed #e5e7eb", paddingTop: "0.625rem" }}>
+                        {dealActive ? (
+                          <>
+                            <span style={{ fontSize: "0.75rem", fontWeight: 700, color: "#d97706" }}>
+                              ⚡ 라이브특가 표시 중{p.dealEndsAt ? ` (${new Date(p.dealEndsAt).toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" })}까지)` : ""}
+                            </span>
+                            <button
+                              onClick={() => handleToggleDeal(p.id, false)}
+                              disabled={dealUpdating === p.id}
+                              className="admin-btn admin-btn-secondary admin-btn-sm"
+                              style={{ marginLeft: "auto" }}
+                            >
+                              해제
+                            </button>
+                          </>
                         ) : (
-                          <button
-                            onClick={() => handleFeaturedProductChange(p.id)}
-                            disabled={stream.status !== "live"}
-                            className="admin-btn admin-btn-primary admin-btn-sm"
-                          >
-                            화면 노출
-                          </button>
+                          <>
+                            <span style={{ fontSize: "0.75rem", color: "#9ca3af" }}>라이브특가:</span>
+                            <button
+                              onClick={() => handleToggleDeal(p.id, true, 10)}
+                              disabled={dealUpdating === p.id}
+                              className="admin-btn admin-btn-secondary admin-btn-sm"
+                            >
+                              10분
+                            </button>
+                            <button
+                              onClick={() => handleToggleDeal(p.id, true, 30)}
+                              disabled={dealUpdating === p.id}
+                              className="admin-btn admin-btn-secondary admin-btn-sm"
+                            >
+                              30분
+                            </button>
+                            <button
+                              onClick={() => handleToggleDeal(p.id, true)}
+                              disabled={dealUpdating === p.id}
+                              className="admin-btn admin-btn-secondary admin-btn-sm"
+                            >
+                              방송 끝까지
+                            </button>
+                          </>
                         )}
                       </div>
                     </div>
@@ -605,6 +740,46 @@ export default function AdminLiveControlPage({ params }: { params: Promise<{ id:
                 시청자 수: {stream.viewerCount}명
               </span>
             </div>
+
+            {/* 채팅 핀 공지 */}
+            <div style={{ marginTop: "0.75rem" }}>
+              {stream.pinnedMessage ? (
+                <div style={{
+                  display: "flex", alignItems: "center", gap: "0.5rem",
+                  background: "#fdf2f8", border: "1px solid #fbcfe8",
+                  borderRadius: "8px", padding: "0.5rem 0.75rem",
+                }}>
+                  <span style={{ fontSize: "0.8125rem", flex: 1 }}>📌 {stream.pinnedMessage}</span>
+                  <button
+                    onClick={() => handleSavePinnedMessage(null)}
+                    disabled={pinnedSaving}
+                    className="admin-btn admin-btn-secondary admin-btn-sm"
+                  >
+                    해제
+                  </button>
+                </div>
+              ) : (
+                <div style={{ display: "flex", gap: "0.5rem" }}>
+                  <input
+                    className="admin-input"
+                    value={pinnedInput}
+                    onChange={(e) => setPinnedInput(e.target.value)}
+                    placeholder="채팅창 상단에 고정할 공지 입력..."
+                    maxLength={120}
+                    style={{ fontSize: "0.8125rem" }}
+                  />
+                  <button
+                    onClick={() => handleSavePinnedMessage(pinnedInput.trim() || null)}
+                    disabled={pinnedSaving || !pinnedInput.trim()}
+                    className="admin-btn admin-btn-primary admin-btn-sm"
+                    style={{ flexShrink: 0 }}
+                  >
+                    📌 고정
+                  </button>
+                </div>
+              )}
+            </div>
+
             <div className="chat-logs-area">
               {chats.length === 0 ? (
                 <p style={{ padding: "2rem", textAlign: "center", color: "#9ca3af", fontSize: "0.875rem" }}>

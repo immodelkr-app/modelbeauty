@@ -15,7 +15,7 @@ export async function PATCH(
   try {
     const { id } = await params;
     const body = await request.json();
-    const { status, activeProductId, replayUrl } = body;
+    const { status, activeProductId, replayUrl, pinnedMessage } = body;
 
     const admin = createSupabaseAdmin();
 
@@ -50,6 +50,10 @@ export async function PATCH(
 
     if (replayUrl !== undefined) {
       updatePayload.replay_url = replayUrl;
+    }
+
+    if (pinnedMessage !== undefined) {
+      updatePayload.pinned_message = pinnedMessage || null;
     }
 
     // ── 3. 상태 업데이트 수행 ──────────────────────────────────

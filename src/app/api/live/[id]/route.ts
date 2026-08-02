@@ -21,8 +21,10 @@ export async function GET(
         live_stream_products (
           product_id,
           sort_order,
+          is_live_deal,
+          deal_ends_at,
           products (
-            id, name, slug, base_price, sale_price, images, is_active
+            id, name, slug, base_price, sale_price, images, is_active, stock_quantity
           )
         )
       `)
@@ -31,6 +33,19 @@ export async function GET(
 
     if (error || !stream) {
       return Response.json({ success: false, error: "방송을 찾을 수 없습니다." }, { status: 404 });
+    }
+
+    // 이 방송으로 귀속된 결제완료 주문의 상품별 판매수량 집계 ("실시간 판매량" 뱃지용)
+    const { data: soldRows } = await supabase
+      .from("order_items")
+      .select("product_id, quantity, orders!inner(live_stream_id, payment_status)")
+      .eq("orders.live_stream_id", id)
+      .eq("orders.payment_status", "paid");
+
+    const soldCountByProduct = new Map<string, number>();
+    for (const row of soldRows ?? []) {
+      const prev = soldCountByProduct.get(row.product_id) ?? 0;
+      soldCountByProduct.set(row.product_id, prev + row.quantity);
     }
 
     // 매핑 상품 추출 및 정렬
@@ -47,11 +62,21 @@ export async function GET(
           salePrice: prod.sale_price,
           images: prod.images ?? [],
           isActive: prod.is_active,
+          stockQuantity: prod.stock_quantity,
           sortOrder: lp.sort_order,
+          isLiveDeal: lp.is_live_deal ?? false,
+          dealEndsAt: lp.deal_ends_at ?? null,
+          soldCount: soldCountByProduct.get(prod.id) ?? 0,
         };
       })
       .filter(Boolean)
       .sort((a: any, b: any) => a.sortOrder - b.sortOrder);
+
+    // 알림 구독자 수 (관리자 제어실 참고용)
+    const { count: subscriberCount } = await supabase
+      .from("live_stream_subscriptions")
+      .select("id", { count: "exact", head: true })
+      .eq("stream_id", id);
 
     const streamData = {
       id: stream.id,
@@ -63,7 +88,9 @@ export async function GET(
       streamUrl: stream.stream_url,
       replayUrl: stream.replay_url,
       activeProductId: stream.active_product_id,
+      pinnedMessage: stream.pinned_message ?? null,
       viewerCount: stream.viewer_count,
+      subscriberCount: subscriberCount ?? 0,
       createdAt: stream.created_at,
       startedAt: stream.started_at,
       endedAt: stream.ended_at,

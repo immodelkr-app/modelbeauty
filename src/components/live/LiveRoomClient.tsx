@@ -18,7 +18,13 @@ interface Product {
   images: { url: string }[];
   isActive: boolean;
   description?: string | null;
+  stockQuantity?: number;
+  soldCount?: number;
+  isLiveDeal?: boolean;
+  dealEndsAt?: string | null;
 }
+
+const LOW_STOCK_THRESHOLD = 10;
 
 interface CartToast {
   id: string;
@@ -36,12 +42,14 @@ interface LiveStream {
   streamUrl: string | null;
   replayUrl: string | null;
   activeProductId: string | null;
+  pinnedMessage?: string | null;
   viewerCount: number;
   createdAt: string;
   startedAt: string | null;
   endedAt: string | null;
   scheduledAt: string | null;
   products: Product[];
+  isSubscribed?: boolean;
 }
 
 interface ChatMessage {
@@ -78,6 +86,14 @@ export default function LiveRoomClient({ initialStream, initialChats }: LiveRoom
 
   // ── 장바구니 담기 토스트 상태 ─────────────────────────────────
   const [cartToasts, setCartToasts] = useState<CartToast[]>([]);
+
+  // ── 전체 상품 목록 바텀시트 ────────────────────────────────────
+  const [showProductList, setShowProductList] = useState(false);
+
+  // ── 방송 시작 알림 구독 ─────────────────────────────────────
+  const [subscribed, setSubscribed] = useState(!!initialStream.isSubscribed);
+  const [subscribing, setSubscribing] = useState(false);
+  const prevStatusRef = useRef(initialStream.status);
 
   const chatEndRef = useRef<HTMLDivElement>(null);
   const heartsContainerRef = useRef<HTMLDivElement>(null);
@@ -139,14 +155,28 @@ export default function LiveRoomClient({ initialStream, initialChats }: LiveRoom
         const res = await fetch(`/api/live/${stream.id}`);
         const { data, success } = await res.json();
         if (success && data) {
+          // 대기 → 방송 시작 전환 감지: 알림 신청자에게 브라우저 알림 발송
+          if (prevStatusRef.current === "upcoming" && data.status === "live" && subscribed) {
+            if (typeof Notification !== "undefined" && Notification.permission === "granted") {
+              new Notification(`${data.streamerName}님의 라이브가 시작됐어요!`, {
+                body: data.title,
+                icon: "/favicon.ico",
+                tag: `live-start-${data.id}`,
+              });
+            }
+          }
+          prevStatusRef.current = data.status;
+
           setStream((prev) => ({
             ...prev,
             status: data.status,
             activeProductId: data.activeProductId,
+            pinnedMessage: data.pinnedMessage,
             viewerCount: data.viewerCount,
             replayUrl: data.replayUrl,
             startedAt: data.startedAt,
             endedAt: data.endedAt,
+            products: data.products ?? prev.products,
           }));
         }
       } catch (e) {
@@ -309,6 +339,36 @@ export default function LiveRoomClient({ initialStream, initialChats }: LiveRoom
     }
   };
 
+  // ── 방송 시작 알림 구독 토글 ────────────────────────────────
+  const handleToggleSubscribe = async () => {
+    if (!isLoggedIn) {
+      window.location.href = `/login?redirect=/live/${stream.id}`;
+      return;
+    }
+    if (subscribing) return;
+
+    setSubscribing(true);
+    try {
+      if (subscribed) {
+        const res = await fetch(`/api/live/${stream.id}/subscribe`, { method: "DELETE" });
+        const { success } = await res.json();
+        if (success) setSubscribed(false);
+      } else {
+        // 브라우저 알림 권한 요청 (탭이 열려있는 동안 방송 시작 시 알림 표시)
+        if (typeof Notification !== "undefined" && Notification.permission === "default") {
+          await Notification.requestPermission();
+        }
+        const res = await fetch(`/api/live/${stream.id}/subscribe`, { method: "POST" });
+        const { success } = await res.json();
+        if (success) setSubscribed(true);
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setSubscribing(false);
+    }
+  };
+
   // ── 하트 인터랙션 (Popping Hearts) ─────────────────────────
   const handleLike = () => {
     if (!heartsContainerRef.current) return;
@@ -385,6 +445,14 @@ export default function LiveRoomClient({ initialStream, initialChats }: LiveRoom
             ) : (
               <p className="waiting-time-info">일정 미정 — 먹 눈요를 보내주세요!</p>
             )}
+
+            <button
+              onClick={handleToggleSubscribe}
+              disabled={subscribing}
+              className={`waiting-notify-btn${subscribed ? " subscribed" : ""}`}
+            >
+              {subscribed ? "🔔 알림 신청 완료" : "🔕 방송 시작 알림 신청"}
+            </button>
 
             {stream.products.length > 0 && (
               <div className="waiting-products">
@@ -517,6 +585,28 @@ export default function LiveRoomClient({ initialStream, initialChats }: LiveRoom
             color: rgba(255,255,255,0.55);
             margin: 1.5rem 0;
           }
+          .waiting-notify-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            background: rgba(255,255,255,0.08);
+            border: 1px solid rgba(255,255,255,0.18);
+            color: #fff;
+            font-size: 0.875rem;
+            font-weight: 700;
+            padding: 0.75rem 1.5rem;
+            border-radius: 9999px;
+            cursor: pointer;
+            transition: background 0.2s, border-color 0.2s;
+            margin-top: 0.5rem;
+          }
+          .waiting-notify-btn:hover {
+            background: rgba(255,255,255,0.14);
+          }
+          .waiting-notify-btn.subscribed {
+            background: linear-gradient(135deg, #db2777 0%, #7c3aed 100%);
+            border-color: transparent;
+          }
           .waiting-products {
             margin-top: 2rem;
             padding-top: 1.5rem;
@@ -599,13 +689,24 @@ export default function LiveRoomClient({ initialStream, initialChats }: LiveRoom
 
             {/* 비디오 위의 메타 오버레이 */}
             <div className="video-overlay-top">
-              <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
-                {stream.status === "live" ? (
-                  <span className="overlay-badge live-badge">LIVE</span>
-                ) : (
-                  <span className="overlay-badge replay-badge">다시보기</span>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
+                  {stream.status === "live" ? (
+                    <span className="overlay-badge live-badge">LIVE</span>
+                  ) : (
+                    <span className="overlay-badge replay-badge">다시보기</span>
+                  )}
+                  <span className="overlay-viewers">👤 {stream.viewerCount.toLocaleString()}명</span>
+                </div>
+                {stream.products.length > 0 && (
+                  <button
+                    onClick={() => setShowProductList(true)}
+                    className="overlay-product-list-btn"
+                    style={{ pointerEvents: "auto" }}
+                  >
+                    🛍️ 상품 {stream.products.length}
+                  </button>
                 )}
-                <span className="overlay-viewers">👤 {stream.viewerCount.toLocaleString()}명</span>
               </div>
               <h2 className="overlay-stream-title">{stream.title}</h2>
             </div>
@@ -617,7 +718,7 @@ export default function LiveRoomClient({ initialStream, initialChats }: LiveRoom
             {activeProduct && (
               <div className="floating-live-product-wrap">
                 <div className="featured-product-overlay-card">
-                  <div style={{ display: "flex", gap: "0.75rem", alignItems: "center" }}>
+                  <div style={{ display: "flex", gap: "0.75rem", alignItems: "center", flex: 1, minWidth: 0 }}>
                     <div className="overlay-prod-image">
                       {pimg(activeProduct) ? (
                         <Image
@@ -648,6 +749,23 @@ export default function LiveRoomClient({ initialStream, initialChats }: LiveRoom
                           <span>{activeProduct.basePrice.toLocaleString()}원</span>
                         )}
                       </div>
+                      {(isActiveLiveDeal(activeProduct) || isSoldOut(activeProduct) || isLowStock(activeProduct) || (activeProduct.soldCount ?? 0) > 0) && (
+                        <div className="overlay-prod-badges">
+                          {isActiveLiveDeal(activeProduct) && (
+                            <span className="live-urgency-badge deal">
+                              ⚡ 라이브특가{activeProduct.dealEndsAt ? ` · ${formatDealCountdown(activeProduct.dealEndsAt)}` : ""}
+                            </span>
+                          )}
+                          {isSoldOut(activeProduct) ? (
+                            <span className="live-urgency-badge soldout">품절</span>
+                          ) : isLowStock(activeProduct) ? (
+                            <span className="live-urgency-badge lowstock">🔥 품절임박 {activeProduct.stockQuantity}개</span>
+                          ) : null}
+                          {(activeProduct.soldCount ?? 0) > 0 && (
+                            <span className="live-urgency-badge sold">🛒 실시간 {activeProduct.soldCount}개 판매</span>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </div>
                   <button
@@ -692,6 +810,14 @@ export default function LiveRoomClient({ initialStream, initialChats }: LiveRoom
             <h3>실시간 채팅</h3>
           </div>
 
+          {/* 호스트 핀 공지 */}
+          {stream.pinnedMessage && (
+            <div className="chat-pinned-banner">
+              <span className="chat-pinned-icon">📌</span>
+              <span className="chat-pinned-text">{stream.pinnedMessage}</span>
+            </div>
+          )}
+
           <div className="chat-messages-box">
             {chats.map((c) => (
               <div key={c.id} className="chat-msg-line">
@@ -699,7 +825,7 @@ export default function LiveRoomClient({ initialStream, initialChats }: LiveRoom
                   {c.nickname === "모델뷰티" ? "📢 모델뷰티" : c.nickname}
                 </span>
                 <span className={`chat-user-text${c.nickname === "모델뷰티" ? " admin-official" : ""}`}>
-                  {c.message}
+                  {renderChatMessage(c.message, stream.products, handleOpenPanel)}
                 </span>
               </div>
             ))}
@@ -786,6 +912,23 @@ export default function LiveRoomClient({ initialStream, initialChats }: LiveRoom
                         <span className="panel-sale-price">{panelProduct.basePrice.toLocaleString()}원</span>
                       )}
                     </div>
+                    {(isActiveLiveDeal(panelProduct) || isSoldOut(panelProduct) || isLowStock(panelProduct) || (panelProduct.soldCount ?? 0) > 0) && (
+                      <div className="overlay-prod-badges" style={{ marginTop: "0.5rem" }}>
+                        {isActiveLiveDeal(panelProduct) && (
+                          <span className="live-urgency-badge deal">
+                            ⚡ 라이브특가{panelProduct.dealEndsAt ? ` · ${formatDealCountdown(panelProduct.dealEndsAt)}` : ""}
+                          </span>
+                        )}
+                        {isSoldOut(panelProduct) ? (
+                          <span className="live-urgency-badge soldout">품절</span>
+                        ) : isLowStock(panelProduct) ? (
+                          <span className="live-urgency-badge lowstock">🔥 품절임박 {panelProduct.stockQuantity}개</span>
+                        ) : null}
+                        {(panelProduct.soldCount ?? 0) > 0 && (
+                          <span className="live-urgency-badge sold">🛒 실시간 {panelProduct.soldCount}개 판매</span>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -830,6 +973,71 @@ export default function LiveRoomClient({ initialStream, initialChats }: LiveRoom
                 )}
               </div>
             )}
+          </div>
+        </>
+      )}
+
+      {/* 전체 상품 목록 바텀시트 */}
+      {showProductList && (
+        <>
+          <div className="panel-backdrop" onClick={() => setShowProductList(false)} />
+          <div className="product-slide-panel product-list-panel">
+            <div className="panel-header">
+              <div className="panel-drag-handle" />
+              <button className="panel-close-btn" onClick={() => setShowProductList(false)}>✕</button>
+            </div>
+            <div className="panel-content">
+              <div className="panel-label" style={{ marginBottom: "0.75rem" }}>
+                이 방송의 상품 {stream.products.length}개
+              </div>
+              <div className="product-list-scroll">
+                {stream.products.map((p) => (
+                  <button
+                    key={p.id}
+                    className="product-list-row"
+                    onClick={() => {
+                      setShowProductList(false);
+                      handleOpenPanel(p);
+                    }}
+                  >
+                    <div className="product-list-row-image">
+                      {pimg(p) ? (
+                        <Image src={pimg(p)!} alt={p.name} fill sizes="48px" style={{ objectFit: "cover" }} />
+                      ) : (
+                        "💄"
+                      )}
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0, textAlign: "left" }}>
+                      <div className="product-list-row-name">{p.name}</div>
+                      <div className="product-list-row-price">
+                        {p.salePrice ? (
+                          <>
+                            <span className="panel-sale-price" style={{ fontSize: "0.9375rem" }}>{p.salePrice.toLocaleString()}원</span>
+                            <span className="panel-base-price-strike" style={{ marginLeft: "0.375rem" }}>{p.basePrice.toLocaleString()}원</span>
+                          </>
+                        ) : (
+                          <span className="panel-sale-price" style={{ fontSize: "0.9375rem" }}>{p.basePrice.toLocaleString()}원</span>
+                        )}
+                      </div>
+                      {(isActiveLiveDeal(p) || isSoldOut(p) || isLowStock(p) || (p.soldCount ?? 0) > 0) && (
+                        <div className="overlay-prod-badges">
+                          {isActiveLiveDeal(p) && <span className="live-urgency-badge deal">⚡ 라이브특가</span>}
+                          {isSoldOut(p) ? (
+                            <span className="live-urgency-badge soldout">품절</span>
+                          ) : isLowStock(p) ? (
+                            <span className="live-urgency-badge lowstock">🔥 품절임박</span>
+                          ) : null}
+                          {(p.soldCount ?? 0) > 0 && (
+                            <span className="live-urgency-badge sold">🛒 {p.soldCount}개 판매</span>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                    {p.id === activeProduct?.id && <span className="product-list-row-live">LIVE 소개중</span>}
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
         </>
       )}
@@ -915,6 +1123,24 @@ export default function LiveRoomClient({ initialStream, initialChats }: LiveRoom
           border-radius: 9999px;
         }
 
+        .overlay-product-list-btn {
+          display: inline-flex;
+          align-items: center;
+          gap: 0.25rem;
+          background: rgba(0,0,0,0.55);
+          border: 1px solid rgba(255,255,255,0.2);
+          color: #fff;
+          font-size: 0.75rem;
+          font-weight: 700;
+          padding: 0.375rem 0.75rem;
+          border-radius: 9999px;
+          cursor: pointer;
+          transition: background 0.2s;
+        }
+        .overlay-product-list-btn:hover {
+          background: rgba(0,0,0,0.75);
+        }
+
         .overlay-stream-title {
           font-size: 1.125rem;
           font-weight: 700;
@@ -982,6 +1208,57 @@ export default function LiveRoomClient({ initialStream, initialChats }: LiveRoom
           color: #94a3b8;
           text-decoration: line-through;
           margin-left: 4px;
+        }
+
+        .overlay-prod-badges {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 0.3125rem;
+          margin-top: 0.375rem;
+        }
+
+        .live-urgency-badge {
+          display: inline-flex;
+          align-items: center;
+          font-size: 0.625rem;
+          font-weight: 800;
+          padding: 0.125rem 0.5rem;
+          border-radius: 9999px;
+          white-space: nowrap;
+        }
+        .live-urgency-badge.deal {
+          background: rgba(251, 191, 36, 0.18);
+          color: #fbbf24;
+          border: 1px solid rgba(251, 191, 36, 0.4);
+        }
+        .live-urgency-badge.lowstock {
+          background: rgba(239, 68, 68, 0.18);
+          color: #f87171;
+          border: 1px solid rgba(239, 68, 68, 0.4);
+        }
+        .live-urgency-badge.soldout {
+          background: rgba(255,255,255,0.1);
+          color: #94a3b8;
+          border: 1px solid rgba(255,255,255,0.2);
+        }
+        .live-urgency-badge.sold {
+          background: rgba(236, 72, 153, 0.18);
+          color: #f472b6;
+          border: 1px solid rgba(236, 72, 153, 0.4);
+        }
+
+        .chat-mention-chip {
+          display: inline;
+          background: none;
+          border: none;
+          padding: 0;
+          margin: 0;
+          color: var(--mb-pink-400, #f472b6);
+          font-weight: 800;
+          cursor: pointer;
+          font: inherit;
+          text-decoration: underline;
+          text-underline-offset: 2px;
         }
 
         .overlay-buy-btn {
@@ -1086,6 +1363,28 @@ export default function LiveRoomClient({ initialStream, initialChats }: LiveRoom
           font-size: 0.9375rem;
           font-weight: 700;
           color: #e2e8f0;
+        }
+
+        .chat-pinned-banner {
+          display: flex;
+          align-items: flex-start;
+          gap: 0.5rem;
+          margin: 0.75rem 1.5rem 0;
+          padding: 0.625rem 0.875rem;
+          background: rgba(236, 72, 153, 0.1);
+          border: 1px solid rgba(236, 72, 153, 0.25);
+          border-radius: 10px;
+        }
+        .chat-pinned-icon {
+          flex-shrink: 0;
+          font-size: 0.875rem;
+        }
+        .chat-pinned-text {
+          font-size: 0.8125rem;
+          font-weight: 600;
+          color: #fbcfe8;
+          line-height: 1.4;
+          word-break: break-word;
         }
 
         .chat-messages-box {
@@ -1309,6 +1608,68 @@ export default function LiveRoomClient({ initialStream, initialChats }: LiveRoom
           font-size: 0.8125rem;
           color: #64748b;
           text-decoration: line-through;
+        }
+
+        /* 전체 상품 목록 바텀시트 */
+        .product-list-panel {
+          max-height: 82vh;
+          display: flex;
+          flex-direction: column;
+        }
+        .product-list-scroll {
+          display: flex;
+          flex-direction: column;
+          gap: 0.625rem;
+          overflow-y: auto;
+        }
+        .product-list-row {
+          display: flex;
+          align-items: center;
+          gap: 0.75rem;
+          width: 100%;
+          background: rgba(255,255,255,0.03);
+          border: 1px solid rgba(255,255,255,0.07);
+          border-radius: 12px;
+          padding: 0.75rem;
+          cursor: pointer;
+          text-align: left;
+          font: inherit;
+          color: inherit;
+          transition: background 0.15s;
+        }
+        .product-list-row:hover {
+          background: rgba(255,255,255,0.06);
+        }
+        .product-list-row-image {
+          position: relative;
+          width: 48px;
+          height: 48px;
+          border-radius: 10px;
+          overflow: hidden;
+          background: #334155;
+          flex-shrink: 0;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+        .product-list-row-name {
+          font-size: 0.8125rem;
+          font-weight: 700;
+          color: #f1f5f9;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+        .product-list-row-live {
+          flex-shrink: 0;
+          font-size: 0.625rem;
+          font-weight: 800;
+          color: #db2777;
+          background: rgba(219,39,119,0.15);
+          border: 1px solid rgba(219,39,119,0.35);
+          padding: 0.1875rem 0.5rem;
+          border-radius: 9999px;
+          white-space: nowrap;
         }
         .panel-description {
           font-size: 0.875rem;
@@ -1615,6 +1976,53 @@ export default function LiveRoomClient({ initialStream, initialChats }: LiveRoom
 function pimg(prod: Product) {
   const imgs = prod.images ?? [];
   return imgs[0]?.url ?? null;
+}
+
+// 헬퍼: 재고/판매량/라이브특가 뱃지 계산
+function isLowStock(prod: Product) {
+  return typeof prod.stockQuantity === "number" && prod.stockQuantity > 0 && prod.stockQuantity <= LOW_STOCK_THRESHOLD;
+}
+function isSoldOut(prod: Product) {
+  return typeof prod.stockQuantity === "number" && prod.stockQuantity <= 0;
+}
+function isActiveLiveDeal(prod: Product) {
+  if (!prod.isLiveDeal) return false;
+  if (!prod.dealEndsAt) return true;
+  return new Date(prod.dealEndsAt).getTime() > Date.now();
+}
+function formatDealCountdown(dealEndsAt: string): string {
+  const diff = new Date(dealEndsAt).getTime() - Date.now();
+  if (diff <= 0) return "마감";
+  const mins = Math.floor(diff / 60000);
+  if (mins < 60) return `${mins}분 남음`;
+  const hours = Math.floor(mins / 60);
+  return `${hours}시간 ${mins % 60}분 남음`;
+}
+
+// 헬퍼: 채팅 메시지에서 "#상품명" 언급을 클릭 가능한 하이라이트로 변환
+function renderChatMessage(text: string, products: Product[], onMention: (p: Product) => void) {
+  if (products.length === 0) return text;
+  const names = products.map((p) => p.name).sort((a, b) => b.length - a.length);
+  const pattern = new RegExp(`#(${names.map((n) => n.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|")})`, "g");
+  const parts = text.split(pattern);
+  if (parts.length === 1) return text;
+
+  return parts.map((part, i) => {
+    const prod = products.find((p) => p.name === part);
+    if (prod) {
+      return (
+        <button
+          key={i}
+          type="button"
+          className="chat-mention-chip"
+          onClick={() => onMention(prod)}
+        >
+          #{part}
+        </button>
+      );
+    }
+    return <span key={i}>{part}</span>;
+  });
 }
 
 function getEmbedUrl(url: string): { type: "youtube" | "vimeo" | "direct"; url: string } {

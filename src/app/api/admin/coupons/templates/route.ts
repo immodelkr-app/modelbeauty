@@ -42,3 +42,47 @@ export async function GET() {
     return NextResponse.json({ success: true, templates: [] });
   }
 }
+
+// POST /api/admin/coupons/templates — 쿠폰 템플릿 신규 생성
+export async function POST(request: Request) {
+  const notAllowed = await requireAdmin();
+  if (notAllowed) return notAllowed;
+
+  try {
+    const body = await request.json();
+    const { code, name, discountType, discountValue, validityDays } = body;
+
+    if (!code || !name || !discountType || !discountValue || !validityDays) {
+      return NextResponse.json(
+        { success: false, error: "코드, 이름, 할인유형, 할인값, 유효기간은 필수입니다." },
+        { status: 400 }
+      );
+    }
+
+    const res = await fetch(`${CORE_AUTH_URL}/api/coupons/templates`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-secret": CORE_AUTH_SECRET,
+      },
+      body: JSON.stringify({ code, name, discountType, discountValue, validityDays }),
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      return NextResponse.json(
+        { success: false, error: err.error || `템플릿 생성 실패: ${res.status}` },
+        { status: res.status }
+      );
+    }
+
+    const data = await res.json();
+    return NextResponse.json({ success: true, template: data.template ?? null });
+  } catch (error) {
+    console.error("[POST /api/admin/coupons/templates] Error:", error);
+    return NextResponse.json(
+      { success: false, error: error instanceof Error ? error.message : "서버 오류" },
+      { status: 500 }
+    );
+  }
+}

@@ -123,22 +123,11 @@ export default function HeaderAuthSection() {
 
   // 비로그인 상태
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-      <Link 
-        href="/login" 
-        style={{
-          fontSize: "0.875rem",
-          fontWeight: 600,
-          color: "var(--mb-gray-600)",
-          textDecoration: "none",
-          padding: "0.5rem 0.75rem",
-          transition: "color 0.2s"
-        }}
-        aria-label="로그인"
-      >
+    <div className="shop-auth-guest">
+      <Link href="/login" className="shop-login-link" aria-label="로그인">
         로그인
       </Link>
-      <Link href="/login?mode=signup" className="shop-login-btn" aria-label="회원가입">
+      <Link href="/signup" className="shop-login-btn" aria-label="회원가입">
         회원가입
       </Link>
     </div>

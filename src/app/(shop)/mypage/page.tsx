@@ -77,6 +77,9 @@ export default function MypagePage() {
     marketingEmail: false, marketingSms: false,
   });
 
+  // 등급 안내 팝업 상태
+  const [isGradeInfoOpen, setIsGradeInfoOpen] = useState(false);
+
   // 회원 탈퇴(계정 삭제) 상태 변수
   const [isWithdrawOpen, setIsWithdrawOpen] = useState(false);
   const [isWithdrawing, setIsWithdrawing] = useState(false);
@@ -556,49 +559,117 @@ export default function MypagePage() {
         ))}
       </div>
 
-      {/* 멤버십 등급 배지 카드 */}
+      {/* 멤버십 등급 배지 카드 — 현재 등급만 간단히 표시, 승급 조건은 팝업으로 분리 */}
       {membershipInfo && (
         <div style={{
           background: "linear-gradient(135deg, rgba(var(--mb-pink-rgb,236,72,153),0.08), rgba(168,85,247,0.06))",
           border: "1px solid rgba(var(--mb-pink-rgb,236,72,153),0.18)",
           borderRadius: 16, padding: "1.25rem 1.5rem",
-          marginBottom: "1.5rem", display: "flex", flexDirection: "column", gap: "0.75rem",
+          marginBottom: "1.5rem", display: "flex", justifyContent: "space-between", alignItems: "center", gap: "0.75rem",
         }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: "0.625rem" }}>
-              <span style={{ fontSize: "2rem" }}>{membershipInfo.currentTier.badge_emoji}</span>
+          <div style={{ display: "flex", alignItems: "center", gap: "0.625rem" }}>
+            <span style={{ fontSize: "2rem" }}>{membershipInfo.currentTier.badge_emoji}</span>
+            <div>
+              <div style={{ fontWeight: 800, fontSize: "1.0625rem" }}>{membershipInfo.currentTier.name} 등급</div>
+              <div style={{ fontSize: "0.8125rem", color: "var(--mb-gray-500)", marginTop: 2 }}>
+                {membershipInfo.currentTier.discount_rate > 0
+                  ? `전 상품 ${membershipInfo.currentTier.discount_rate}% 할인 혜택`
+                  : "등급 현황을 유지하세요"}
+              </div>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setIsGradeInfoOpen(true)}
+            style={{
+              flexShrink: 0,
+              background: "#fff", color: "var(--mb-pink-500)",
+              border: "1px solid rgba(var(--mb-pink-rgb,236,72,153),0.3)",
+              borderRadius: "100px", padding: "0.5rem 0.875rem",
+              fontSize: "0.8125rem", fontWeight: 700, cursor: "pointer",
+              whiteSpace: "nowrap",
+            }}
+          >
+            등급 안내
+          </button>
+        </div>
+      )}
+
+      {/* 등급 안내 팝업 — 다음 등급, 승급까지 필요 금액, 진행률 */}
+      {isGradeInfoOpen && membershipInfo && (
+        <div
+          onClick={() => setIsGradeInfoOpen(false)}
+          style={{
+            position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
+            background: "rgba(0, 0, 0, 0.4)", display: "flex",
+            alignItems: "center", justifyContent: "center", zIndex: 1000,
+            padding: "1rem"
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: "#fff", borderRadius: "20px", maxWidth: "420px",
+              width: "100%", padding: "1.5rem", boxShadow: "0 20px 25px -5px rgba(0,0,0,0.1), 0 10px 10px -5px rgba(0,0,0,0.04)"
+            }}
+          >
+            <h3 style={{ fontSize: "1.125rem", fontWeight: 800, color: "var(--mb-gray-900)", margin: "0 0 1rem 0" }}>
+              등급 안내
+            </h3>
+
+            <div style={{ display: "flex", alignItems: "center", gap: "0.625rem", marginBottom: "1rem" }}>
+              <span style={{ fontSize: "1.75rem" }}>{membershipInfo.currentTier.badge_emoji}</span>
               <div>
-                <div style={{ fontWeight: 800, fontSize: "1.0625rem" }}>{membershipInfo.currentTier.name} 등급</div>
+                <div style={{ fontWeight: 800, fontSize: "1rem" }}>{membershipInfo.currentTier.name} 등급</div>
                 <div style={{ fontSize: "0.8125rem", color: "var(--mb-gray-500)", marginTop: 2 }}>
                   {membershipInfo.currentTier.discount_rate > 0
                     ? `전 상품 ${membershipInfo.currentTier.discount_rate}% 할인 혜택`
-                    : "등급 현황을 유지하세요"}
+                    : "구매 실적에 따라 등급이 올라가요"}
                 </div>
               </div>
             </div>
-            {membershipInfo.nextTier && (
-              <div style={{ textAlign: "right", fontSize: "0.8125rem", color: "var(--mb-gray-500)" }}>
-                <div>다음 등급: <strong style={{ color: "var(--mb-gray-700)" }}>{membershipInfo.nextTier.badge_emoji} {membershipInfo.nextTier.name}</strong></div>
-                <div style={{ marginTop: 2 }}><strong style={{ color: "var(--mb-pink-500)" }}>{membershipInfo.amountToNextTier.toLocaleString()}원</strong> 더 구매하면 승급</div>
+
+            {membershipInfo.nextTier ? (
+              <div style={{ background: "var(--mb-gray-50)", borderRadius: "12px", padding: "1rem" }}>
+                <div style={{ fontSize: "0.8125rem", color: "var(--mb-gray-600)" }}>
+                  다음 등급: <strong style={{ color: "var(--mb-gray-900)" }}>{membershipInfo.nextTier.badge_emoji} {membershipInfo.nextTier.name}</strong>
+                </div>
+                <div style={{ marginTop: 4, fontSize: "0.8125rem" }}>
+                  <strong style={{ color: "var(--mb-pink-500)" }}>{membershipInfo.amountToNextTier.toLocaleString()}원</strong>
+                  <span style={{ color: "var(--mb-gray-600)" }}> 더 구매하면 승급</span>
+                </div>
+
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.75rem", color: "var(--mb-gray-400)", margin: "0.875rem 0 6px" }}>
+                  <span>6개월 구매액: {membershipInfo.totalPurchasedLast6m.toLocaleString()}원</span>
+                  <span>{membershipInfo.nextTier.name} 목표: {membershipInfo.nextTier.min_amount.toLocaleString()}원</span>
+                </div>
+                <div style={{ height: 8, background: "rgba(0,0,0,0.08)", borderRadius: 99, overflow: "hidden" }}>
+                  <div style={{
+                    height: "100%",
+                    width: `${Math.min(100, (membershipInfo.totalPurchasedLast6m / membershipInfo.nextTier.min_amount) * 100)}%`,
+                    background: "linear-gradient(90deg, var(--mb-pink-400), #a855f7)",
+                    borderRadius: 99, transition: "width 0.5s ease",
+                  }} />
+                </div>
+              </div>
+            ) : (
+              <div style={{ background: "var(--mb-gray-50)", borderRadius: "12px", padding: "1rem", fontSize: "0.8125rem", color: "var(--mb-gray-600)" }}>
+                최고 등급을 유지하고 계세요! 🎉
               </div>
             )}
+
+            <button
+              type="button"
+              onClick={() => setIsGradeInfoOpen(false)}
+              style={{
+                width: "100%", marginTop: "1.25rem", padding: "0.75rem", borderRadius: "10px",
+                border: "1px solid var(--mb-gray-200)", background: "#fff", color: "var(--mb-gray-700)",
+                fontWeight: 600, cursor: "pointer", fontSize: "0.875rem"
+              }}
+            >
+              닫기
+            </button>
           </div>
-          {membershipInfo.nextTier && (
-            <div>
-              <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.75rem", color: "var(--mb-gray-400)", marginBottom: 6 }}>
-                <span>6개월 구매액: {membershipInfo.totalPurchasedLast6m.toLocaleString()}원</span>
-                <span>{membershipInfo.nextTier.name} 목표: {membershipInfo.nextTier.min_amount.toLocaleString()}원</span>
-              </div>
-              <div style={{ height: 8, background: "rgba(0,0,0,0.08)", borderRadius: 99, overflow: "hidden" }}>
-                <div style={{
-                  height: "100%",
-                  width: `${Math.min(100, (membershipInfo.totalPurchasedLast6m / membershipInfo.nextTier.min_amount) * 100)}%`,
-                  background: "linear-gradient(90deg, var(--mb-pink-400), #a855f7)",
-                  borderRadius: 99, transition: "width 0.5s ease",
-                }} />
-              </div>
-            </div>
-          )}
         </div>
       )}
 

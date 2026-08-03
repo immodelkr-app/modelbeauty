@@ -479,15 +479,7 @@ export default async function HomePage() {
           }}
           aria-label="브랜드 가치"
         >
-          <div
-            style={{
-              maxWidth: "1280px",
-              margin: "0 auto",
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-              gap: "2rem",
-            }}
-          >
+          <div className="brand-value-grid">
             {[
               {
                 icon: "🧪",

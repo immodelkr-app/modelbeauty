@@ -11,14 +11,14 @@ CREATE TABLE IF NOT EXISTS model_beauty.membership_tiers (
   min_amount INTEGER NOT NULL DEFAULT 0,   -- 6개월 누적 구매액 승급 기준 (원)
   discount_rate NUMERIC NOT NULL DEFAULT 0
     CHECK (discount_rate >= 0 AND discount_rate <= 100),  -- 할인율 (%)
-  badge_emoji TEXT NOT NULL DEFAULT '🩶', -- 배지 이모지
+  badge_emoji TEXT NOT NULL DEFAULT '💛', -- 배지 이모지
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
 -- 2. 초기 등급 데이터 INSERT
 INSERT INTO model_beauty.membership_tiers (id, name, sort_order, min_amount, discount_rate, badge_emoji)
 VALUES
-  ('normal',    '일반',     1,        0, 0, '🩶'),
+  ('normal',    '일반',     1,        0, 0, '💛'),
   ('silver',    '실버',     2,   100000, 2, '🥈'),
   ('gold',      '골드',     3,   300000, 5, '🥇'),
   ('im_model',  '아임모델', 4,   500000, 8, '⭐'),

@@ -3889,7 +3889,7 @@ html, body {
 /* 홈 히어로 모바일 최적화 반응형 디자인 */
 @media (max-width: 768px) {
   .hero-section {
-    padding: 5rem 1.25rem 4rem; /* 모바일 상하 여백 조절 */
+    padding: 2.25rem 1.25rem 3.5rem; /* 모바일 상하 여백 조절 */
   }
 
   .hero-content {
@@ -3962,11 +3962,6 @@ html, body {
   .shop-icon-btn {
     width: 44px;
     height: 44px;
-  }
-
-  /* 회원가입 버튼 숨기기 (로그인을 통해 진입 가능하므로 공간 절약) */
-  .shop-login-btn {
-    display: none !important;
   }
 
   /* 헤더 내 포인트 표시 숨기기 (마이페이지에서 확인 가능하므로 모바일 헤더 간소화) */

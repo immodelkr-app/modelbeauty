@@ -424,12 +424,12 @@ export default function MypagePage() {
               }, 100);
             }}
             style={{
-              alignSelf: "flex-start",
+              width: "100%",
               background: "var(--mb-pink-500)",
               color: "#fff",
               border: "none",
               borderRadius: "8px",
-              padding: "0.5rem 1rem",
+              padding: "0.625rem 1rem",
               fontSize: "0.8125rem",
               fontWeight: 700,
               cursor: "pointer",
@@ -643,6 +643,7 @@ export default function MypagePage() {
                 onChange={(e) => setAddressState(prev => ({ ...prev, recipient: e.target.value }))}
                 style={{
                   flex: "1",
+                  minWidth: 0,
                   border: "1px solid var(--mb-gray-300)",
                   borderRadius: "8px", padding: "0.5rem",
                   fontSize: "0.875rem", outline: "none"
@@ -655,6 +656,7 @@ export default function MypagePage() {
                 onChange={(e) => setAddressState(prev => ({ ...prev, phone: formatPhone(e.target.value) }))}
                 style={{
                   flex: "1",
+                  minWidth: 0,
                   border: "1px solid var(--mb-gray-300)",
                   borderRadius: "8px", padding: "0.5rem",
                   fontSize: "0.875rem", outline: "none"
@@ -670,6 +672,7 @@ export default function MypagePage() {
                 onClick={handleAddressSearch}
                 style={{
                   flex: "1",
+                  minWidth: 0,
                   border: "1px solid var(--mb-gray-300)",
                   borderRadius: "8px", padding: "0.5rem",
                   fontSize: "0.875rem", outline: "none",
@@ -803,11 +806,11 @@ export default function MypagePage() {
               <p style={{ fontSize: "0.8125rem", color: "var(--mb-gray-500)", margin: "0 0 0.5rem 0" }}>
                 🎂 생년월일을 등록하시면 매년 생일에 쿠폰을 보내드려요. (선택 입력)
               </p>
-              <div style={{ display: "grid", gridTemplateColumns: "2fr 1.2fr 1.2fr", gap: "0.5rem" }}>
+              <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 2fr) minmax(0, 1.2fr) minmax(0, 1.2fr)", gap: "0.5rem" }}>
                 <select
                   value={profileState.birthYear}
                   onChange={(e) => setProfileState((prev) => ({ ...prev, birthYear: e.target.value }))}
-                  style={{ border: "1px solid var(--mb-gray-300)", borderRadius: "8px", padding: "0.5rem", fontSize: "0.875rem", outline: "none", cursor: "pointer" }}
+                  style={{ width: "100%", border: "1px solid var(--mb-gray-300)", borderRadius: "8px", padding: "0.5rem", fontSize: "0.875rem", outline: "none", cursor: "pointer" }}
                 >
                   <option value="">출생 연도</option>
                   {Array.from({ length: new Date().getFullYear() - 14 - 1899 }, (_, i) => new Date().getFullYear() - 14 - i).map((y) => (
@@ -817,7 +820,7 @@ export default function MypagePage() {
                 <select
                   value={profileState.birthMonth}
                   onChange={(e) => setProfileState((prev) => ({ ...prev, birthMonth: e.target.value }))}
-                  style={{ border: "1px solid var(--mb-gray-300)", borderRadius: "8px", padding: "0.5rem", fontSize: "0.875rem", outline: "none", cursor: "pointer" }}
+                  style={{ width: "100%", border: "1px solid var(--mb-gray-300)", borderRadius: "8px", padding: "0.5rem", fontSize: "0.875rem", outline: "none", cursor: "pointer" }}
                 >
                   <option value="">월</option>
                   {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
@@ -827,7 +830,7 @@ export default function MypagePage() {
                 <select
                   value={profileState.birthDay}
                   onChange={(e) => setProfileState((prev) => ({ ...prev, birthDay: e.target.value }))}
-                  style={{ border: "1px solid var(--mb-gray-300)", borderRadius: "8px", padding: "0.5rem", fontSize: "0.875rem", outline: "none", cursor: "pointer" }}
+                  style={{ width: "100%", border: "1px solid var(--mb-gray-300)", borderRadius: "8px", padding: "0.5rem", fontSize: "0.875rem", outline: "none", cursor: "pointer" }}
                 >
                   <option value="">일</option>
                   {Array.from({ length: 31 }, (_, i) => i + 1).map((d) => (

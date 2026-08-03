@@ -6,6 +6,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import MultiImageUploader, { type UploadedImage } from "./MultiImageUploader";
 
 interface Category { id: string; name: string; }
 interface Crew { id: string; name: string; nickname: string; }
@@ -20,8 +21,8 @@ export interface ProductFormData {
   salePrice: string;
   stockQuantity: string;
   sku: string;
-  imageUrl: string;   // 단일 이미지 URL (추후 멀티 업로드로 확장)
-  imageAlt: string;
+  images: UploadedImage[];       // 상품 이미지(첫 번째가 대표 썸네일)
+  detailImages: UploadedImage[]; // 상세페이지 이미지(순서대로 쌓아서 content로 저장)
   tags: string;       // 쉼표 구분
   isActive: boolean;
   isFeatured: boolean;
@@ -36,11 +37,21 @@ export interface ProductFormData {
 const INITIAL: ProductFormData = {
   name: "", slug: "", categoryId: "", description: "",
   basePrice: "", salePrice: "", stockQuantity: "0",
-  sku: "", imageUrl: "", imageAlt: "", tags: "",
+  sku: "", images: [], detailImages: [], tags: "",
   isActive: true, isFeatured: false,
   recommenderCrewId: "", recommendationNote: "",
   vendorId: "", vendorCostType: "rate", vendorCostRate: "0", vendorSupplyPrice: "0",
 };
+
+// 상세페이지 이미지 목록을 안전한 <img> 태그 나열 HTML로 변환
+// (자유 HTML 입력을 받지 않고 검증된 업로드 URL만 조합하므로 XSS 위험이 없음)
+function buildDetailContentHtml(images: UploadedImage[]): string | null {
+  if (images.length === 0) return null;
+  const escapeAttr = (s: string) => s.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  return images
+    .map((img) => `<img src="${escapeAttr(img.url)}" alt="${escapeAttr(img.alt || "")}" style="width:100%;display:block;" />`)
+    .join("\n");
+}
 
 function toSlug(name: string): string {
   return name
@@ -95,7 +106,8 @@ export default function ProductForm({ productId, initialData, onSuccess }: Produ
       salePrice: form.salePrice ? parseInt(form.salePrice, 10) : null,
       stockQuantity: parseInt(form.stockQuantity, 10) || 0,
       sku: form.sku || null,
-      images: form.imageUrl ? [{ url: form.imageUrl, alt: form.imageAlt || form.name, sortOrder: 0 }] : [],
+      images: form.images.map((img, idx) => ({ url: img.url, alt: img.alt || form.name, sortOrder: idx })),
+      content: buildDetailContentHtml(form.detailImages),
       tags: form.tags ? form.tags.split(",").map((t) => t.trim()).filter(Boolean) : [],
       isActive: form.isActive,
       isFeatured: form.isFeatured,
@@ -252,26 +264,27 @@ export default function ProductForm({ productId, initialData, onSuccess }: Produ
         </div>
       </div>
 
-      {/* 이미지 */}
+      {/* 상품 이미지 (썸네일 갤러리) */}
       <div className="admin-card" style={{ padding: "1.5rem" }}>
-        <h2 className="admin-card-title" style={{ marginBottom: "1.25rem" }}>이미지</h2>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1.25rem" }}>
-          <div className="admin-field" style={{ gridColumn: "1 / -1" }}>
-            <label className="admin-label">이미지 URL</label>
-            <input className="admin-input" type="url" value={form.imageUrl} onChange={(e) => set("imageUrl", e.target.value)} placeholder="https://example.com/image.jpg" />
-            <p className="admin-input-hint">외부 이미지 URL을 입력하세요 (추후 직접 업로드 지원 예정)</p>
-          </div>
-          <div className="admin-field">
-            <label className="admin-label">이미지 대체 텍스트</label>
-            <input className="admin-input" value={form.imageAlt} onChange={(e) => set("imageAlt", e.target.value)} placeholder="이미지 설명" />
-          </div>
-          {form.imageUrl && (
-            <div>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={form.imageUrl} alt="미리보기" style={{ width: "100px", height: "100px", objectFit: "cover", borderRadius: "10px", border: "1px solid #e5e7eb" }} onError={(e) => (e.currentTarget.style.display = "none")} />
-            </div>
-          )}
-        </div>
+        <h2 className="admin-card-title" style={{ marginBottom: "1.25rem" }}>상품 이미지</h2>
+        <MultiImageUploader
+          images={form.images}
+          onChange={(images) => setForm((prev) => ({ ...prev, images }))}
+          hint="목록/카드에 보여지는 상품 이미지입니다. jpg/png/webp/gif, 장당 5MB 이하. 첫 번째 이미지가 대표 썸네일입니다."
+        />
+      </div>
+
+      {/* 상세페이지 이미지 */}
+      <div className="admin-card" style={{ padding: "1.5rem" }}>
+        <h2 className="admin-card-title" style={{ marginBottom: "1.25rem" }}>상세페이지 이미지</h2>
+        <p style={{ fontSize: "0.8125rem", color: "#6b7280", margin: "0 0 1rem" }}>
+          상품 상세페이지 하단에 순서대로 이어붙여 표시됩니다. 상세 설명 이미지를 원하는 순서대로 올려주세요.
+        </p>
+        <MultiImageUploader
+          images={form.detailImages}
+          onChange={(detailImages) => setForm((prev) => ({ ...prev, detailImages }))}
+          hint="jpg/png/webp/gif, 장당 5MB 이하. 여러 장을 올리면 위에서 아래로 이어붙여 보여집니다."
+        />
       </div>
 
       {/* 추천 크루 */}

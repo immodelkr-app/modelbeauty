@@ -21,7 +21,15 @@ export default function EditProductPage({ params }: { params: Promise<{ id: stri
         .then((r) => r.json())
         .then(({ data, success }) => {
           if (!success || !data) { setNotFound(true); return; }
-          const images = data.images as { url: string; alt: string }[] ?? [];
+          const images = (data.images as { url: string; alt: string }[] ?? [])
+            .map((img) => ({ url: img.url, alt: img.alt ?? "" }));
+          // 상세페이지 content는 ProductForm이 생성한 <img> 나열 HTML이므로 src/alt만 다시 추출
+          const detailImages = Array.from(
+            (data.content as string ?? "").matchAll(/<img[^>]*\ssrc="([^"]*)"[^>]*\salt="([^"]*)"[^>]*>/g)
+          ).map((m) => ({
+            url: m[1].replace(/&quot;/g, '"').replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&"),
+            alt: m[2].replace(/&quot;/g, '"').replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&"),
+          }));
           setInitialData({
             name: data.name ?? "",
             slug: data.slug ?? "",
@@ -31,8 +39,8 @@ export default function EditProductPage({ params }: { params: Promise<{ id: stri
             salePrice: data.sale_price ? String(data.sale_price) : "",
             stockQuantity: String(data.stock_quantity ?? 0),
             sku: data.sku ?? "",
-            imageUrl: images[0]?.url ?? "",
-            imageAlt: images[0]?.alt ?? "",
+            images,
+            detailImages,
             tags: (data.tags ?? []).join(", "),
             isActive: data.is_active ?? true,
             isFeatured: data.is_featured ?? false,

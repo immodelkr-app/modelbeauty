@@ -1,14 +1,18 @@
-package com.modelbeauty.app;
+package kr.modelbeauty;
 
 import android.annotation.SuppressLint;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
+import android.view.View;
 import android.webkit.ValueCallback;
 import android.webkit.WebChromeClient;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
+import android.widget.FrameLayout;
 import androidx.activity.OnBackPressedCallback;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
@@ -16,8 +20,12 @@ import androidx.appcompat.app.AppCompatActivity;
 public class MainActivity extends AppCompatActivity {
 
     private WebView mWebView;
+    private View mSplashOverlay;
+    private boolean mSplashHidden = false;
     private ValueCallback<Uri[]> mUploadMessage;
     private final static int FILE_CHOOSER_RESULT_CODE = 1001;
+    // 페이지 로딩이 지연되더라도 스플래시가 무한정 떠 있지 않도록 하는 최대 대기 시간
+    private final static long SPLASH_TIMEOUT_MS = 6000;
 
     // 실서비스 웹사이트 URL
     private static final String TARGET_URL = "https://www.modelbeauty.kr";
@@ -26,12 +34,20 @@ public class MainActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        // 자바 코드로 웹뷰 생성 및 전체 화면 채우기
+        setContentView(R.layout.activity_main);
+        mSplashOverlay = findViewById(R.id.splash_overlay);
+
+        // 자바 코드로 웹뷰 생성 후 컨테이너에 추가
         mWebView = new WebView(this);
-        setContentView(mWebView);
+        FrameLayout webViewContainer = findViewById(R.id.webview_container);
+        webViewContainer.addView(mWebView, new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
 
         // 웹뷰 기본 설정
         initWebViewSettings();
+
+        // 로딩이 오래 걸려도 스플래시가 영구히 남지 않도록 안전장치
+        new Handler(Looper.getMainLooper()).postDelayed(this::hideSplash, SPLASH_TIMEOUT_MS);
 
         // 뒤로가기 버튼 콜백 설정 (물리 뒤로가기 클릭 시 웹뷰 히스토리 이동)
         getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
@@ -88,6 +104,19 @@ public class MainActivity extends AppCompatActivity {
                     }
                 }
             }
+
+            @Override
+            public void onPageFinished(WebView view, String url) {
+                super.onPageFinished(view, url);
+                hideSplash();
+            }
+
+            @Override
+            public void onReceivedError(WebView view, int errorCode, String description, String failingUrl) {
+                super.onReceivedError(view, errorCode, description, failingUrl);
+                // 네트워크 오류 시에도 스플래시에 갇히지 않도록 즉시 해제
+                hideSplash();
+            }
         });
 
         // 파일 업로드(사진 리뷰 등록 등) 가로채기 지원
@@ -115,6 +144,17 @@ public class MainActivity extends AppCompatActivity {
                 return true;
             }
         });
+    }
+
+    // 스플래시 오버레이를 부드럽게 사라지게 함 (페이지 로딩 완료/오류/타임아웃 중 가장 먼저 발생하는 시점에 1회만 실행)
+    private void hideSplash() {
+        if (mSplashHidden || mSplashOverlay == null) return;
+        mSplashHidden = true;
+        mSplashOverlay.animate()
+                .alpha(0f)
+                .setDuration(250)
+                .withEndAction(() -> mSplashOverlay.setVisibility(View.GONE))
+                .start();
     }
 
     // 파일 선택 완료 후 업로드 정보 전달

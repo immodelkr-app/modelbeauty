@@ -10,4 +10,10 @@
         <item name="android:statusBarColor">#0f172a</item>
         <item name="android:windowLightStatusBar">false</item>
     </style>
+
+    <!-- 앱 실행 즉시(웹뷰 코드 실행 전) OS가 그려주는 최초 화면 배경.
+         액티비티 onCreate가 실행되기도 전에 윈도우 배경으로 바로 표시되어 흰 화면 깜빡임을 없앰 -->
+    <style name="Theme.ModelBeauty.Splash" parent="Theme.ModelBeauty">
+        <item name="android:windowBackground">@drawable/splash_background</item>
+    </style>
 </resources>

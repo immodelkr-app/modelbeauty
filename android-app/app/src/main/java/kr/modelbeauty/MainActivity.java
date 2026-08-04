@@ -6,6 +6,7 @@ import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.os.Message;
 import android.view.View;
 import android.webkit.ValueCallback;
 import android.webkit.WebChromeClient;
@@ -81,6 +82,11 @@ public class MainActivity extends AppCompatActivity {
         settings.setSupportZoom(false);
         settings.setBuiltInZoomControls(false);
 
+        // 카카오톡 공유 등 window.open()으로 새 창을 여는 스크립트 지원
+        // (미설정 시 window.open()이 null을 반환해 카카오 SDK가 즉시 에러를 던짐)
+        settings.setSupportMultipleWindows(true);
+        settings.setJavaScriptCanOpenWindowsAutomatically(true);
+
         // 💡 앱 접속 식별을 위한 커스텀 User-Agent 덧붙이기
         // 웹사이트(Next.js)에서 브라우저 정보를 체크하여 "ModelBeautyApp"이 포함되어 있으면 앱 뷰로 인지할 수 있습니다.
         String defaultUserAgent = settings.getUserAgentString();
@@ -141,6 +147,29 @@ public class MainActivity extends AppCompatActivity {
                     mUploadMessage = null;
                     return false;
                 }
+                return true;
+            }
+
+            // window.open()으로 열리는 새 창(카카오톡 공유 팝업 등)을 가로채서
+            // 시스템 인텐트로 넘긴다 (카카오톡 앱 딥링크는 앱 실행, 일반 URL은 외부 브라우저로 이동)
+            @Override
+            public boolean onCreateWindow(WebView view, boolean isDialog, boolean isUserGesture, Message resultMsg) {
+                WebView transportWebView = new WebView(MainActivity.this);
+                transportWebView.setWebViewClient(new WebViewClient() {
+                    @Override
+                    public boolean shouldOverrideUrlLoading(WebView childView, String url) {
+                        try {
+                            startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(url)));
+                        } catch (Exception e) {
+                            // 해당 URL을 처리할 앱이 없는 경우 등은 무시
+                        }
+                        return true;
+                    }
+                });
+
+                WebView.WebViewTransport transport = (WebView.WebViewTransport) resultMsg.obj;
+                transport.setWebView(transportWebView);
+                resultMsg.sendToTarget();
                 return true;
             }
         });

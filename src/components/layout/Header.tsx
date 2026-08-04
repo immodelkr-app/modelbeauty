@@ -6,7 +6,7 @@
 
 import Link from "next/link";
 import HeaderAuthSection from "@/components/layout/HeaderAuthSection";
-import HeaderCartButton from "@/components/layout/HeaderCartButton";
+import HeaderShopIcons from "@/components/layout/HeaderShopIcons";
 
 const NAV_ITEMS = [
   { href: "/products", label: "전체 상품" },
@@ -48,24 +48,8 @@ export default function Header() {
 
         {/* 액션 버튼 */}
         <div className="shop-header-actions">
-          {/* 검색 */}
-          <Link href="/products" className="shop-icon-btn" aria-label="검색">
-            <svg
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              aria-hidden="true"
-            >
-              <circle cx="11" cy="11" r="8" />
-              <path d="m21 21-4.35-4.35" />
-            </svg>
-          </Link>
-
-          {/* 장바구니 + 수량 뱃지 (Client Component) */}
-          <HeaderCartButton />
+          {/* 검색 + 장바구니: 로그인 상태에서만 노출 (Client Component) */}
+          <HeaderShopIcons />
 
           {/* 로그인 상태에 따른 UI (Client Component) */}
           <HeaderAuthSection />

@@ -555,6 +555,14 @@ body {
   flex-shrink: 0;
 }
 
+.shop-logo-icon {
+  display: none;
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+  flex-shrink: 0;
+}
+
 .shop-nav {
   display: flex;
   align-items: center;
@@ -4009,5 +4017,18 @@ html, body {
   /* 헤더 내 로그아웃 버튼 숨기기 (마이페이지에서 로그아웃 가능하므로 모바일 헤더 간소화) */
   .header-logout-btn {
     display: none !important;
+  }
+}
+
+/* 좁은 폰(390px 이하 등)에서는 워드마크 폭 때문에 로그인/회원가입이 잘리므로
+   앱 아이콘 배지로 전환해 공간을 확보 (워드마크는 공간이 되는 한 우선 사용) */
+@media (max-width: 420px) {
+  .shop-logo-text,
+  .shop-logo-dot {
+    display: none;
+  }
+
+  .shop-logo-icon {
+    display: block;
   }
 }

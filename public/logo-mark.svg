@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="mbGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#e879a0"/>
+      <stop offset="100%" stop-color="#a855f7"/>
+    </linearGradient>
+    <filter id="softShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="6" stdDeviation="10" flood-color="#000000" flood-opacity="0.12"/>
+    </filter>
+  </defs>
+
+  <rect x="16" y="16" width="480" height="480" rx="108" fill="#ffffff" filter="url(#softShadow)"/>
+
+  <text x="256" y="234" text-anchor="middle"
+        font-family="Arial, 'Helvetica Neue', sans-serif" font-weight="900"
+        font-size="76" letter-spacing="-1" fill="url(#mbGradient)">MODEL</text>
+  <text x="256" y="316" text-anchor="middle"
+        font-family="Arial, 'Helvetica Neue', sans-serif" font-weight="900"
+        font-size="76" letter-spacing="-1" fill="url(#mbGradient)">BEAUTY</text>
+
+  <circle cx="256" cy="358" r="7" fill="url(#mbGradient)"/>
+</svg>

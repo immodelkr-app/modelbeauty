@@ -8,7 +8,7 @@
 //         → 모델뷰티 Supabase Auth 계정 없으면 im-core-auth sync 후 자동 생성
 
 import { NextRequest, NextResponse } from "next/server";
-import { getMasterUserByNickname, getMasterUser, syncMasterUser } from "@/lib/core-auth";
+import { getMasterUserByNickname, getMasterUser, syncMasterUser, getMasterUserByPhone } from "@/lib/core-auth";
 import { createSupabaseAdmin } from "@/lib/supabase/server";
 
 export async function POST(request: NextRequest) {
@@ -35,6 +35,8 @@ export async function POST(request: NextRequest) {
 
       const adminClient = createSupabaseAdmin();
       const phoneDigits = (phoneNumber || "").replace(/\D/g, "");
+      const cleanPhone = phoneDigits.length > 11 ? phoneDigits.slice(-11) : phoneDigits;
+      const authEmail = cleanPhone ? `${cleanPhone}@modelbeauty.kr` : undefined;
 
       // ── 모델뷰티 Supabase Auth에서 master_user_id로 기존 계정 탐색 ──
       const { data: { users: allUsers } } = await adminClient.auth.admin.listUsers({ perPage: 1000 });
@@ -43,10 +45,17 @@ export async function POST(request: NextRequest) {
       );
 
       if (existingUser) {
-        // 계정이 이미 존재하는 경우 → 비밀번호 업데이트
-        const { error: updateError } = await adminClient.auth.admin.updateUserById(existingUser.id, {
+        // 계정이 이미 존재하는 경우 → 비밀번호 업데이트 + email 비어있으면 자동 생성/보정
+        const updateData: { password: string; email?: string; email_confirm?: boolean } = {
           password: newPassword,
-        });
+        };
+
+        if ((!existingUser.email || existingUser.email === "") && authEmail) {
+          updateData.email = authEmail;
+          updateData.email_confirm = true;
+        }
+
+        const { error: updateError } = await adminClient.auth.admin.updateUserById(existingUser.id, updateData);
         if (updateError) {
           console.error("[POST /api/auth/reset-password] 비밀번호 변경 실패:", updateError);
           return NextResponse.json({ error: "비밀번호 변경에 실패했습니다." }, { status: 500 });
@@ -56,14 +65,12 @@ export async function POST(request: NextRequest) {
 
       // ── 모델뷰티 Supabase Auth 계정이 없는 경우 (MOCA·IMFF 전용 유저) ──
       // im-core-auth에 MODEL_BEAUTY 연동 생성 후 Supabase Auth 계정 신규 생성
-      if (!phoneDigits) {
+      if (!phoneDigits || !authEmail) {
         return NextResponse.json(
           { error: "계정 생성에 필요한 휴대폰 번호 정보가 없습니다." },
           { status: 400 }
         );
       }
-
-      const authEmail = `${phoneDigits}@modelbeauty.kr`;
 
       console.log(`[reset-password] 신규 모델뷰티 계정 생성 진행. masterUserId: ${masterUserId}, email: ${authEmail}`);
 
@@ -178,8 +185,16 @@ export async function POST(request: NextRequest) {
 
     const phoneDigits = phoneNumber.replace(/\D/g, "");
 
-    // 아임모델 공화국에서 닉네임으로 마스터 유저 조회
-    const masterUserRef = await getMasterUserByNickname(nickname.trim());
+    // 아임모델 공화국에서 닉네임으로 마스터 유저 조회 시도
+    let masterUserRef = await getMasterUserByNickname(nickname.trim());
+
+    // 닉네임 조회 실패 시 휴대폰 번호로 fallback 조회 (실명을 닉네임란에 입력했거나 닉네임 미설정 유저 대비)
+    if (!masterUserRef) {
+      const phoneMaster = await getMasterUserByPhone(phoneDigits);
+      if (phoneMaster) {
+        masterUserRef = { masterUserId: phoneMaster.masterUserId, phoneNumber: phoneMaster.phoneNumber };
+      }
+    }
 
     if (!masterUserRef) {
       return NextResponse.json(

@@ -119,6 +119,13 @@ export default function AdminUsersPage() {
   } | null>(null);
   const [syncError, setSyncError] = useState<string | null>(null);
 
+  // ── OTP 이메일 일괄 마이그레이션 ─────────────────────────
+  const [migrating, setMigrating] = useState(false);
+  const [migrateResult, setMigrateResult] = useState<{
+    total: number; targets: number; migrated: number; failed: number; skipped: number;
+  } | null>(null);
+  const [migrateError, setMigrateError] = useState<string | null>(null);
+
   // ── 솔라피 설정 확인 모달 ───────────────────────────────
   const [showSolapiCheckModal, setShowSolapiCheckModal] = useState(false);
   const [solapiConfig, setSolapiConfig] = useState<any>(null);
@@ -285,6 +292,28 @@ export default function AdminUsersPage() {
       setSyncError("네트워크 오류가 발생했습니다.");
     } finally {
       setSyncing(false);
+    }
+  };
+
+  const handleMigrateEmail = async () => {
+    if (!confirm(`⚠️ OTP(전화번호 인증) 가입자 중 이메일이 없는 회원 전체에게 전화번호 기반 이메일을 자동 할당합니다.\n\n계속하시겠습니까?`)) return;
+    setMigrating(true);
+    setMigrateResult(null);
+    setMigrateError(null);
+    try {
+      const res = await fetch("/api/admin/users/migrate-email", { method: "POST" });
+      const data = await res.json();
+      if (data.success) {
+        setMigrateResult(data.result);
+        await fetchUsers();
+      } else {
+        setMigrateError(data.error ?? "이메일 마이그레이션에 실패했습니다.");
+      }
+    } catch (e) {
+      console.error("이메일 마이그레이션 요청 실패:", e);
+      setMigrateError("네트워크 오류가 발생했습니다.");
+    } finally {
+      setMigrating(false);
     }
   };
 
@@ -705,6 +734,34 @@ export default function AdminUsersPage() {
           {syncing ? "⏳ 동기화 중..." : "🏛️ 아임모델 공화국 회원 가져오기"}
         </button>
         <button
+          onClick={handleMigrateEmail}
+          disabled={migrating}
+          title="이메일이 없는 OTP 가입자에게 전화번호 기반 이메일을 자동 할당합니다"
+          style={{
+            display: "flex", alignItems: "center", gap: "0.375rem",
+            padding: "0.625rem 1.125rem", fontSize: "0.875rem", fontWeight: 700,
+            background: migrating ? "rgba(234,179,8,0.1)" : "rgba(234,179,8,0.15)",
+            border: "1px solid rgba(234,179,8,0.4)",
+            color: migrating ? "#fde047" : "#facc15",
+            borderRadius: "8px", cursor: migrating ? "not-allowed" : "pointer",
+            transition: "all 0.2s",
+          }}
+          onMouseEnter={(e) => {
+            if (!migrating) {
+              e.currentTarget.style.background = "rgba(234,179,8,0.3)";
+              e.currentTarget.style.color = "#fef08a";
+            }
+          }}
+          onMouseLeave={(e) => {
+            if (!migrating) {
+              e.currentTarget.style.background = "rgba(234,179,8,0.15)";
+              e.currentTarget.style.color = "#facc15";
+            }
+          }}
+        >
+          {migrating ? "⏳ 처리 중..." : "📧 OTP 회원 로그인 이메일 일괄 설정"}
+        </button>
+        <button
           onClick={handleCheckSolapi}
           className="admin-btn-secondary"
           style={{ display: "flex", alignItems: "center", gap: "0.25rem", padding: "0.625rem 1rem", fontSize: "0.875rem", border: "1px solid rgba(236,72,153,0.3)", color: "#ec4899" }}
@@ -747,6 +804,47 @@ export default function AdminUsersPage() {
           <span>⚠️ {syncError}</span>
           <button
             onClick={() => setSyncError(null)}
+            style={{ background: "transparent", border: "none", color: "#64748b", cursor: "pointer", fontSize: "1.1rem" }}
+          >✕</button>
+        </div>
+      )}
+
+      {/* 이메일 마이그레이션 결과 배너 */}
+      {migrateResult && (
+        <div style={{
+          marginBottom: "1rem", padding: "0.875rem 1.25rem",
+          background: "rgba(234, 179, 8, 0.08)", border: "1px solid rgba(234, 179, 8, 0.3)",
+          borderRadius: "10px", fontSize: "0.875rem", color: "#fde047",
+          display: "flex", gap: "1.5rem", flexWrap: "wrap", alignItems: "center",
+        }}>
+          <span style={{ fontWeight: 700, color: "#facc15", fontSize: "0.9375rem" }}>📧 이메일 마이그레이션 완료</span>
+          <span>전체 <strong style={{ color: "#f1f5f9" }}>{migrateResult.total}명</strong></span>
+          <span>대상 <strong style={{ color: "#fde047" }}>{migrateResult.targets}명</strong></span>
+          <span>✅ 처리 완료 <strong style={{ color: "#86efac" }}>{migrateResult.migrated}명</strong></span>
+          {migrateResult.skipped > 0 && (
+            <span>⏭️ 스킵 <strong style={{ color: "#94a3b8" }}>{migrateResult.skipped}명</strong></span>
+          )}
+          {migrateResult.failed > 0 && (
+            <span>❌ 실패 <strong style={{ color: "#f87171" }}>{migrateResult.failed}명</strong></span>
+          )}
+          <button
+            onClick={() => setMigrateResult(null)}
+            style={{ marginLeft: "auto", background: "transparent", border: "none", color: "#64748b", cursor: "pointer", fontSize: "1.1rem" }}
+          >✕</button>
+        </div>
+      )}
+
+      {/* 이메일 마이그레이션 오류 배너 */}
+      {migrateError && (
+        <div style={{
+          marginBottom: "1rem", padding: "0.875rem 1.25rem",
+          background: "rgba(239, 68, 68, 0.08)", border: "1px solid rgba(239, 68, 68, 0.3)",
+          borderRadius: "10px", fontSize: "0.875rem", color: "#f87171",
+          display: "flex", alignItems: "center", justifyContent: "space-between",
+        }}>
+          <span>⚠️ 이메일 마이그레이션 오류: {migrateError}</span>
+          <button
+            onClick={() => setMigrateError(null)}
             style={{ background: "transparent", border: "none", color: "#64748b", cursor: "pointer", fontSize: "1.1rem" }}
           >✕</button>
         </div>

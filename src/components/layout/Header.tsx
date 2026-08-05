@@ -23,18 +23,10 @@ export default function Header() {
   return (
     <header className="shop-header">
       <div className="shop-header-inner">
-        {/* 로고: 좁은 화면에서는 워드마크 대신 앱 아이콘 배지로 전환 (로그인/회원가입 잘림 방지) */}
+        {/* 로고: 항상 워드마크 텍스트로 노출 (앱 아이콘 배지 전환 없음) */}
         <Link href="/" className="shop-logo" aria-label="MODEL BEAUTY 홈으로">
           <span className="shop-logo-text" aria-hidden="true">MODEL BEAUTY</span>
           <span className="shop-logo-dot" aria-hidden="true" />
-          <img
-            src="/logo-mark.svg"
-            alt=""
-            aria-hidden="true"
-            className="shop-logo-icon"
-            width={32}
-            height={32}
-          />
         </Link>
 
         {/* 네비게이션 */}

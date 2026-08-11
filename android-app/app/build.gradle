@@ -10,8 +10,8 @@ android {
         applicationId "kr.modelbeauty"
         minSdk 24
         targetSdk 36
-        versionCode 15
-        versionName "1.0.15"
+        versionCode 16
+        versionName "1.0.16"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -43,4 +43,5 @@ dependencies {
     implementation 'com.google.android.material:material:1.11.0'
     implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
     implementation 'androidx.activity:activity:1.8.2'
+    implementation 'androidx.biometric:biometric:1.1.0'
 }

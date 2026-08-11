@@ -13,6 +13,8 @@ import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { useAuthStore } from "@/store/auth.store";
 import type { MasterUser } from "@/types";
 import Link from "next/link";
+import { isAppWebView } from "@/lib/device/webview";
+import { checkBiometricAvailability, loginWithBiometric, clearBiometricCredential } from "@/lib/device/biometricBridge";
 
 // ── 닉네임 찾기 모달 ──────────────────────────────────────────
 function FindNicknameModal({ onClose }: { onClose: () => void }) {
@@ -455,11 +457,59 @@ function LoginForm() {
   const [email, setEmail] = useState("");
   const [adminPassword, setAdminPassword] = useState("");
 
+  // 지문 로그인 (앱 웹뷰 + 등록된 자격증명이 있을 때만)
+  const [showBiometricButton, setShowBiometricButton] = useState(false);
+  const [isBiometricSubmitting, setIsBiometricSubmitting] = useState(false);
+
   useEffect(() => {
     if (mode === "admin") {
       setLoginMode("email");
     }
   }, [mode]);
+
+  useEffect(() => {
+    if (isAppWebView() && checkBiometricAvailability().credentialSaved) {
+      setShowBiometricButton(true);
+    }
+  }, []);
+
+  // 지문 로그인
+  const handleBiometricLogin = async () => {
+    setError("");
+    setIsBiometricSubmitting(true);
+    try {
+      const result = await loginWithBiometric();
+      if (!result.success || !result.token) {
+        if (result.message === "invalidated") {
+          clearBiometricCredential();
+          setShowBiometricButton(false);
+          setError("지문 정보가 변경되어 지문 로그인이 해제되었습니다. 다시 등록해주세요.");
+        }
+        return;
+      }
+
+      const { error: refreshError } = await supabase.auth.refreshSession({ refresh_token: result.token });
+      if (refreshError) {
+        clearBiometricCredential();
+        setShowBiometricButton(false);
+        setError("로그인이 만료되었습니다. 닉네임과 비밀번호로 다시 로그인해주세요.");
+        return;
+      }
+
+      const meRes = await fetch("/api/auth/me");
+      if (meRes.ok) {
+        const meData = await meRes.json();
+        setMasterUser(meData.user as MasterUser);
+      }
+
+      router.push(redirectTo);
+      router.refresh();
+    } catch {
+      setError("네트워크 오류가 발생했습니다. 다시 시도해주세요.");
+    } finally {
+      setIsBiometricSubmitting(false);
+    }
+  };
 
   // 닉네임 + 비밀번호 로그인
   const handleNicknameLogin = async (e: React.FormEvent) => {
@@ -601,6 +651,26 @@ function LoginForm() {
             <h2>로그인</h2>
             <p>닉네임과 비밀번호를 입력해주세요</p>
           </div>
+
+          {showBiometricButton && (
+            <>
+              <button
+                type="button"
+                onClick={handleBiometricLogin}
+                className="login-btn"
+                disabled={isBiometricSubmitting}
+                style={{ marginBottom: "1rem" }}
+              >
+                {isBiometricSubmitting ? "인증 중..." : "👆 지문으로 로그인"}
+              </button>
+              <div style={{
+                textAlign: "center", fontSize: "0.75rem", color: "var(--mb-gray-400)",
+                margin: "0 0 1rem",
+              }}>
+                또는
+              </div>
+            </>
+          )}
 
           <div className="login-field">
             <label htmlFor="nickname">닉네임</label>

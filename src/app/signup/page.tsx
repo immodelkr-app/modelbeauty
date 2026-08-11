@@ -8,11 +8,15 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { createSupabaseBrowserClient } from "@/lib/supabase/client";
+import { isAppWebView } from "@/lib/device/webview";
+import { enrollBiometricLogin } from "@/lib/device/biometricBridge";
 
 type NicknameStatus = "idle" | "checking" | "available" | "taken" | "invalid";
 
 export default function SignupPage() {
   const router = useRouter();
+  const supabase = createSupabaseBrowserClient();
 
   const [form, setForm] = useState({
     nickname: "",
@@ -43,6 +47,9 @@ export default function SignupPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [linkedAppsAlert, setLinkedAppsAlert] = useState("");
+  const [signupDone, setSignupDone] = useState(false);
+  const [bioStatus, setBioStatus] = useState<"idle" | "loading" | "done" | "error">("idle");
+  const [bioMessage, setBioMessage] = useState("");
 
   // 전화번호 포맷팅
   const formatPhone = (value: string) => {
@@ -267,6 +274,15 @@ export default function SignupPage() {
         setLinkedAppsAlert(
           `이미 ${appNames} 앱에 가입된 계정이 존재하여 자동으로 통합되었습니다.\n앞으로 동일한 닉네임과 비밀번호로 두 앱을 모두 이용하실 수 있습니다.`
         );
+      }
+
+      // 앱(웹뷰) 환경이면 지문 로그인을 바로 등록할 수 있도록 완료 화면을 항상 거친다
+      if (isAppWebView()) {
+        setSignupDone(true);
+        return;
+      }
+
+      if (data.linkedApps && data.linkedApps.length > 0) {
         return;
       }
 
@@ -276,6 +292,46 @@ export default function SignupPage() {
       setError("네트워크 오류가 발생했습니다. 다시 시도해주세요.");
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  // 회원가입 완료 화면에서 지문 로그인 등록
+  const handleEnrollBiometric = async () => {
+    setBioStatus("loading");
+    setBioMessage("");
+    try {
+      const emailRes = await fetch("/api/auth/get-auth-email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ nickname: form.nickname.trim() }),
+      });
+      const emailData = await emailRes.json();
+      if (!emailData.found || !emailData.authEmail) {
+        setBioStatus("error");
+        setBioMessage("로그인 정보를 확인할 수 없습니다. 마이페이지에서 다시 시도해주세요.");
+        return;
+      }
+
+      const { data, error: signInError } = await supabase.auth.signInWithPassword({
+        email: emailData.authEmail,
+        password: form.password,
+      });
+      if (signInError || !data.session?.refresh_token) {
+        setBioStatus("error");
+        setBioMessage("로그인 정보를 확인할 수 없습니다. 마이페이지에서 다시 시도해주세요.");
+        return;
+      }
+
+      const result = await enrollBiometricLogin(data.session.refresh_token);
+      if (result.success) {
+        setBioStatus("done");
+      } else {
+        setBioStatus("error");
+        setBioMessage("지문 등록에 실패했습니다. 마이페이지에서 다시 시도해주세요.");
+      }
+    } catch {
+      setBioStatus("error");
+      setBioMessage("네트워크 오류가 발생했습니다. 마이페이지에서 다시 시도해주세요.");
     }
   };
 
@@ -291,7 +347,7 @@ export default function SignupPage() {
   const allConsented =
     consents.terms && consents.privacy && consents.marketingEmail && consents.marketingSms;
 
-  if (linkedAppsAlert) {
+  if (signupDone) {
     return (
       <main className="login-page">
         <div className="login-bg-blob login-bg-blob-1" />
@@ -303,27 +359,80 @@ export default function SignupPage() {
             <h2 style={{ marginBottom: "1rem", fontSize: "1.25rem", fontWeight: 700 }}>
               가입이 완료되었습니다!
             </h2>
-            <div
-              style={{
-                background: "rgba(219,39,119,0.08)",
-                border: "1px solid rgba(219,39,119,0.2)",
-                borderRadius: "12px",
-                padding: "1rem",
-                marginBottom: "1.5rem",
-                fontSize: "0.875rem",
-                color: "var(--mb-gray-600)",
-                lineHeight: 1.6,
-                whiteSpace: "pre-line",
-                textAlign: "left",
-              }}
-            >
-              {linkedAppsAlert}
-            </div>
+            {linkedAppsAlert && (
+              <div
+                style={{
+                  background: "rgba(219,39,119,0.08)",
+                  border: "1px solid rgba(219,39,119,0.2)",
+                  borderRadius: "12px",
+                  padding: "1rem",
+                  marginBottom: "1.5rem",
+                  fontSize: "0.875rem",
+                  color: "var(--mb-gray-600)",
+                  lineHeight: 1.6,
+                  whiteSpace: "pre-line",
+                  textAlign: "left",
+                }}
+              >
+                {linkedAppsAlert}
+              </div>
+            )}
+
+            {isAppWebView() && bioStatus !== "done" && (
+              <div
+                style={{
+                  background: "rgba(168,85,247,0.08)",
+                  border: "1px solid rgba(168,85,247,0.2)",
+                  borderRadius: "12px",
+                  padding: "1.25rem 1rem",
+                  marginBottom: "1.5rem",
+                  textAlign: "center",
+                }}
+              >
+                <div style={{ fontSize: "2rem", marginBottom: "0.5rem" }}>👆</div>
+                <p style={{ fontSize: "0.9375rem", fontWeight: 700, marginBottom: "0.375rem" }}>
+                  지문으로 간편하게 로그인하시겠어요?
+                </p>
+                <p style={{ fontSize: "0.8125rem", color: "var(--mb-gray-500)", marginBottom: "1rem" }}>
+                  다음부터 닉네임/비밀번호 없이 지문만으로 로그인할 수 있어요.
+                  <br />나중에 마이페이지에서 언제든 설정할 수 있습니다.
+                </p>
+                {bioMessage && (
+                  <p style={{ fontSize: "0.8125rem", color: "#ef4444", marginBottom: "0.75rem" }}>{bioMessage}</p>
+                )}
+                <button
+                  onClick={handleEnrollBiometric}
+                  className="login-btn"
+                  disabled={bioStatus === "loading"}
+                  style={{ marginBottom: "0.5rem" }}
+                >
+                  {bioStatus === "loading" ? "등록 중..." : "지문 로그인 등록하기"}
+                </button>
+              </div>
+            )}
+
+            {isAppWebView() && bioStatus === "done" && (
+              <div
+                style={{
+                  background: "rgba(34,197,94,0.08)",
+                  border: "1px solid rgba(34,197,94,0.25)",
+                  borderRadius: "12px",
+                  padding: "1rem",
+                  marginBottom: "1.5rem",
+                  fontSize: "0.875rem",
+                  color: "#16a34a",
+                  fontWeight: 700,
+                }}
+              >
+                ✅ 지문 로그인이 등록되었습니다!
+              </div>
+            )}
+
             <button
               onClick={() => { router.push("/"); router.refresh(); }}
               className="login-btn"
             >
-              시작하기 →
+              {isAppWebView() && bioStatus === "idle" ? "건너뛰고 시작하기 →" : "시작하기 →"}
             </button>
           </div>
         </div>

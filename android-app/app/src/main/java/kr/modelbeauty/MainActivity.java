@@ -2,12 +2,18 @@ package kr.modelbeauty;
 
 import android.annotation.SuppressLint;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.Message;
+import android.security.keystore.KeyGenParameterSpec;
+import android.security.keystore.KeyPermanentlyInvalidatedException;
+import android.security.keystore.KeyProperties;
+import android.util.Base64;
 import android.view.View;
+import android.webkit.JavascriptInterface;
 import android.webkit.ValueCallback;
 import android.webkit.WebChromeClient;
 import android.webkit.WebSettings;
@@ -17,6 +23,17 @@ import android.widget.FrameLayout;
 import androidx.activity.OnBackPressedCallback;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.biometric.BiometricManager;
+import androidx.biometric.BiometricPrompt;
+import androidx.core.content.ContextCompat;
+
+import java.nio.charset.StandardCharsets;
+import java.security.KeyStore;
+
+import javax.crypto.Cipher;
+import javax.crypto.KeyGenerator;
+import javax.crypto.SecretKey;
+import javax.crypto.spec.GCMParameterSpec;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -30,6 +47,14 @@ public class MainActivity extends AppCompatActivity {
 
     // 실서비스 웹사이트 URL
     private static final String TARGET_URL = "https://www.modelbeauty.kr";
+
+    // 지문 로그인용 Android Keystore 키 별칭 및 저장 정보
+    private static final String BIOMETRIC_KEY_ALIAS = "modelbeauty_biometric_key";
+    private static final String BIOMETRIC_PREFS_NAME = "biometric_prefs";
+    private static final String PREF_IV = "iv";
+    private static final String PREF_CIPHERTEXT = "ciphertext";
+    private static final String AES_TRANSFORMATION =
+            KeyProperties.KEY_ALGORITHM_AES + "/" + KeyProperties.BLOCK_MODE_GCM + "/" + KeyProperties.ENCRYPTION_PADDING_NONE;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -173,6 +198,9 @@ public class MainActivity extends AppCompatActivity {
                 return true;
             }
         });
+
+        // 지문 로그인용 JS 브릿지 등록 (웹에서 window.AndroidBiometric으로 접근)
+        mWebView.addJavascriptInterface(new BiometricBridge(), "AndroidBiometric");
     }
 
     // 스플래시 오버레이를 부드럽게 사라지게 함 (페이지 로딩 완료/오류/타임아웃 중 가장 먼저 발생하는 시점에 1회만 실행)
@@ -196,5 +224,192 @@ public class MainActivity extends AppCompatActivity {
             mUploadMessage.onReceiveValue(result);
             mUploadMessage = null;
         }
+    }
+
+    // ===================== 지문 로그인(생체 인증) 관련 =====================
+
+    private interface OnBiometricSuccess {
+        void run(BiometricPrompt.AuthenticationResult result);
+    }
+
+    private interface OnBiometricError {
+        void run(String message);
+    }
+
+    // 웹(JS)에서 window.AndroidBiometric.xxx()로 호출하는 브릿지.
+    // 주의: @JavascriptInterface 메서드는 WebView 내부 스레드(백그라운드)에서 호출되므로
+    // BiometricPrompt 표시/evaluateJavascript 호출은 반드시 runOnUiThread로 감싼다.
+    private class BiometricBridge {
+
+        @JavascriptInterface
+        public String checkAvailability() {
+            BiometricManager biometricManager = BiometricManager.from(MainActivity.this);
+            int canAuth = biometricManager.canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_STRONG);
+            boolean hardwareAvailable = canAuth == BiometricManager.BIOMETRIC_SUCCESS;
+            SharedPreferences prefs = getSharedPreferences(BIOMETRIC_PREFS_NAME, MODE_PRIVATE);
+            boolean credentialSaved = prefs.contains(PREF_CIPHERTEXT);
+            return "{\"hardwareAvailable\":" + hardwareAvailable + ",\"credentialSaved\":" + credentialSaved + "}";
+        }
+
+        // 회원가입 완료 화면 / 마이페이지에서 호출: 현재 세션의 refresh token을 지문으로 보호해 저장
+        @JavascriptInterface
+        public void saveCredential(String refreshToken) {
+            runOnUiThread(() -> {
+                try {
+                    Cipher cipher = getEncryptCipher();
+                    BiometricPrompt.CryptoObject cryptoObject = new BiometricPrompt.CryptoObject(cipher);
+                    showBiometricPrompt(
+                            "지문 로그인 등록",
+                            "지문을 인증하면 다음부터 지문으로 로그인할 수 있어요",
+                            cryptoObject,
+                            result -> {
+                                try {
+                                    Cipher c = result.getCryptoObject().getCipher();
+                                    byte[] encrypted = c.doFinal(refreshToken.getBytes(StandardCharsets.UTF_8));
+                                    getSharedPreferences(BIOMETRIC_PREFS_NAME, MODE_PRIVATE).edit()
+                                            .putString(PREF_IV, Base64.encodeToString(c.getIV(), Base64.NO_WRAP))
+                                            .putString(PREF_CIPHERTEXT, Base64.encodeToString(encrypted, Base64.NO_WRAP))
+                                            .apply();
+                                    notifyJs("window.__onBiometricEnrollResult && window.__onBiometricEnrollResult(true, '')");
+                                } catch (Exception e) {
+                                    notifyJs("window.__onBiometricEnrollResult && window.__onBiometricEnrollResult(false, " + jsString(e.getMessage()) + ")");
+                                }
+                            },
+                            errorMessage -> notifyJs("window.__onBiometricEnrollResult && window.__onBiometricEnrollResult(false, " + jsString(errorMessage) + ")")
+                    );
+                } catch (Exception e) {
+                    notifyJs("window.__onBiometricEnrollResult && window.__onBiometricEnrollResult(false, " + jsString(e.getMessage()) + ")");
+                }
+            });
+        }
+
+        // 로그인 화면에서 호출: 지문 인증 성공 시 저장된 refresh token을 복호화해 웹으로 전달
+        @JavascriptInterface
+        public void login() {
+            runOnUiThread(() -> {
+                try {
+                    Cipher cipher = getDecryptCipher();
+                    BiometricPrompt.CryptoObject cryptoObject = new BiometricPrompt.CryptoObject(cipher);
+                    showBiometricPrompt(
+                            "지문으로 로그인",
+                            "등록한 지문으로 로그인하세요",
+                            cryptoObject,
+                            result -> {
+                                try {
+                                    Cipher c = result.getCryptoObject().getCipher();
+                                    String ciphertextB64 = getSharedPreferences(BIOMETRIC_PREFS_NAME, MODE_PRIVATE)
+                                            .getString(PREF_CIPHERTEXT, null);
+                                    byte[] ciphertext = Base64.decode(ciphertextB64, Base64.NO_WRAP);
+                                    byte[] decrypted = c.doFinal(ciphertext);
+                                    String token = new String(decrypted, StandardCharsets.UTF_8);
+                                    notifyJs("window.__onBiometricLoginResult && window.__onBiometricLoginResult(true, " + jsString(token) + ", '')");
+                                } catch (Exception e) {
+                                    notifyJs("window.__onBiometricLoginResult && window.__onBiometricLoginResult(false, null, " + jsString(e.getMessage()) + ")");
+                                }
+                            },
+                            errorMessage -> notifyJs("window.__onBiometricLoginResult && window.__onBiometricLoginResult(false, null, " + jsString(errorMessage) + ")")
+                    );
+                } catch (KeyPermanentlyInvalidatedException e) {
+                    // 지문 재등록 등으로 키가 무효화된 경우: 저장된 자격증명을 지우고 재등록을 유도
+                    clearStoredCredential();
+                    notifyJs("window.__onBiometricLoginResult && window.__onBiometricLoginResult(false, null, 'invalidated')");
+                } catch (Exception e) {
+                    notifyJs("window.__onBiometricLoginResult && window.__onBiometricLoginResult(false, null, " + jsString(e.getMessage()) + ")");
+                }
+            });
+        }
+
+        // 마이페이지에서 지문 로그인을 끌 때 호출
+        @JavascriptInterface
+        public void clearCredential() {
+            clearStoredCredential();
+        }
+    }
+
+    private void clearStoredCredential() {
+        getSharedPreferences(BIOMETRIC_PREFS_NAME, MODE_PRIVATE).edit().clear().apply();
+    }
+
+    private void showBiometricPrompt(String title, String subtitle, BiometricPrompt.CryptoObject cryptoObject,
+                                      OnBiometricSuccess onSuccess, OnBiometricError onError) {
+        BiometricPrompt.PromptInfo promptInfo = new BiometricPrompt.PromptInfo.Builder()
+                .setTitle(title)
+                .setSubtitle(subtitle)
+                .setNegativeButtonText("취소")
+                .setAllowedAuthenticators(BiometricManager.Authenticators.BIOMETRIC_STRONG)
+                .build();
+
+        BiometricPrompt biometricPrompt = new BiometricPrompt(MainActivity.this,
+                ContextCompat.getMainExecutor(MainActivity.this),
+                new BiometricPrompt.AuthenticationCallback() {
+                    @Override
+                    public void onAuthenticationSucceeded(BiometricPrompt.AuthenticationResult result) {
+                        super.onAuthenticationSucceeded(result);
+                        onSuccess.run(result);
+                    }
+
+                    @Override
+                    public void onAuthenticationError(int errorCode, CharSequence errString) {
+                        super.onAuthenticationError(errorCode, errString);
+                        onError.run(errString.toString());
+                    }
+
+                    @Override
+                    public void onAuthenticationFailed() {
+                        super.onAuthenticationFailed();
+                        // 지문 불일치 등 단순 실패는 프롬프트가 자체적으로 재시도를 유도하므로 별도 처리 없음
+                    }
+                });
+
+        biometricPrompt.authenticate(promptInfo, cryptoObject);
+    }
+
+    private SecretKey getOrCreateSecretKey() throws Exception {
+        KeyStore keyStore = KeyStore.getInstance("AndroidKeyStore");
+        keyStore.load(null);
+
+        if (keyStore.containsAlias(BIOMETRIC_KEY_ALIAS)) {
+            return (SecretKey) keyStore.getKey(BIOMETRIC_KEY_ALIAS, null);
+        }
+
+        KeyGenerator keyGenerator = KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, "AndroidKeyStore");
+        KeyGenParameterSpec spec = new KeyGenParameterSpec.Builder(
+                BIOMETRIC_KEY_ALIAS, KeyProperties.PURPOSE_ENCRYPT | KeyProperties.PURPOSE_DECRYPT)
+                .setBlockModes(KeyProperties.BLOCK_MODE_GCM)
+                .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
+                .setUserAuthenticationRequired(true)
+                .setInvalidatedByBiometricEnrollment(true)
+                .build();
+        keyGenerator.init(spec);
+        return keyGenerator.generateKey();
+    }
+
+    private Cipher getEncryptCipher() throws Exception {
+        Cipher cipher = Cipher.getInstance(AES_TRANSFORMATION);
+        cipher.init(Cipher.ENCRYPT_MODE, getOrCreateSecretKey());
+        return cipher;
+    }
+
+    private Cipher getDecryptCipher() throws Exception {
+        SharedPreferences prefs = getSharedPreferences(BIOMETRIC_PREFS_NAME, MODE_PRIVATE);
+        String ivB64 = prefs.getString(PREF_IV, null);
+        if (ivB64 == null) {
+            throw new IllegalStateException("no credential saved");
+        }
+        byte[] iv = Base64.decode(ivB64, Base64.NO_WRAP);
+        Cipher cipher = Cipher.getInstance(AES_TRANSFORMATION);
+        cipher.init(Cipher.DECRYPT_MODE, getOrCreateSecretKey(), new GCMParameterSpec(128, iv));
+        return cipher;
+    }
+
+    private void notifyJs(String script) {
+        if (mWebView != null) {
+            mWebView.evaluateJavascript(script, null);
+        }
+    }
+
+    private String jsString(String s) {
+        if (s == null) return "null";
+        return "'" + s.replace("\\", "\\\\").replace("'", "\\'").replace("\n", "\\n").replace("\r", "") + "'";
     }
 }

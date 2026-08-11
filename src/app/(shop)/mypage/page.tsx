@@ -10,6 +10,86 @@ import { useAuthStore } from "@/store/auth.store";
 import { useWishlistStore } from "@/store/wishlist.store";
 import OrderCard from "@/components/mypage/OrderCard";
 import type { OrderStatus } from "@/types";
+import { createSupabaseBrowserClient } from "@/lib/supabase/client";
+import {
+  isBiometricBridgeAvailable,
+  checkBiometricAvailability,
+  enrollBiometricLogin,
+  clearBiometricCredential,
+} from "@/lib/device/biometricBridge";
+
+// 지문 로그인 설정 카드 (앱 웹뷰에서만 노출)
+function BiometricLoginCard() {
+  const [visible, setVisible] = useState(false);
+  const [enabled, setEnabled] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState("");
+
+  useEffect(() => {
+    if (!isBiometricBridgeAvailable()) return;
+    setVisible(true);
+    setEnabled(checkBiometricAvailability().credentialSaved);
+  }, []);
+
+  if (!visible) return null;
+
+  const handleToggle = async () => {
+    setLoading(true);
+    setMessage("");
+    try {
+      if (enabled) {
+        clearBiometricCredential();
+        setEnabled(false);
+        return;
+      }
+      const supabase = createSupabaseBrowserClient();
+      const { data } = await supabase.auth.getSession();
+      const refreshToken = data.session?.refresh_token;
+      if (!refreshToken) {
+        setMessage("로그인 정보를 확인할 수 없습니다. 다시 로그인 후 시도해주세요.");
+        return;
+      }
+      const result = await enrollBiometricLogin(refreshToken);
+      if (result.success) {
+        setEnabled(true);
+      } else {
+        setMessage("지문 등록에 실패했습니다. 다시 시도해주세요.");
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div style={{
+      background: "#fff",
+      borderRadius: "20px",
+      padding: "1.5rem",
+      boxShadow: "0 4px 20px rgba(0, 0, 0, 0.05)",
+      border: "1px solid var(--mb-gray-100)",
+      marginBottom: "2rem",
+    }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.5rem" }}>
+        <h2 style={{ fontSize: "1.0625rem", fontWeight: 800, color: "var(--mb-gray-900)", margin: 0 }}>
+          👆 지문 로그인
+        </h2>
+        <input
+          type="checkbox"
+          checked={enabled}
+          disabled={loading}
+          onChange={handleToggle}
+          style={{ width: "18px", height: "18px", accentColor: "var(--mb-pink-500)", cursor: loading ? "default" : "pointer" }}
+        />
+      </div>
+      <p style={{ fontSize: "0.8125rem", color: "var(--mb-gray-500)", margin: 0 }}>
+        {enabled
+          ? "이 기기에서 지문으로 로그인할 수 있어요."
+          : "이 기기에 지문 로그인을 등록하면 다음부터 비밀번호 없이 로그인할 수 있어요."}
+      </p>
+      {message && <p style={{ color: "#ef4444", fontSize: "0.8125rem", marginTop: "0.5rem" }}>{message}</p>}
+    </div>
+  );
+}
 
 interface RecentOrder {
   id: string;
@@ -989,6 +1069,8 @@ export default function MypagePage() {
           </div>
         )}
       </div>
+
+      <BiometricLoginCard />
 
       {/* 최근 주문 */}
       <div>

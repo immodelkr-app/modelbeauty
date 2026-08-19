@@ -4,7 +4,7 @@
 // /mypage — 마이페이지 홈 (프로필 요약 + 최근 주문)
 // ============================================================
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useAuthStore } from "@/store/auth.store";
 import { useWishlistStore } from "@/store/wishlist.store";
@@ -215,42 +215,51 @@ export default function MypagePage() {
       .catch(() => {});
   }, [masterUser ? masterUser.masterUserId : null]);
 
+  // 우편번호 검색: 앱 웹뷰에서 daum.Postcode의 .open()(window.open 팝업)이
+  // 안드로이드 WebView의 onCreateWindow 처리와 충돌해 진행되지 않는 문제가 있어
+  // 새 창을 띄우지 않는 .embed() 방식으로 페이지 내 모달에 직접 그린다.
+  const [isPostcodeOpen, setIsPostcodeOpen] = useState(false);
+  const postcodeContainerRef = useRef<HTMLDivElement>(null);
+
   const handleAddressSearch = () => {
     const scriptId = "daum-postcode-script";
     const existingScript = document.getElementById(scriptId);
-
-    const openPostcode = () => {
-      if ((window as any).daum && (window as any).daum.Postcode) {
-        new (window as any).daum.Postcode({
-          oncomplete: (data: any) => {
-            let fullAddress = data.address;
-            let extraAddress = "";
-            if (data.addressType === "R") {
-              if (data.bname !== "") extraAddress += data.bname;
-              if (data.buildingName !== "") extraAddress += (extraAddress !== "" ? `, ${data.buildingName}` : data.buildingName);
-              fullAddress += (extraAddress !== "" ? ` (${extraAddress})` : "");
-            }
-            setAddressState((prev) => ({
-              ...prev,
-              address: fullAddress,
-              zipcode: data.zonecode,
-            }));
-          },
-        }).open();
-      }
-    };
 
     if (!existingScript) {
       const script = document.createElement("script");
       script.id = scriptId;
       script.src = "//t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js";
       script.async = true;
-      script.onload = openPostcode;
+      script.onload = () => setIsPostcodeOpen(true);
       document.head.appendChild(script);
     } else {
-      openPostcode();
+      setIsPostcodeOpen(true);
     }
   };
+
+  useEffect(() => {
+    if (!isPostcodeOpen || !postcodeContainerRef.current || !(window as any).daum?.Postcode) return;
+    postcodeContainerRef.current.innerHTML = "";
+    new (window as any).daum.Postcode({
+      oncomplete: (data: any) => {
+        let fullAddress = data.address;
+        let extraAddress = "";
+        if (data.addressType === "R") {
+          if (data.bname !== "") extraAddress += data.bname;
+          if (data.buildingName !== "") extraAddress += (extraAddress !== "" ? `, ${data.buildingName}` : data.buildingName);
+          fullAddress += (extraAddress !== "" ? ` (${extraAddress})` : "");
+        }
+        setAddressState((prev) => ({
+          ...prev,
+          address: fullAddress,
+          zipcode: data.zonecode,
+        }));
+        setIsPostcodeOpen(false);
+      },
+      width: "100%",
+      height: "100%",
+    }).embed(postcodeContainerRef.current);
+  }, [isPostcodeOpen]);
 
   const handleAddressSave = async () => {
     if (!addressState.recipient.trim()) {
@@ -786,34 +795,29 @@ export default function MypagePage() {
 
         {isEditingAddress ? (
           <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
-            <div style={{ display: "flex", gap: "0.5rem" }}>
-              <input
-                type="text"
-                placeholder="수령인 *"
-                value={addressState.recipient}
-                onChange={(e) => setAddressState(prev => ({ ...prev, recipient: e.target.value }))}
-                style={{
-                  flex: "1",
-                  minWidth: 0,
-                  border: "1px solid var(--mb-gray-300)",
-                  borderRadius: "8px", padding: "0.5rem",
-                  fontSize: "0.875rem", outline: "none"
-                }}
-              />
-              <input
-                type="text"
-                placeholder="연락처 * (010-0000-0000)"
-                value={addressState.phone}
-                onChange={(e) => setAddressState(prev => ({ ...prev, phone: formatPhone(e.target.value) }))}
-                style={{
-                  flex: "1",
-                  minWidth: 0,
-                  border: "1px solid var(--mb-gray-300)",
-                  borderRadius: "8px", padding: "0.5rem",
-                  fontSize: "0.875rem", outline: "none"
-                }}
-              />
-            </div>
+            <input
+              type="text"
+              placeholder="수령인 *"
+              value={addressState.recipient}
+              onChange={(e) => setAddressState(prev => ({ ...prev, recipient: e.target.value }))}
+              style={{
+                border: "1px solid var(--mb-gray-300)",
+                borderRadius: "8px", padding: "0.5rem",
+                fontSize: "0.875rem", outline: "none"
+              }}
+            />
+            <input
+              type="text"
+              placeholder="연락처 * (010-0000-0000)"
+              value={addressState.phone}
+              onChange={(e) => setAddressState(prev => ({ ...prev, phone: formatPhone(e.target.value) }))}
+              inputMode="numeric"
+              style={{
+                border: "1px solid var(--mb-gray-300)",
+                borderRadius: "8px", padding: "0.5rem",
+                fontSize: "0.875rem", outline: "none"
+              }}
+            />
             <div style={{ display: "flex", gap: "0.5rem" }}>
               <input
                 type="text"
@@ -924,6 +928,36 @@ export default function MypagePage() {
           </div>
         )}
       </div>
+
+      {isPostcodeOpen && (
+        <div
+          style={{
+            position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)",
+            zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center",
+            padding: "1rem",
+          }}
+          onClick={() => setIsPostcodeOpen(false)}
+        >
+          <div
+            style={{
+              background: "#fff", borderRadius: "16px", width: "100%", maxWidth: "420px",
+              height: "70vh", overflow: "hidden", position: "relative",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              type="button"
+              onClick={() => setIsPostcodeOpen(false)}
+              style={{
+                position: "absolute", top: "0.5rem", right: "0.5rem", zIndex: 1,
+                background: "var(--mb-gray-100)", border: "none", borderRadius: "50%",
+                width: "28px", height: "28px", fontSize: "1rem", cursor: "pointer",
+              }}
+            >✕</button>
+            <div ref={postcodeContainerRef} style={{ width: "100%", height: "100%" }} />
+          </div>
+        </div>
+      )}
 
       {/* 프로필 정보 카드 (생년월일/성별/마케팅 동의) */}
       <div style={{

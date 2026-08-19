@@ -26,9 +26,12 @@
   --mb-gray-50:  #fafafa;
   --mb-gray-100: #f5f5f5;
   --mb-gray-200: #e5e5e5;
+  --mb-gray-300: #d4d4d4;
   --mb-gray-400: #a3a3a3;
   --mb-gray-500: #737373;
+  --mb-gray-600: #525252;
   --mb-gray-700: #404040;
+  --mb-gray-800: #262626;
   --mb-gray-900: #171717;
 
   /* 배경 */

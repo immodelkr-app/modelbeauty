@@ -43,16 +43,54 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "필수 정보가 누락되었습니다." }, { status: 400 });
     }
 
-    // 금액 계산
-    const subtotal = items.reduce(
-      (sum: number, item: { unitPrice: number; quantity: number }) =>
-        sum + item.unitPrice * item.quantity,
-      0
+    if (items.some((item: { quantity: number }) => !Number.isInteger(item.quantity) || item.quantity < 1)) {
+      return NextResponse.json({ error: "수량은 1 이상의 정수여야 합니다." }, { status: 400 });
+    }
+
+    const admin = createSupabaseAdmin();
+
+    // 상품 금액은 클라이언트 값을 신뢰하지 않고 DB에서 다시 조회해 서버가 직접 계산
+    const productIds: string[] = Array.from(
+      new Set(items.map((item: { productId: string }) => item.productId))
     );
+    const variantIds: string[] = Array.from(
+      new Set(
+        items
+          .map((item: { variantId?: string }) => item.variantId)
+          .filter((id: string | undefined): id is string => Boolean(id))
+      )
+    );
+
+    const { data: products } = await admin
+      .from("products")
+      .select("id, base_price, sale_price, is_active")
+      .in("id", productIds);
+    const { data: variants } = variantIds.length
+      ? await admin.from("product_variants").select("id, price_adjustment").in("id", variantIds)
+      : { data: [] as { id: string; price_adjustment: number }[] };
+
+    const productMap = new Map((products ?? []).map((p) => [p.id, p]));
+    const variantMap = new Map((variants ?? []).map((v) => [v.id, v]));
+
+    const verifiedItems: { productId: string; variantId?: string; productName: string; variantInfo?: Record<string, string>; unitPrice: number; quantity: number }[] = [];
+    for (const item of items as { productId: string; variantId?: string; productName: string; variantInfo?: Record<string, string>; quantity: number }[]) {
+      const product = productMap.get(item.productId);
+      if (!product || !product.is_active) {
+        return NextResponse.json({ error: "판매 중이 아니거나 존재하지 않는 상품이 포함되어 있습니다." }, { status: 400 });
+      }
+      if (item.variantId && !variantMap.has(item.variantId)) {
+        return NextResponse.json({ error: "존재하지 않는 옵션이 포함되어 있습니다." }, { status: 400 });
+      }
+      const priceAdjustment = item.variantId ? (variantMap.get(item.variantId)?.price_adjustment ?? 0) : 0;
+      const unitPrice = (product.sale_price ?? product.base_price) + priceAdjustment;
+      verifiedItems.push({ ...item, unitPrice });
+    }
+
+    // 금액 계산 (서버 검증된 unitPrice 기준)
+    const subtotal = verifiedItems.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0);
     const shippingFee = subtotal >= SHIPPING_FREE_THRESHOLD ? 0 : SHIPPING_FEE;
 
     // 회원 등급 할인 계산 (subtotal 기준 자동 적용, 모델뷰티 로컬 등급 기준)
-    const admin = createSupabaseAdmin();
     let membershipDiscount = 0;
     let membershipTierId = "normal";
     try {
@@ -109,15 +147,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "주문 생성에 실패했습니다." }, { status: 500 });
     }
 
-    // 주문 상품 레코드 생성
-    const orderItems = items.map((item: {
-      productId: string;
-      variantId?: string;
-      productName: string;
-      variantInfo?: Record<string, string>;
-      unitPrice: number;
-      quantity: number;
-    }) => ({
+    // 주문 상품 레코드 생성 (서버 검증된 unitPrice 사용)
+    const orderItems = verifiedItems.map((item) => ({
       order_id: order.id,
       product_id: item.productId,
       variant_id: item.variantId || null,

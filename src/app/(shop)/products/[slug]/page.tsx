@@ -476,7 +476,7 @@ export default async function ProductDetailPage({
                     배송 안내
                   </p>
                   <p style={{ margin: 0, fontSize: "0.8125rem", color: "var(--mb-gray-600)", lineHeight: 1.6 }}>
-                    결제 완료 후 안내된 일정에 따라 배송되며, 배송기간은 결제일로부터 최대 14일 이내입니다.
+                    결제 완료 후 안내된 일정에 따라 배송되며 영업일 기준 1일~3일 이내 발송이 됩니다.
                   </p>
                 </div>
               </div>

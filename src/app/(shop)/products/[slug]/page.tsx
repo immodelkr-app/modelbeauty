@@ -445,7 +445,6 @@ export default async function ProductDetailPage({
               {[
                 { icon: "🚚", text: "50,000원 이상 구매 시 무료배송" },
                 { icon: "✨", text: "구매 시 포인트 1% 적립" },
-                { icon: "🔄", text: "수령 후 7일 이내 무료 반품" },
               ].map((item) => (
                 <div
                   key={item.text}
@@ -455,6 +454,60 @@ export default async function ProductDetailPage({
                   <span>{item.text}</span>
                 </div>
               ))}
+            </div>
+
+            {/* 배송/환불·반품/고객문의 안내 (고정 노출) */}
+            <div
+              style={{
+                marginTop: "0.75rem",
+                padding: "1.25rem",
+                background: "#fff",
+                border: "1px solid var(--mb-gray-200)",
+                borderRadius: "16px",
+                display: "flex",
+                flexDirection: "column",
+                gap: "1rem",
+              }}
+            >
+              <div style={{ display: "flex", gap: "0.625rem" }}>
+                <span>📦</span>
+                <div>
+                  <p style={{ margin: "0 0 0.25rem", fontSize: "0.8125rem", fontWeight: 700, color: "var(--mb-gray-900)" }}>
+                    배송 안내
+                  </p>
+                  <p style={{ margin: 0, fontSize: "0.8125rem", color: "var(--mb-gray-600)", lineHeight: 1.6 }}>
+                    결제 완료 후 안내된 일정에 따라 배송되며, 배송기간은 결제일로부터 최대 14일 이내입니다.
+                  </p>
+                </div>
+              </div>
+              <div style={{ display: "flex", gap: "0.625rem" }}>
+                <span>🔄</span>
+                <div>
+                  <p style={{ margin: "0 0 0.25rem", fontSize: "0.8125rem", fontWeight: 700, color: "var(--mb-gray-900)" }}>
+                    환불/반품 안내
+                  </p>
+                  <ul style={{ margin: 0, paddingLeft: "1.1rem", fontSize: "0.8125rem", color: "var(--mb-gray-600)", lineHeight: 1.6 }}>
+                    <li>배송 시작 전 : 결제 금액 100% 환불</li>
+                    <li>배송 시작 후 : 배송비를 제외한 금액 환불</li>
+                    <li>상품 수령 후 7일 이내 (단순 변심) : 고객센터로 사전 연락 후 교환/반품 가능</li>
+                    <li>교환/반품/환불 시 : 배송비는 고객부담으로 진행됨</li>
+                  </ul>
+                  <p style={{ margin: "0.375rem 0 0", fontSize: "0.75rem", color: "var(--mb-gray-500)" }}>
+                    ※ 상품 수령 후 7일이 경과하면 환불 및 반품이 제한될 수 있습니다. 단, 상품 하자 또는 오배송의 경우 왕복 배송비는 당사가 부담합니다.
+                  </p>
+                </div>
+              </div>
+              <div style={{ display: "flex", gap: "0.625rem" }}>
+                <span>💬</span>
+                <div>
+                  <p style={{ margin: "0 0 0.25rem", fontSize: "0.8125rem", fontWeight: 700, color: "var(--mb-gray-900)" }}>
+                    고객문의
+                  </p>
+                  <p style={{ margin: 0, fontSize: "0.8125rem", color: "var(--mb-gray-600)", lineHeight: 1.6 }}>
+                    이메일 : immodelkr@gmail.com
+                  </p>
+                </div>
+              </div>
             </div>
           </div>
         </div>

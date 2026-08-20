@@ -584,38 +584,21 @@ export default function MypagePage() {
           ) : (
             <div style={{ display: "flex", alignItems: "center", gap: "0.625rem" }}>
               <h1 className="mypage-section-title" style={{ margin: 0 }}>
-                안녕하세요, {masterUser?.name ?? "회원"}님 👋
+                안녕하세요, {masterUser?.name ?? "회원"}님
               </h1>
               <button
                 onClick={handleNicknameEdit}
-                title="닉네임 변경"
                 style={{
-                  background: "transparent", border: "none",
-                  cursor: "pointer", fontSize: "0.875rem",
-                  color: "var(--mb-gray-400)", padding: "0.25rem",
-                  lineHeight: 1,
+                  background: "transparent",
+                  border: "1px solid var(--mb-gray-200)",
+                  cursor: "pointer", fontSize: "0.75rem",
+                  color: "var(--mb-gray-400)", padding: "0.25rem 0.5rem",
+                  borderRadius: "8px",
                 }}
-              >✏️</button>
+              >수정</button>
             </div>
           )}
         </div>
-        <button
-          onClick={handleLogout}
-          disabled={isLoggingOut}
-          style={{
-            background: "transparent",
-            border: "1px solid var(--mb-gray-300)",
-            color: "var(--mb-gray-600)",
-            padding: "0.5rem 0.875rem",
-            borderRadius: "10px",
-            fontSize: "0.8125rem",
-            fontWeight: 600,
-            cursor: "pointer",
-            transition: "all 0.2s"
-          }}
-        >
-          {isLoggingOut ? "로그아웃 중..." : "로그아웃"}
-        </button>
       </div>
 
       {/* 회원 탈퇴(계정 삭제) 비동기 제출 핸들러 */}
@@ -1167,8 +1150,28 @@ export default function MypagePage() {
         )}
       </div>
 
-      {/* 회원 탈퇴(계정 삭제) 버튼 링크 */}
-      <div style={{ marginTop: "4rem", borderTop: "1px solid var(--mb-gray-100)", paddingTop: "1.5rem", textAlign: "right" }}>
+      {/* 로그아웃 / 회원 탈퇴(계정 삭제) 버튼 */}
+      <div style={{
+        marginTop: "4rem", borderTop: "1px solid var(--mb-gray-100)", paddingTop: "1.5rem",
+        display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "0.75rem",
+      }}>
+        <button
+          onClick={handleLogout}
+          disabled={isLoggingOut}
+          style={{
+            background: "transparent",
+            border: "1px solid var(--mb-gray-300)",
+            color: "var(--mb-gray-600)",
+            padding: "0.5rem 0.875rem",
+            borderRadius: "10px",
+            fontSize: "0.8125rem",
+            fontWeight: 600,
+            cursor: "pointer",
+            transition: "all 0.2s"
+          }}
+        >
+          {isLoggingOut ? "로그아웃 중..." : "로그아웃"}
+        </button>
         <button
           type="button"
           onClick={() => {

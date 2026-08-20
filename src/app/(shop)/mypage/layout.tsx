@@ -115,7 +115,7 @@ export default function MypageLayout({
           </div>
           <div>
             <p className="mypage-profile-name">
-              {masterUser?.name ?? "회원"}
+              {masterUser?.name ? `${masterUser.name}님` : "회원"}
             </p>
             <p className="mypage-profile-phone">{phone}</p>
           </div>

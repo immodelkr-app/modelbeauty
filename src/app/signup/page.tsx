@@ -206,10 +206,6 @@ export default function SignupPage() {
         return;
       }
     }
-    if (!form.gender) {
-      setError("성별을 선택해주세요.");
-      return;
-    }
     if (form.password.length < 6) {
       setError("비밀번호는 6자리 이상이어야 합니다.");
       return;
@@ -477,6 +473,26 @@ export default function SignupPage() {
             📋 기본 정보
           </div>
 
+          {/* 실명 */}
+          <div className="login-field">
+            <label htmlFor="realName">
+              실명 <span style={{ color: "#db2777", fontSize: "0.75rem" }}>*</span>
+              <span style={{ fontSize: "0.72rem", color: "var(--mb-gray-400)", marginLeft: "0.5rem", fontWeight: 400 }}>
+                (닉네임 찾기, 비밀번호 재설정 시 사용)
+              </span>
+            </label>
+            <input
+              id="realName"
+              name="realName"
+              type="text"
+              placeholder="홍길동"
+              value={form.realName}
+              onChange={handleChange}
+              className="login-input"
+              autoFocus
+            />
+          </div>
+
           {/* 닉네임 */}
           <div className="login-field">
             <label htmlFor="nickname">
@@ -494,7 +510,6 @@ export default function SignupPage() {
               onChange={handleChange}
               className="login-input"
               maxLength={12}
-              autoFocus
             />
             {nicknameStatus !== "idle" && nicknameStatusConfig[nicknameStatus].text && (
               <span
@@ -514,97 +529,6 @@ export default function SignupPage() {
                 {nicknameStatusConfig[nicknameStatus].text}
               </span>
             )}
-          </div>
-
-          {/* 실명 */}
-          <div className="login-field">
-            <label htmlFor="realName">
-              실명 <span style={{ color: "#db2777", fontSize: "0.75rem" }}>*</span>
-              <span style={{ fontSize: "0.72rem", color: "var(--mb-gray-400)", marginLeft: "0.5rem", fontWeight: 400 }}>
-                (닉네임 찾기, 비밀번호 재설정 시 사용)
-              </span>
-            </label>
-            <input
-              id="realName"
-              name="realName"
-              type="text"
-              placeholder="홍길동"
-              value={form.realName}
-              onChange={handleChange}
-              className="login-input"
-            />
-          </div>
-
-          {/* 생년월일 + 성별 (2열) */}
-          {/* 생년월일 */}
-          <div className="login-field">
-            <label>
-              생년월일 <span style={{ color: "var(--mb-gray-400)", fontSize: "0.75rem", fontWeight: 400 }}>(선택)</span>
-            </label>
-            <div style={{ display: "grid", gridTemplateColumns: "2fr 1.2fr 1.2fr", gap: "0.5rem" }}>
-              <select
-                id="birthYear"
-                name="birthYear"
-                value={form.birthYear}
-                onChange={handleChange}
-                className="login-input"
-                style={{ cursor: "pointer" }}
-              >
-                <option value="">출생 연도</option>
-                {Array.from({ length: new Date().getFullYear() - 14 - 1899 }, (_, i) => new Date().getFullYear() - 14 - i).map((y) => (
-                  <option key={y} value={String(y)}>{y}년</option>
-                ))}
-              </select>
-              <select
-                id="birthMonth"
-                name="birthMonth"
-                value={form.birthMonth}
-                onChange={handleChange}
-                className="login-input"
-                style={{ cursor: "pointer" }}
-              >
-                <option value="">월</option>
-                {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
-                  <option key={m} value={String(m)}>{m}월</option>
-                ))}
-              </select>
-              <select
-                id="birthDay"
-                name="birthDay"
-                value={form.birthDay}
-                onChange={handleChange}
-                className="login-input"
-                style={{ cursor: "pointer" }}
-              >
-                <option value="">일</option>
-                {Array.from({ length: 31 }, (_, i) => i + 1).map((d) => (
-                  <option key={d} value={String(d)}>{d}일</option>
-                ))}
-              </select>
-            </div>
-            <span style={{ fontSize: "0.7rem", color: "var(--mb-gray-400)", marginTop: "0.25rem", display: "block" }}>
-              만 14세 이상 가입 가능
-            </span>
-          </div>
-
-          {/* 성별 */}
-          <div className="login-field">
-            <label htmlFor="gender">
-              성별 <span style={{ color: "#db2777", fontSize: "0.75rem" }}>*</span>
-            </label>
-            <select
-              id="gender"
-              name="gender"
-              value={form.gender}
-              onChange={handleChange}
-              className="login-input"
-              style={{ cursor: "pointer" }}
-            >
-              <option value="">선택하세요</option>
-              <option value="female">여성</option>
-              <option value="male">남성</option>
-              <option value="other">선택 안함</option>
-            </select>
           </div>
 
           {/* ── 보안 정보 섹션 ── */}
@@ -791,6 +715,86 @@ export default function SignupPage() {
               onChange={handleChange}
               className="login-input"
             />
+          </div>
+
+          {/* ── 추가 정보 섹션 ── */}
+          <div style={{
+            fontSize: "0.75rem", fontWeight: 700, color: "var(--mb-gray-400)",
+            letterSpacing: "0.06em", textTransform: "uppercase",
+            marginBottom: "0.75rem", marginTop: "1.25rem",
+          }}>
+            🎂 추가 정보
+          </div>
+
+          {/* 생년월일 */}
+          <div className="login-field">
+            <label>
+              생년월일 <span style={{ color: "var(--mb-gray-400)", fontSize: "0.75rem", fontWeight: 400 }}>(선택)</span>
+            </label>
+            <div style={{ display: "grid", gridTemplateColumns: "2fr 1.2fr 1.2fr", gap: "0.5rem" }}>
+              <select
+                id="birthYear"
+                name="birthYear"
+                value={form.birthYear}
+                onChange={handleChange}
+                className="login-input"
+                style={{ cursor: "pointer" }}
+              >
+                <option value="">출생 연도</option>
+                {Array.from({ length: new Date().getFullYear() - 14 - 1899 }, (_, i) => new Date().getFullYear() - 14 - i).map((y) => (
+                  <option key={y} value={String(y)}>{y}년</option>
+                ))}
+              </select>
+              <select
+                id="birthMonth"
+                name="birthMonth"
+                value={form.birthMonth}
+                onChange={handleChange}
+                className="login-input"
+                style={{ cursor: "pointer" }}
+              >
+                <option value="">월</option>
+                {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
+                  <option key={m} value={String(m)}>{m}월</option>
+                ))}
+              </select>
+              <select
+                id="birthDay"
+                name="birthDay"
+                value={form.birthDay}
+                onChange={handleChange}
+                className="login-input"
+                style={{ cursor: "pointer" }}
+              >
+                <option value="">일</option>
+                {Array.from({ length: 31 }, (_, i) => i + 1).map((d) => (
+                  <option key={d} value={String(d)}>{d}일</option>
+                ))}
+              </select>
+            </div>
+            <span style={{ fontSize: "0.7rem", color: "var(--mb-gray-400)", marginTop: "0.25rem", display: "block" }}>
+              만 14세 이상 가입 가능
+            </span>
+          </div>
+
+          {/* 성별 */}
+          <div className="login-field">
+            <label htmlFor="gender">
+              성별 <span style={{ color: "var(--mb-gray-400)", fontSize: "0.75rem", fontWeight: 400 }}>(선택)</span>
+            </label>
+            <select
+              id="gender"
+              name="gender"
+              value={form.gender}
+              onChange={handleChange}
+              className="login-input"
+              style={{ cursor: "pointer" }}
+            >
+              <option value="">선택하세요</option>
+              <option value="female">여성</option>
+              <option value="male">남성</option>
+              <option value="other">선택 안함</option>
+            </select>
           </div>
 
           {/* ── 약관 동의 섹션 ── */}

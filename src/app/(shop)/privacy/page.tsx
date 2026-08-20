@@ -81,7 +81,7 @@ export default function PrivacyPage() {
               <li>직책: 대표</li>
               <li>소속: 글로벌아임</li>
               <li>이메일: immodelkr@gmail.com</li>
-              <li>전화번호: 010-9042-4521</li>
+              <li>전화번호: 010-5543-9674</li>
             </ul>
           </div>
         </section>

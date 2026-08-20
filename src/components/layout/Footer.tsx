@@ -66,11 +66,9 @@ export default function Footer() {
         <p className="shop-footer-copy" style={{ lineHeight: "1.7", color: "var(--mb-gray-500)" }}>
           상호명: 글로벌아임 | 대표자: 김대희 | 사업자등록번호: 365-22-00947
           <br />
-          통신판매업신고번호: 제 2021-서울강남-05756 호 | 이메일: immodelkr@gmail.com
+          통신판매업신고번호: 제 2021-서울강남-05756 호 | 대표전화: 010-5543-9674 | 이메일: immodelkr@gmail.com | 카카오톡 문의: @아임모델
           <br />
-          사업자 주소: 서울특별시 강남구 도곡로17길 16, 102동 303호(역삼동, 마이플레이스)
-          <br />
-          운영/반품 주소: 서울특별시 영등포구 영중로 159, 7층 (모델뷰티)
+          사업자 주소 / 운영·반품 주소: 서울특별시 영등포구 영중로159, 7층 (글로벌아임)
           <br />
           <span style={{ fontSize: "0.75rem", display: "inline-block", marginTop: "0.5rem" }}>
             © {new Date().getFullYear()} Model Beauty. All rights reserved.

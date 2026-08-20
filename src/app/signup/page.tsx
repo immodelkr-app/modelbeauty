@@ -541,25 +541,6 @@ export default function SignupPage() {
             <label>
               생년월일 <span style={{ color: "var(--mb-gray-400)", fontSize: "0.75rem", fontWeight: 400 }}>(선택)</span>
             </label>
-            {/* 생일 쿠폰 혜택 배너 */}
-            <div style={{
-              display: "flex", alignItems: "center", gap: "0.5rem",
-              background: "linear-gradient(135deg, rgba(219,39,119,0.13), rgba(168,85,247,0.10))",
-              border: "1px solid rgba(219,39,119,0.28)",
-              borderRadius: "10px",
-              padding: "0.55rem 0.875rem",
-              marginBottom: "0.625rem",
-              fontSize: "0.78rem",
-              color: "#f9a8d4",
-              fontWeight: 600,
-              lineHeight: 1.4,
-            }}>
-              <span style={{ fontSize: "1.1rem" }}>🎂</span>
-              <span>
-                생일에 <strong style={{ color: "#fb7185" }}>모델뷰티 생일 쿠폰</strong>을 드려요!<br />
-                <span style={{ fontSize: "0.72rem", fontWeight: 400, color: "#f0abfc" }}>정확한 생년월일을 입력하시면 매년 생일날 특별 혜택이 발송됩니다 🎁</span>
-              </span>
-            </div>
             <div style={{ display: "grid", gridTemplateColumns: "2fr 1.2fr 1.2fr", gap: "0.5rem" }}>
               <select
                 id="birthYear"

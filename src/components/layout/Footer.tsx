@@ -88,7 +88,9 @@ export default function Footer() {
           <br />
           통신판매업신고번호: 제 2021-서울강남-05756 호 | 대표전화: 010-5543-9674 | 이메일: immodelkr@gmail.com | 카카오톡 문의: @아임모델
           <br />
-          사업자 주소 / 운영·반품 주소: 서울특별시 영등포구 영중로159, 7층 (글로벌아임)
+          사업자 주소: 서울시 강남구 도곡로 17길16 마이플레이스 102동303호 (글로벌아임)
+          <br />
+          운영·반품 주소: 서울특별시 영등포구 영중로159, 7층
           <br />
           <span style={{ fontSize: "0.75rem", display: "inline-block", marginTop: "0.5rem" }}>
             © {new Date().getFullYear()} Model Beauty. All rights reserved.

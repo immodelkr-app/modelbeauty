@@ -38,16 +38,21 @@ export async function POST(request: NextRequest) {
       console.warn("[get-auth-email] getMasterUserByNickname 예외:", e);
     }
 
-    // 2. Supabase Auth 사용자 목록에서 fallback 조회 및 email 보정
+    // 2. 로컬 Supabase Auth 유저 단건 조회(DB 함수) 및 email 보정
+    // (타 앱 → 모델뷰티 SSO 연동 시 로컬 계정 email이 비어있거나 형식이 다를 수 있어
+    //  보정이 필요함. 예전에는 listUsers로 전체를 끌어와 매 로그인마다 훑었으나
+    //  find_local_auth_user 함수로 대체해 단건 조회로 처리한다)
     const adminClient = createSupabaseAdmin();
-    const { data: { users: allUsers } } = await adminClient.auth.admin.listUsers({ perPage: 1000 });
-
-    const localUser = allUsers.find((u) => {
-      const meta = u.user_metadata || {};
-      const matchName = meta.name === cleanNickname || meta.nickname === cleanNickname || meta.real_name === cleanNickname;
-      const matchPhone = phoneDigits && (meta.phone === phoneDigits || (u.phone && u.phone.replace(/\D/g, "").endsWith(phoneDigits)));
-      return matchName || matchPhone;
-    });
+    const { data: matchedUsers, error: findUserError } = await adminClient.rpc(
+      "find_local_auth_user",
+      { p_phone: phoneDigits, p_nickname: cleanNickname }
+    );
+    if (findUserError) {
+      console.warn("[get-auth-email] find_local_auth_user 예외:", findUserError);
+    }
+    const localUser = (matchedUsers?.[0] as
+      | { id: string; email: string | null; phone: string | null; user_metadata: Record<string, any> | null }
+      | undefined) ?? null;
 
     if (localUser) {
       const rawPhone = (localUser.phone || localUser.user_metadata?.phone || phoneDigits || "").replace(/\D/g, "");

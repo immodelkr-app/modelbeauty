@@ -15,6 +15,7 @@ import type { MasterUser } from "@/types";
 import Link from "next/link";
 import { isAppWebView } from "@/lib/device/webview";
 import { checkBiometricAvailability, loginWithBiometric, clearBiometricCredential } from "@/lib/device/biometricBridge";
+import { markLoginAt } from "@/lib/session-timeout";
 
 // ── 닉네임 찾기 모달 ──────────────────────────────────────────
 function FindNicknameModal({ onClose }: { onClose: () => void }) {
@@ -502,6 +503,7 @@ function LoginForm() {
         setMasterUser(meData.user as MasterUser);
       }
 
+      markLoginAt();
       router.push(redirectTo);
       router.refresh();
     } catch {
@@ -542,13 +544,9 @@ function LoginForm() {
         return;
       }
 
-      // 마스터 유저 정보 로드
-      const meRes = await fetch("/api/auth/me");
-      if (meRes.ok) {
-        const meData = await meRes.json();
-        setMasterUser(meData.user as MasterUser);
-      }
-
+      // 마스터 유저 정보는 signInWithPassword가 발생시키는 SIGNED_IN 이벤트를 받아
+      // AuthProvider가 자동으로 채운다 (여기서 중복 호출하지 않음)
+      markLoginAt();
       router.push(redirectTo);
       router.refresh();
     } catch {
@@ -572,12 +570,10 @@ function LoginForm() {
         setError(signInError?.message || "이메일 또는 비밀번호가 올바르지 않습니다.");
         return;
       }
-      const meRes = await fetch("/api/auth/me");
-      if (meRes.ok) {
-        const meData = await meRes.json();
-        setMasterUser(meData.user as MasterUser);
-      }
+      // 마스터 유저 정보는 signInWithPassword가 발생시키는 SIGNED_IN 이벤트를 받아
+      // AuthProvider가 자동으로 채운다 (여기서 중복 호출하지 않음)
       const isAdminEmail = data.user.email?.startsWith("admin") || data.user.email === "admin@immodel.kr";
+      markLoginAt();
       router.push(isAdminEmail && redirectTo === "/" ? "/admin" : redirectTo);
       router.refresh();
     } catch {

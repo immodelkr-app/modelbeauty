@@ -34,6 +34,26 @@ export default function Footer() {
             엄선된 뷰티 제품을 합리적인 가격으로 만나보세요.<br />
             피부가 아름다워지는 경험을 선사합니다.
           </p>
+          <div style={{ display: "flex", gap: "0.625rem", marginTop: "1rem" }}>
+            <a
+              href="https://www.instagram.com/im_modelbeauty/"
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="모델뷰티 인스타그램"
+              style={{
+                display: "flex", alignItems: "center", justifyContent: "center",
+                width: "36px", height: "36px", borderRadius: "50%",
+                background: "var(--mb-gray-100)", color: "var(--mb-gray-600, #525252)",
+                transition: "background 0.2s, color 0.2s",
+              }}
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <rect x="2" y="2" width="20" height="20" rx="5" ry="5" />
+                <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z" />
+                <line x1="17.5" y1="6.5" x2="17.51" y2="6.5" />
+              </svg>
+            </a>
+          </div>
         </div>
 
         {/* 쇼핑 링크 */}

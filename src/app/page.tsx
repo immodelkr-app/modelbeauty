@@ -11,6 +11,7 @@ import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
 import ProductCard from "@/components/products/ProductCard";
 import HeroVideoCard from "@/components/home/HeroVideoCard";
+import { getModelBeautyYoutubeVideos, type YoutubeVideo } from "@/lib/youtube";
 import type { Category, Product } from "@/types";
 
 export const metadata: Metadata = {
@@ -92,12 +93,13 @@ async function getHomeData(): Promise<{
   categories: Category[];
   featured: Product[];
   allProducts: Product[];
+  youtubeVideos: YoutubeVideo[];
   activeStream: ActiveStream | null;
   lastStream: LastStream | null;
 }> {
   const supabase = await createSupabaseServerClient();
 
-  const [{ data: catData }, { data: prodData }, { data: allProdData }, { data: liveData }] = await Promise.all([
+  const [{ data: catData }, { data: prodData }, { data: allProdData }, { data: liveData }, youtubeVideos] = await Promise.all([
     supabase
       .from("categories")
       .select("*")
@@ -124,6 +126,7 @@ async function getHomeData(): Promise<{
       .eq("status", "live")
       .order("started_at", { ascending: false })
       .limit(1),
+    getModelBeautyYoutubeVideos(8),
   ]);
 
   // 현재 라이브가 없으면 가장 최근 종료된 리플레이 조회
@@ -170,13 +173,13 @@ async function getHomeData(): Promise<{
     replayUrl: lastStreamData[0].replay_url ?? null,
   } : null;
 
-  return { categories, featured, allProducts, activeStream, lastStream };
+  return { categories, featured, allProducts, youtubeVideos, activeStream, lastStream };
 }
 
 // ── 페이지 컴포넌트 ───────────────────────────────────────
 
 export default async function HomePage() {
-  const { categories, featured, allProducts, activeStream, lastStream } = await getHomeData();
+  const { categories, featured, allProducts, youtubeVideos, activeStream, lastStream } = await getHomeData();
 
   const APP_URL = "https://www.modelbeauty.kr";
 
@@ -580,6 +583,49 @@ export default async function HomePage() {
             ))}
           </div>
         </section>
+
+        {/* ── 유튜브 섹션 (#모델뷰티 해시태그 영상) ─────── */}
+        {youtubeVideos.length > 0 && (
+          <section className="products-section" aria-label="모델뷰티 유튜브">
+            <div className="section-header">
+              <div>
+                <p className="section-eyebrow">YouTube</p>
+                <h2 className="section-title">📺 모델뷰티 유튜브</h2>
+              </div>
+              <a
+                href="https://www.youtube.com/@IM_MODEL_BEAUTY"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="section-link"
+              >
+                채널 바로가기 →
+              </a>
+            </div>
+            <div className="youtube-grid">
+              {youtubeVideos.map((video) => (
+                <a
+                  key={video.videoId}
+                  href={`https://www.youtube.com/watch?v=${video.videoId}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="youtube-card"
+                >
+                  <div className="youtube-card-thumb">
+                    <Image
+                      src={video.thumbnailUrl}
+                      alt={video.title}
+                      fill
+                      sizes="(min-width: 1024px) 25vw, 50vw"
+                      style={{ objectFit: "cover" }}
+                    />
+                    <span className="youtube-card-play" aria-hidden="true">▶</span>
+                  </div>
+                  <p className="youtube-card-title">{video.title}</p>
+                </a>
+              ))}
+            </div>
+          </section>
+        )}
       </main>
 
       <Footer />

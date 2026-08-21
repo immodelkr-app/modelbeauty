@@ -7,7 +7,7 @@
 
 import { NextResponse } from "next/server";
 import { createSupabaseServerClient, createSupabaseAdmin } from "@/lib/supabase/server";
-import { syncMasterUser } from "@/lib/core-auth";
+import { syncMasterUser, getMasterUser } from "@/lib/core-auth";
 
 export async function GET() {
   try {
@@ -70,13 +70,20 @@ export async function GET() {
 
     try {
       // im-core-auth에서 마스터유저 동기화 (없으면 생성)
-      const masterUser = await syncMasterUser({
+      const syncResult = await syncMasterUser({
         phoneNumber: userPhone,
         appName: "MODEL_BEAUTY",
         localUserId: user.id,
         name: user.user_metadata?.name || user.user_metadata?.real_name,
         realName: user.user_metadata?.real_name,
       });
+
+      // im-core-auth의 /api/auth/sync 응답에는 name(닉네임) 필드가 포함되지 않아
+      // (syncAndGetMasterUser의 반환값 자체에 name이 없음) 매 세션 초기화마다
+      // masterUser.name이 undefined로 리셋되어 마이페이지에서 닉네임 수정이
+      // 저장 안 되는 것처럼 보이던 문제. /api/auth/user/:id(select *)로 실제 name을 보강한다.
+      const fullUser = await getMasterUser(syncResult.masterUserId);
+      const masterUser = { ...syncResult, name: fullUser.name };
 
       // master_user_id를 Supabase user_metadata에 캐싱
       if (masterUser.masterUserId && user.user_metadata?.master_user_id !== masterUser.masterUserId) {

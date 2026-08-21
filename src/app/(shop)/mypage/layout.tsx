@@ -4,6 +4,7 @@
 // 마이페이지 레이아웃 — 사이드 프로필 + 네비 + 모바일 탭
 // ============================================================
 
+import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuthStore } from "@/store/auth.store";
@@ -25,10 +26,49 @@ export default function MypageLayout({
 }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { masterUser, isLoggedIn, isLoading, logout } = useAuthStore();
+  const { masterUser, setMasterUser, isLoggedIn, isLoading, logout } = useAuthStore();
   const resetCart = useCartStore((s) => s.reset);
   const resetWishlist = useWishlistStore((s) => s.reset);
   const wishlistCount = useWishlistStore((s) => s.items.length);
+
+  // 닉네임 수정
+  const [isEditingNickname, setIsEditingNickname] = useState(false);
+  const [nicknameInput, setNicknameInput] = useState("");
+  const [isSavingNickname, setIsSavingNickname] = useState(false);
+  const [nicknameError, setNicknameError] = useState("");
+
+  const handleNicknameEdit = () => {
+    setNicknameInput(masterUser?.name ?? "");
+    setNicknameError("");
+    setIsEditingNickname(true);
+  };
+
+  const handleNicknameSave = async () => {
+    const trimmed = nicknameInput.trim();
+    if (trimmed.length < 2) { setNicknameError("닉네임은 2자 이상이어야 합니다."); return; }
+    if (trimmed.length > 12) { setNicknameError("닉네임은 12자 이하이어야 합니다."); return; }
+    setIsSavingNickname(true);
+    try {
+      const res = await fetch("/api/auth/sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          masterUserId: masterUser?.masterUserId,
+          name: trimmed,
+        }),
+      });
+      if (res.ok) {
+        if (masterUser) setMasterUser({ ...masterUser, name: trimmed });
+        setIsEditingNickname(false);
+      } else {
+        setNicknameError("저장에 실패했습니다. 다시 시도해주세요.");
+      }
+    } catch {
+      setNicknameError("네트워크 오류가 발생했습니다.");
+    } finally {
+      setIsSavingNickname(false);
+    }
+  };
 
   const handleLogout = async () => {
     await fetch("/api/auth/logout", { method: "POST" });
@@ -114,9 +154,59 @@ export default function MypageLayout({
             {initial}
           </div>
           <div>
-            <p className="mypage-profile-name">
-              {masterUser?.name ? `${masterUser.name}님` : "회원"}
-            </p>
+            {isEditingNickname ? (
+              <div style={{ display: "flex", flexDirection: "column", gap: "0.375rem" }}>
+                <div style={{ display: "flex", gap: "0.375rem", alignItems: "center" }}>
+                  <input
+                    type="text"
+                    value={nicknameInput}
+                    onChange={(e) => setNicknameInput(e.target.value)}
+                    maxLength={12}
+                    autoFocus
+                    style={{
+                      fontSize: "0.9375rem", fontWeight: 700,
+                      border: "2px solid var(--mb-pink-400)",
+                      borderRadius: "8px", padding: "0.25rem 0.5rem",
+                      outline: "none", width: "100px",
+                    }}
+                  />
+                  <button
+                    onClick={handleNicknameSave}
+                    disabled={isSavingNickname}
+                    style={{
+                      background: "var(--mb-pink-500)", color: "#fff",
+                      border: "none", borderRadius: "8px",
+                      padding: "0.25rem 0.5rem", fontSize: "0.75rem",
+                      fontWeight: 600, cursor: "pointer"
+                    }}
+                  >{isSavingNickname ? "저장 중" : "확인"}</button>
+                  <button
+                    onClick={() => setIsEditingNickname(false)}
+                    style={{
+                      background: "transparent",
+                      border: "1px solid var(--mb-gray-300)",
+                      borderRadius: "8px", padding: "0.25rem 0.5rem",
+                      fontSize: "0.75rem", cursor: "pointer", color: "var(--mb-gray-500)"
+                    }}
+                  >취소</button>
+                </div>
+                {nicknameError && <p style={{ color: "#ef4444", fontSize: "0.75rem", margin: 0 }}>{nicknameError}</p>}
+              </div>
+            ) : (
+              <p className="mypage-profile-name" style={{ display: "flex", alignItems: "center", gap: "0.375rem" }}>
+                {masterUser?.name ? `${masterUser.name}님` : "회원"}
+                <button
+                  onClick={handleNicknameEdit}
+                  style={{
+                    background: "transparent",
+                    border: "1px solid var(--mb-gray-200)",
+                    cursor: "pointer", fontSize: "0.6875rem",
+                    color: "var(--mb-gray-400)", padding: "0.125rem 0.4375rem",
+                    borderRadius: "6px",
+                  }}
+                >수정</button>
+              </p>
+            )}
             <p className="mypage-profile-phone">{phone}</p>
           </div>
 

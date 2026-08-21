@@ -44,6 +44,21 @@ export async function createSupabaseServerClient() {
 }
 
 /**
+ * 쿠키 없이 쓰는 공개 읽기 전용 클라이언트 (RLS 적용, anon key)
+ * cookies()를 건드리지 않아 정적 렌더링(캐싱)이 가능한 페이지에서
+ * 공개 데이터(카테고리 등)를 가져올 때 사용 — 매 요청 동적 렌더링을 강제하지 않음.
+ */
+export function createSupabasePublicClient() {
+  return createClient(supabaseUrl, supabaseAnonKey, {
+    db: { schema: 'model_beauty' },
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+    },
+  });
+}
+
+/**
  * 서버 전용 서비스 롤 클라이언트 (RLS 우회 — 관리자 작업에만 사용)
  */
 export function createSupabaseAdmin() {

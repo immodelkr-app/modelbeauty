@@ -7,19 +7,24 @@
 import Link from "next/link";
 import HeaderAuthSection from "@/components/layout/HeaderAuthSection";
 import HeaderShopIcons from "@/components/layout/HeaderShopIcons";
+import { createSupabasePublicClient } from "@/lib/supabase/server";
 
-const NAV_ITEMS = [
-  { href: "/products", label: "전체 상품" },
-  { href: "/products?category=skincare", label: "스킨케어" },
-  { href: "/products?category=makeup", label: "메이크업" },
-  { href: "/products?category=body", label: "바디" },
-  { href: "/products?category=hair", label: "헤어" },
-  { href: "/products?featured=true", label: "베스트" },
-  { href: "/live", label: "📺 라이브" },
-];
+export default async function Header() {
+  const supabase = createSupabasePublicClient();
+  const { data: categories } = await supabase
+    .from("categories")
+    .select("name, slug")
+    .eq("is_active", true)
+    .order("sort_order")
+    .order("name");
 
+  const navItems = [
+    { href: "/products", label: "전체 상품" },
+    ...(categories ?? []).map((c) => ({ href: `/products?category=${c.slug}`, label: c.name })),
+    { href: "/products?featured=true", label: "베스트" },
+    { href: "/live", label: "📺 라이브" },
+  ];
 
-export default function Header() {
   return (
     <header className="shop-header">
       <div className="shop-header-inner">
@@ -31,7 +36,7 @@ export default function Header() {
 
         {/* 네비게이션 */}
         <nav className="shop-nav" aria-label="주요 메뉴">
-          {NAV_ITEMS.map((item) => (
+          {navItems.map((item) => (
             <Link key={item.href} href={item.href} className="shop-nav-link">
               {item.label}
             </Link>

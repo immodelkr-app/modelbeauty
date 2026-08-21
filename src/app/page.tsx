@@ -407,11 +407,11 @@ export default async function HomePage() {
 
         {/* ── 추천 상품 섹션 ──────────────────────────── */}
         {featured.length > 0 && (
-          <section className="products-section" aria-label="베스트 셀러">
+          <section className="products-section" aria-label="모델뷰티 베스트">
             <div className="section-header">
               <div>
-                <p className="section-eyebrow">Best Seller</p>
-                <h2 className="section-title">베스트 셀러</h2>
+                <p className="section-eyebrow">Model Beauty Best</p>
+                <h2 className="section-title">모델뷰티 베스트</h2>
               </div>
               <Link href="/products?featured=true" className="section-link">
                 전체 보기 →

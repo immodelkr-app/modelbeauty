@@ -6,7 +6,7 @@ import Link from "next/link";
 
 const SHOP_LINKS = [
   { href: "/products", label: "전체 상품" },
-  { href: "/products?featured=true", label: "베스트 셀러" },
+  { href: "/products?featured=true", label: "모델뷰티 베스트" },
   { href: "/products?sort=latest", label: "신상품" },
 ];
 

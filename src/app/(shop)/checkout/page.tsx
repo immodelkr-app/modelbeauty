@@ -23,7 +23,7 @@ type CheckoutStep = "address" | "payment";
 
 export default function CheckoutPage() {
   const router = useRouter();
-  const { items, clearCart } = useCartStore();
+  const { items, clearCart, updateQuantity } = useCartStore();
   const { masterUser, isLoggedIn, isLoading: authLoading } = useAuthStore();
 
   const [isDirect, setIsDirect] = useState(false);
@@ -371,25 +371,51 @@ export default function CheckoutPage() {
               주문 상품 ({checkoutItems.length}개)
             </h2>
             <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
-              {checkoutItems.map((item) => (
-                <div key={item.id} style={{ display: "flex", gap: "0.75rem", alignItems: "center" }}>
-                  {item.product?.images?.[0]?.url && (
-                    <img
-                      src={item.product.images[0].url}
-                      alt={item.product.name}
-                      style={{ width: "52px", height: "52px", borderRadius: "8px", objectFit: "cover", flexShrink: 0 }}
-                    />
-                  )}
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: "0.875rem", fontWeight: 600, color: "var(--mb-gray-900)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                      {item.product?.name}
+              {checkoutItems.map((item) => {
+                const maxQty = item.variant?.stockQuantity ?? item.product?.stockQuantity ?? 99;
+                return (
+                  <div key={item.id} style={{ display: "flex", gap: "0.75rem", alignItems: "center" }}>
+                    {item.product?.images?.[0]?.url && (
+                      <img
+                        src={item.product.images[0].url}
+                        alt={item.product.name}
+                        style={{ width: "52px", height: "52px", borderRadius: "8px", objectFit: "cover", flexShrink: 0 }}
+                      />
+                    )}
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: "0.875rem", fontWeight: 600, color: "var(--mb-gray-900)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {item.product?.name}
+                      </div>
+                      <div style={{ fontSize: "0.8125rem", color: "var(--mb-gray-500)" }}>
+                        {fmt(item.subtotal)}
+                      </div>
                     </div>
-                    <div style={{ fontSize: "0.8125rem", color: "var(--mb-gray-500)" }}>
-                      {item.quantity}개 · {fmt(item.subtotal)}
+                    <div className="cart-qty-ctrl" role="group" aria-label="수량 조절" style={{ flexShrink: 0 }}>
+                      <button
+                        type="button"
+                        className="cart-qty-btn"
+                        onClick={() => updateQuantity(item.id, item.quantity - 1)}
+                        disabled={item.quantity <= 1}
+                        aria-label="수량 감소"
+                      >
+                        −
+                      </button>
+                      <div className="cart-qty-val" aria-label={`수량: ${item.quantity}`}>
+                        {item.quantity}
+                      </div>
+                      <button
+                        type="button"
+                        className="cart-qty-btn"
+                        onClick={() => updateQuantity(item.id, item.quantity + 1)}
+                        disabled={item.quantity >= maxQty}
+                        aria-label="수량 증가"
+                      >
+                        +
+                      </button>
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </section>
 

@@ -37,7 +37,7 @@ export async function GET(request: Request) {
         `id, name, slug, base_price, sale_price, stock_quantity,
          is_active, is_featured, sku, images, created_at, updated_at,
          vendor_id, vendor_cost_type, vendor_cost_rate, vendor_supply_price,
-         categories ( id, name, slug ),
+         categories!products_category_id_fkey ( id, name, slug ),
          product_categories ( categories ( id, name, slug ) ),
          vendors ( id, name )`,
         { count: "exact" }

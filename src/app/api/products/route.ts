@@ -77,7 +77,7 @@ export async function GET(request: NextRequest) {
         created_at,
         updated_at,
         category_id,
-        categories!inner (
+        categories!products_category_id_fkey!inner (
           id,
           name,
           slug

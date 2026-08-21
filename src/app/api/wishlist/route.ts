@@ -32,7 +32,7 @@ export async function GET() {
          products (
            id, name, slug, base_price, sale_price,
            stock_quantity, images, is_featured,
-           categories ( id, name, slug )
+           categories!products_category_id_fkey ( id, name, slug )
          )`
       )
       .eq("master_user_id", masterUserId)

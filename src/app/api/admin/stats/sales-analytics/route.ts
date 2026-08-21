@@ -135,7 +135,7 @@ export async function GET() {
         subtotal,
         quantity,
         orders!inner ( created_at, payment_status ),
-        products ( category_id, categories ( id, name ) )
+        products ( category_id, categories!products_category_id_fkey ( id, name ) )
       `)
       .eq("orders.payment_status", "paid")
       .gte("orders.created_at", thisMonthStart);
@@ -153,7 +153,7 @@ export async function GET() {
         subtotal,
         quantity,
         orders!inner ( created_at, payment_status ),
-        products ( category_id, categories ( id, name ) )
+        products ( category_id, categories!products_category_id_fkey ( id, name ) )
       `)
       .eq("orders.payment_status", "paid")
       .gte("orders.created_at", thisMonthStart);

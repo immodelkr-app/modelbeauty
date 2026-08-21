@@ -19,7 +19,7 @@ export async function GET(
     const admin = createSupabaseAdmin();
     const { data, error } = await admin
       .from("products")
-      .select(`*, categories ( id, name, slug ), product_options ( * ), product_variants ( * ), live_crews ( id, name, nickname )`)
+      .select(`*, categories!products_category_id_fkey ( id, name, slug ), product_options ( * ), product_variants ( * ), live_crews ( id, name, nickname )`)
       .eq("id", id)
       .single();
 

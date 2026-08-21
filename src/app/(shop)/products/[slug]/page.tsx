@@ -25,7 +25,7 @@ export async function generateMetadata({
   const supabase = await createSupabaseServerClient();
   const { data } = await supabase
     .from("products")
-    .select("name, description, images, categories(name)")
+    .select("name, description, images, categories!products_category_id_fkey(name)")
     .eq("slug", slug)
     .eq("is_active", true)
     .single();
@@ -84,7 +84,7 @@ async function getProduct(slug: string): Promise<ProductWithCrew | null> {
       `id, name, slug, description, content, base_price, sale_price,
        stock_quantity, sku, images, tags, is_active, is_featured,
        created_at, updated_at, category_id,
-       categories ( id, name, slug, parent_id ),
+       categories!products_category_id_fkey ( id, name, slug, parent_id ),
        recommender_crew_id, recommendation_note,
        live_crews ( id, name, nickname )`
     )
@@ -183,7 +183,7 @@ async function getRelatedProducts(
       `id, name, slug, description, base_price, sale_price,
        stock_quantity, sku, images, tags, is_active, is_featured,
        created_at, updated_at, category_id,
-       categories ( id, name, slug )`
+       categories!products_category_id_fkey ( id, name, slug )`
     )
     .eq("is_active", true)
     .eq("category_id", categoryId)

@@ -94,7 +94,7 @@ async function getProducts(params: {
       `id, name, slug, description, base_price, sale_price,
        stock_quantity, sku, images, tags, is_active, is_featured,
        created_at, updated_at, category_id,
-       categories ( id, name, slug )`
+       categories!products_category_id_fkey ( id, name, slug )`
     )
     .eq("is_active", true);
 

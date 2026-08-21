@@ -42,7 +42,7 @@ export async function GET(
         created_at,
         updated_at,
         category_id,
-        categories (
+        categories!products_category_id_fkey (
           id,
           name,
           slug,

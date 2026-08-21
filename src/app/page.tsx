@@ -51,15 +51,53 @@ interface LastStream {
   replayUrl: string | null;
 }
 
+const PRODUCT_SELECT = `id, name, slug, description, base_price, sale_price,
+         stock_quantity, sku, images, tags, is_active, is_featured,
+         created_at, updated_at, category_id,
+         categories!products_category_id_fkey ( id, name, slug )`;
+
+function mapProductRow(p: {
+  id: string; name: string; slug: string; description: string | null;
+  base_price: number; sale_price: number | null; stock_quantity: number;
+  sku: string | null; images: unknown; tags: string[] | null;
+  is_active: boolean; is_featured: boolean; created_at: string; updated_at: string;
+  category_id: string | null;
+  categories: { id: string; name: string; slug: string } | { id: string; name: string; slug: string }[] | null;
+}): Product {
+  const cat = Array.isArray(p.categories) ? p.categories[0] : p.categories;
+  return {
+    id: p.id,
+    name: p.name,
+    slug: p.slug,
+    description: p.description,
+    content: null,
+    basePrice: p.base_price,
+    salePrice: p.sale_price,
+    stockQuantity: p.stock_quantity,
+    sku: p.sku,
+    images: (p.images as Product["images"]) ?? [],
+    tags: p.tags ?? [],
+    isActive: p.is_active,
+    isFeatured: p.is_featured,
+    createdAt: p.created_at,
+    updatedAt: p.updated_at,
+    categoryId: p.category_id,
+    category: cat
+      ? { id: cat.id, name: cat.name, slug: cat.slug, parentId: null, sortOrder: 0, imageUrl: null, isActive: true, createdAt: "" }
+      : undefined,
+  } satisfies Product;
+}
+
 async function getHomeData(): Promise<{
   categories: Category[];
   featured: Product[];
+  allProducts: Product[];
   activeStream: ActiveStream | null;
   lastStream: LastStream | null;
 }> {
   const supabase = await createSupabaseServerClient();
 
-  const [{ data: catData }, { data: prodData }, { data: liveData }] = await Promise.all([
+  const [{ data: catData }, { data: prodData }, { data: allProdData }, { data: liveData }] = await Promise.all([
     supabase
       .from("categories")
       .select("*")
@@ -69,16 +107,17 @@ async function getHomeData(): Promise<{
       .limit(6),
     supabase
       .from("products")
-      .select(
-        `id, name, slug, description, base_price, sale_price,
-         stock_quantity, sku, images, tags, is_active, is_featured,
-         created_at, updated_at, category_id,
-         categories!products_category_id_fkey ( id, name, slug )`
-      )
+      .select(PRODUCT_SELECT)
       .eq("is_active", true)
       .eq("is_featured", true)
       .order("created_at", { ascending: false })
-      .limit(8),
+      .limit(4),
+    supabase
+      .from("products")
+      .select(PRODUCT_SELECT)
+      .eq("is_active", true)
+      .order("created_at", { ascending: false })
+      .limit(24),
     supabase
       .from("live_streams")
       .select("id, title, streamer_name, cover_image_url, viewer_count, stream_url")
@@ -111,30 +150,8 @@ async function getHomeData(): Promise<{
     createdAt: c.created_at,
   }));
 
-  const featured: Product[] = (prodData ?? []).map((p) => {
-    const cat = Array.isArray(p.categories) ? p.categories[0] : p.categories;
-    return {
-      id: p.id,
-      name: p.name,
-      slug: p.slug,
-      description: p.description,
-      content: null,
-      basePrice: p.base_price,
-      salePrice: p.sale_price,
-      stockQuantity: p.stock_quantity,
-      sku: p.sku,
-      images: (p.images as Product["images"]) ?? [],
-      tags: p.tags ?? [],
-      isActive: p.is_active,
-      isFeatured: p.is_featured,
-      createdAt: p.created_at,
-      updatedAt: p.updated_at,
-      categoryId: p.category_id,
-      category: cat
-        ? { id: cat.id, name: cat.name, slug: cat.slug, parentId: null, sortOrder: 0, imageUrl: null, isActive: true, createdAt: "" }
-        : undefined,
-    } satisfies Product;
-  });
+  const featured: Product[] = (prodData ?? []).map(mapProductRow);
+  const allProducts: Product[] = (allProdData ?? []).map(mapProductRow);
 
   const activeStream: ActiveStream | null = liveData && liveData.length > 0 ? {
     id: liveData[0].id,
@@ -153,13 +170,13 @@ async function getHomeData(): Promise<{
     replayUrl: lastStreamData[0].replay_url ?? null,
   } : null;
 
-  return { categories, featured, activeStream, lastStream };
+  return { categories, featured, allProducts, activeStream, lastStream };
 }
 
 // ── 페이지 컴포넌트 ───────────────────────────────────────
 
 export default async function HomePage() {
-  const { categories, featured, activeStream, lastStream } = await getHomeData();
+  const { categories, featured, allProducts, activeStream, lastStream } = await getHomeData();
 
   const APP_URL = "https://www.modelbeauty.kr";
 
@@ -419,6 +436,26 @@ export default async function HomePage() {
             </div>
             <div className="product-grid">
               {featured.map((product) => (
+                <ProductCard key={product.id} product={product} />
+              ))}
+            </div>
+          </section>
+        )}
+
+        {/* ── 전체 상품 섹션 (3단 8열 그리드) ─────────── */}
+        {allProducts.length > 0 && (
+          <section className="products-section" aria-label="모델뷰티 전체상품">
+            <div className="section-header" style={{ maxWidth: "1600px" }}>
+              <div>
+                <p className="section-eyebrow">All Products</p>
+                <h2 className="section-title">모델뷰티 전체상품</h2>
+              </div>
+              <Link href="/products" className="section-link">
+                전체 보기 →
+              </Link>
+            </div>
+            <div className="product-grid-8col">
+              {allProducts.map((product) => (
                 <ProductCard key={product.id} product={product} />
               ))}
             </div>

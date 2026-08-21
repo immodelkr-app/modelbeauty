@@ -4,7 +4,7 @@
 // /admin — 관리자 대시보드 (매출 분석 확장판)
 // ============================================================
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import OrderStatusBadge from "@/components/mypage/OrderStatusBadge";
@@ -84,6 +84,78 @@ interface UserStats {
   byApp: Record<string, number>;
 }
 
+interface DashboardProduct {
+  id: string;
+  name: string;
+  slug: string;
+  basePrice: number;
+  salePrice: number | null;
+  stockQuantity: number;
+  isActive: boolean;
+  isFeatured: boolean;
+  thumbnail: string | null;
+  categories: { id: string; name: string; slug: string }[];
+}
+
+function DashboardProductCard({ product }: { product: DashboardProduct }) {
+  return (
+    <Link
+      href={`/admin/products/${product.id}`}
+      style={{
+        width: "104px",
+        display: "flex",
+        flexDirection: "column",
+        gap: "0.375rem",
+        textDecoration: "none",
+        opacity: product.isActive ? 1 : 0.5,
+      }}
+    >
+      <div
+        style={{
+          width: "104px",
+          height: "104px",
+          borderRadius: "10px",
+          overflow: "hidden",
+          background: "#f3f4f6",
+          position: "relative",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        {product.thumbnail ? (
+          <Image src={product.thumbnail} alt={product.name} fill sizes="104px" style={{ objectFit: "cover" }} />
+        ) : (
+          <span style={{ fontSize: "1.75rem" }} aria-hidden="true">💄</span>
+        )}
+        {!product.isActive && (
+          <span
+            style={{
+              position: "absolute", top: "4px", left: "4px",
+              background: "rgba(17,24,39,0.75)", color: "#fff",
+              fontSize: "0.625rem", fontWeight: 700, padding: "1px 6px", borderRadius: "6px",
+            }}
+          >
+            비활성
+          </span>
+        )}
+      </div>
+      <div
+        style={{
+          fontSize: "0.75rem", fontWeight: 600, color: "#111827", lineHeight: 1.3,
+          overflow: "hidden", textOverflow: "ellipsis",
+          display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const,
+        }}
+      >
+        {product.name}
+      </div>
+      <div style={{ fontSize: "0.75rem", fontWeight: 700, color: "#db2777" }}>
+        {(product.salePrice ?? product.basePrice).toLocaleString("ko-KR")}원
+      </div>
+    </Link>
+  );
+}
+
 function formatPrice(n: number) {
   if (n >= 100_000_000) return `${(n / 100_000_000).toFixed(1)}억원`;
   if (n >= 10_000) return `${(n / 10_000).toFixed(0)}만원`;
@@ -118,6 +190,8 @@ export default function AdminDashboard() {
   const [catTab, setCatTab] = useState<CatTab>("month");
   const [memberStats, setMemberStats] = useState<UserStats | null>(null);
   const [memberStatsLoading, setMemberStatsLoading] = useState(true);
+  const [dashboardProducts, setDashboardProducts] = useState<DashboardProduct[]>([]);
+  const [productsLoading, setProductsLoading] = useState(true);
 
   useEffect(() => {
     fetch("/api/admin/stats")
@@ -134,7 +208,26 @@ export default function AdminDashboard() {
       .then((r) => r.json())
       .then(({ stats: s }) => { if (s) setMemberStats(s); })
       .finally(() => setMemberStatsLoading(false));
+
+    fetch("/api/admin/products?limit=100")
+      .then((r) => r.json())
+      .then(({ data }) => setDashboardProducts(data?.products ?? []))
+      .finally(() => setProductsLoading(false));
   }, []);
+
+  const featuredProducts = dashboardProducts.filter((p) => p.isFeatured);
+
+  const categoryProductGroups = useMemo(() => {
+    const map = new Map<string, { id: string; name: string; products: DashboardProduct[] }>();
+    for (const p of dashboardProducts) {
+      const cats = p.categories && p.categories.length > 0 ? p.categories : [{ id: "__uncategorized__", name: "미분류", slug: "" }];
+      for (const c of cats) {
+        if (!map.has(c.id)) map.set(c.id, { id: c.id, name: c.name, products: [] });
+        map.get(c.id)!.products.push(p);
+      }
+    }
+    return Array.from(map.values());
+  }, [dashboardProducts]);
 
   const STAT_CARDS = stats
     ? [
@@ -298,6 +391,82 @@ export default function AdminDashboard() {
             </div>
           ) : (
             <div style={{ color: "#6b7280", fontSize: "0.8125rem" }}>회원 통계를 불러오지 못했습니다.</div>
+          )}
+        </div>
+      </div>
+
+      {/* ── 상품 현황 (베스트 상품 + 카테고리별 전체 상품) ─── */}
+      <div style={{ marginBottom: "1.5rem" }}>
+        <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: "14px", padding: "1.125rem 1.5rem" }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "1rem" }}>
+            <span style={{ fontSize: "0.8125rem", fontWeight: 700, color: "#6b7280", letterSpacing: "0.05em", textTransform: "uppercase" }}>
+              📦 상품 현황
+            </span>
+            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+              <Link
+                href="/admin/products/new"
+                style={{
+                  fontSize: "0.75rem", fontWeight: 700, color: "#fff",
+                  background: "linear-gradient(135deg, #ec4899, #a855f7)",
+                  padding: "0.3rem 0.75rem", borderRadius: "7px", textDecoration: "none",
+                  boxShadow: "0 2px 8px rgba(236,72,153,0.35)",
+                }}
+              >
+                ➕ 상품 등록
+              </Link>
+              <Link href="/admin/products" style={{ fontSize: "0.75rem", color: "#ec4899", fontWeight: 600, textDecoration: "none" }}>
+                상품관리 →
+              </Link>
+            </div>
+          </div>
+
+          {productsLoading ? (
+            <div style={{ display: "flex", gap: "0.75rem" }}>
+              {[1, 2, 3, 4].map((i) => (
+                <div key={i} className="skeleton" style={{ width: "104px", height: "104px", borderRadius: "10px" }} />
+              ))}
+            </div>
+          ) : dashboardProducts.length === 0 ? (
+            <div className="admin-empty" style={{ padding: "2rem 0" }}>
+              <div className="admin-empty-icon">📦</div>
+              <p className="admin-empty-title">등록된 상품이 없습니다</p>
+              <Link href="/admin/products/new" className="admin-btn admin-btn-primary" style={{ marginTop: "0.75rem", display: "inline-flex" }}>
+                + 상품 등록하기
+              </Link>
+            </div>
+          ) : (
+            <>
+              {/* 베스트 상품 */}
+              {featuredProducts.length > 0 && (
+                <div style={{ marginBottom: "1.5rem" }}>
+                  <div style={{ fontSize: "0.8125rem", fontWeight: 700, color: "#111827", marginBottom: "0.625rem" }}>
+                    ⭐ 베스트 상품 <span style={{ fontWeight: 500, color: "#9ca3af" }}>({featuredProducts.length})</span>
+                  </div>
+                  <div style={{ display: "flex", gap: "0.875rem", flexWrap: "wrap" }}>
+                    {featuredProducts.map((p) => (
+                      <DashboardProductCard key={p.id} product={p} />
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* 카테고리별 전체 상품 */}
+              <div style={{ fontSize: "0.8125rem", fontWeight: 700, color: "#111827", marginBottom: "0.75rem" }}>
+                🗂️ 전체 상품 <span style={{ fontWeight: 500, color: "#9ca3af" }}>({dashboardProducts.length})</span>
+              </div>
+              {categoryProductGroups.map((group) => (
+                <div key={group.id} style={{ marginBottom: "1.125rem" }}>
+                  <div style={{ fontSize: "0.75rem", fontWeight: 700, color: "#6b7280", marginBottom: "0.5rem" }}>
+                    {group.name} ({group.products.length})
+                  </div>
+                  <div style={{ display: "flex", gap: "0.875rem", flexWrap: "wrap" }}>
+                    {group.products.map((p) => (
+                      <DashboardProductCard key={p.id} product={p} />
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </>
           )}
         </div>
       </div>

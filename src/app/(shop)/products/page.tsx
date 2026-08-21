@@ -73,6 +73,16 @@ async function getProducts(params: {
     if (cat) categoryId = cat.id;
   }
 
+  // 카테고리 필터 대상 상품 ID 목록 (다중 카테고리 매핑 포함)
+  let categoryProductIds: string[] | null = null;
+  if (categoryId) {
+    const { data: mappedRows } = await supabase
+      .from("product_categories")
+      .select("product_id")
+      .eq("category_id", categoryId);
+    categoryProductIds = (mappedRows ?? []).map((r) => r.product_id);
+  }
+
   let countQuery = supabase
     .from("products")
     .select("id", { count: "exact", head: true })
@@ -88,9 +98,10 @@ async function getProducts(params: {
     )
     .eq("is_active", true);
 
-  if (categoryId) {
-    countQuery = countQuery.eq("category_id", categoryId);
-    dataQuery = dataQuery.eq("category_id", categoryId);
+  if (categoryProductIds) {
+    const ids = categoryProductIds.length > 0 ? categoryProductIds : ["00000000-0000-0000-0000-000000000000"];
+    countQuery = countQuery.in("id", ids);
+    dataQuery = dataQuery.in("id", ids);
   }
   if (search) {
     const f = `name.ilike.%${search}%,description.ilike.%${search}%`;

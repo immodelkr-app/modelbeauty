@@ -20,6 +20,7 @@ interface ProductRow {
   thumbnail: string | null;
   createdAt: string;
   category: { id: string; name: string; slug: string } | null;
+  categories?: { id: string; name: string; slug: string }[];
 }
 
 interface Category { id: string; name: string; }
@@ -269,7 +270,11 @@ export default function AdminProductsPage() {
                         </div>
                       </div>
                     </td>
-                    <td>{p.category?.name ?? <span style={{ color: "#d1d5db" }}>—</span>}</td>
+                    <td>
+                      {p.categories && p.categories.length > 0
+                        ? p.categories.map((c) => c.name).join(", ")
+                        : <span style={{ color: "#d1d5db" }}>—</span>}
+                    </td>
                     <td>
                       <div style={{ fontWeight: 700 }}>{formatPrice(p.salePrice ?? p.basePrice)}</div>
                       {p.salePrice && <div style={{ fontSize: "0.75rem", color: "#9ca3af", textDecoration: "line-through" }}>{formatPrice(p.basePrice)}</div>}

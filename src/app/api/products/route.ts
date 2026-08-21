@@ -41,6 +41,16 @@ export async function GET(request: NextRequest) {
       if (cat) categoryId = cat.id;
     }
 
+    // 카테고리 필터 대상 상품 ID 목록 (다중 카테고리 매핑 포함)
+    let categoryProductIds: string[] | null = null;
+    if (categoryId) {
+      const { data: mappedRows } = await supabase
+        .from("product_categories")
+        .select("product_id")
+        .eq("category_id", categoryId);
+      categoryProductIds = (mappedRows ?? []).map((r) => r.product_id);
+    }
+
     // 기본 쿼리 빌더 (count 용)
     let countQuery = supabase
       .from("products")
@@ -76,10 +86,11 @@ export async function GET(request: NextRequest) {
       )
       .eq("is_active", true);
 
-    // 필터: 카테고리
-    if (categoryId) {
-      countQuery = countQuery.eq("category_id", categoryId);
-      dataQuery = dataQuery.eq("category_id", categoryId);
+    // 필터: 카테고리 (대표 카테고리 매치가 아닌, 다중 매핑 전체 매치)
+    if (categoryProductIds) {
+      const ids = categoryProductIds.length > 0 ? categoryProductIds : ["00000000-0000-0000-0000-000000000000"];
+      countQuery = countQuery.in("id", ids);
+      dataQuery = dataQuery.in("id", ids);
     }
 
     // 필터: 검색어

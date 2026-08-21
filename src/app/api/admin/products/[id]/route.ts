@@ -26,7 +26,14 @@ export async function GET(
     if (error || !data) {
       return Response.json({ success: false, error: "상품을 찾을 수 없습니다." }, { status: 404 });
     }
-    return Response.json({ success: true, data });
+
+    const { data: categoryMappings } = await admin
+      .from("product_categories")
+      .select("category_id")
+      .eq("product_id", id);
+    const categoryIds = (categoryMappings ?? []).map((r) => r.category_id);
+
+    return Response.json({ success: true, data: { ...data, categoryIds } });
   } catch (err) {
     console.error("[GET /api/admin/products/[id]]", err);
     return Response.json({ success: false, error: "서버 오류" }, { status: 500 });
@@ -47,7 +54,7 @@ export async function PATCH(
     const {
       name,
       slug,
-      categoryId,
+      categoryIds,
       description,
       content,
       basePrice,
@@ -76,10 +83,14 @@ export async function PATCH(
     }
 
     // 업데이트할 필드만 포함
+    const categoryIdList: string[] | undefined = Array.isArray(categoryIds)
+      ? categoryIds.filter(Boolean)
+      : undefined;
+
     const updatePayload: Record<string, unknown> = {};
     if (name !== undefined) updatePayload.name = name;
     if (slug !== undefined) updatePayload.slug = slug;
-    if (categoryId !== undefined) updatePayload.category_id = categoryId;
+    if (categoryIdList !== undefined) updatePayload.category_id = categoryIdList[0] ?? null;
     if (description !== undefined) updatePayload.description = description;
     if (content !== undefined) updatePayload.content = content;
     if (basePrice !== undefined) updatePayload.base_price = basePrice;
@@ -128,6 +139,19 @@ export async function PATCH(
         { success: false, error: "상품 수정에 실패했습니다." },
         { status: 500 }
       );
+    }
+
+    // 카테고리 매핑 갱신 (다중 선택 지원) — 기존 매핑 전체 삭제 후 재삽입
+    if (categoryIdList !== undefined) {
+      await admin.from("product_categories").delete().eq("product_id", id);
+      if (categoryIdList.length > 0) {
+        const { error: catError } = await admin
+          .from("product_categories")
+          .insert(categoryIdList.map((categoryId) => ({ product_id: id, category_id: categoryId })));
+        if (catError) {
+          console.error("[PATCH /api/admin/products/[id]] Category mapping update error:", catError);
+        }
+      }
     }
 
     return Response.json({

@@ -20,6 +20,17 @@ export async function GET(request: Request) {
     const offset = (page - 1) * limit;
 
     const admin = createSupabaseAdmin();
+
+    // 카테고리 필터: 대표 카테고리(category_id)뿐 아니라 다중 매핑(product_categories)도 매치
+    let categoryFilterProductIds: string[] | null = null;
+    if (categoryId) {
+      const { data: mappedRows } = await admin
+        .from("product_categories")
+        .select("product_id")
+        .eq("category_id", categoryId);
+      categoryFilterProductIds = (mappedRows ?? []).map((r) => r.product_id);
+    }
+
     let query = admin
       .from("products")
       .select(
@@ -27,6 +38,7 @@ export async function GET(request: Request) {
          is_active, is_featured, sku, images, created_at, updated_at,
          vendor_id, vendor_cost_type, vendor_cost_rate, vendor_supply_price,
          categories ( id, name, slug ),
+         product_categories ( categories ( id, name, slug ) ),
          vendors ( id, name )`,
         { count: "exact" }
       )
@@ -34,7 +46,7 @@ export async function GET(request: Request) {
       .range(offset, offset + limit - 1);
 
     if (search) query = query.ilike("name", `%${search}%`);
-    if (categoryId) query = query.eq("category_id", categoryId);
+    if (categoryFilterProductIds) query = query.in("id", categoryFilterProductIds.length > 0 ? categoryFilterProductIds : ["00000000-0000-0000-0000-000000000000"]);
     if (status === "active") query = query.eq("is_active", true);
     if (status === "inactive") query = query.eq("is_active", false);
 
@@ -44,6 +56,9 @@ export async function GET(request: Request) {
     const products = (data ?? []).map((p) => {
       const cat = Array.isArray(p.categories) ? p.categories[0] : p.categories;
       const vendor = Array.isArray(p.vendors) ? p.vendors[0] : p.vendors;
+      const allCategories = (p.product_categories as { categories: { id: string; name: string; slug: string } | { id: string; name: string; slug: string }[] }[] ?? [])
+        .map((pc) => (Array.isArray(pc.categories) ? pc.categories[0] : pc.categories))
+        .filter((c): c is { id: string; name: string; slug: string } => !!c);
       return {
         id: p.id,
         name: p.name,
@@ -62,6 +77,7 @@ export async function GET(request: Request) {
         vendorCostRate: p.vendor_cost_rate,
         vendorSupplyPrice: p.vendor_supply_price,
         category: cat ? { id: cat.id, name: cat.name, slug: cat.slug } : null,
+        categories: allCategories.length > 0 ? allCategories : (cat ? [{ id: cat.id, name: cat.name, slug: cat.slug }] : []),
         vendor: vendor ? { id: vendor.id, name: vendor.name } : null,
       };
     });
@@ -85,7 +101,7 @@ export async function POST(request: Request) {
     const {
       name,
       slug,
-      categoryId,
+      categoryIds,
       description,
       content,
       basePrice,
@@ -127,14 +143,15 @@ export async function POST(request: Request) {
     }
 
     const admin = createSupabaseAdmin();
+    const categoryIdList: string[] = Array.isArray(categoryIds) ? categoryIds.filter(Boolean) : [];
 
-    // 1. 상품 등록
+    // 1. 상품 등록 (category_id는 대표 카테고리 = 선택한 카테고리 중 첫 번째)
     const { data: product, error: productError } = await admin
       .from("products")
       .insert({
         name,
         slug,
-        category_id: categoryId ?? null,
+        category_id: categoryIdList[0] ?? null,
         description: description ?? null,
         content: content ?? null,
         base_price: basePrice,
@@ -167,6 +184,17 @@ export async function POST(request: Request) {
         { success: false, error: "상품 등록에 실패했습니다." },
         { status: 500 }
       );
+    }
+
+    // 1.5. 카테고리 매핑 등록 (다중 선택 지원)
+    if (categoryIdList.length > 0) {
+      const { error: catError } = await admin
+        .from("product_categories")
+        .insert(categoryIdList.map((categoryId) => ({ product_id: product.id, category_id: categoryId })));
+      if (catError) {
+        console.error("[POST /api/admin/products] Category mapping insert error:", catError);
+        // 매핑 등록 실패해도 상품은 유지, 경고만 로그
+      }
     }
 
     // 2. 옵션 등록 (있는 경우)

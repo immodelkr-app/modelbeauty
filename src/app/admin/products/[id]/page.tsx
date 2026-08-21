@@ -33,7 +33,7 @@ export default function EditProductPage({ params }: { params: Promise<{ id: stri
           setInitialData({
             name: data.name ?? "",
             slug: data.slug ?? "",
-            categoryId: data.category_id ?? "",
+            categoryIds: data.categoryIds ?? (data.category_id ? [data.category_id] : []),
             description: data.description ?? "",
             basePrice: String(data.base_price ?? ""),
             salePrice: data.sale_price ? String(data.sale_price) : "",

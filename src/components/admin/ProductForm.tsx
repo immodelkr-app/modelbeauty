@@ -15,7 +15,7 @@ interface Vendor { id: string; name: string; default_cost_type: string; default_
 export interface ProductFormData {
   name: string;
   slug: string;
-  categoryId: string;
+  categoryIds: string[];
   description: string;
   basePrice: string;
   salePrice: string;
@@ -35,7 +35,7 @@ export interface ProductFormData {
 }
 
 const INITIAL: ProductFormData = {
-  name: "", slug: "", categoryId: "", description: "",
+  name: "", slug: "", categoryIds: [], description: "",
   basePrice: "", salePrice: "", stockQuantity: "0",
   sku: "", images: [], detailImages: [], tags: "",
   isActive: true, isFeatured: false,
@@ -87,6 +87,14 @@ export default function ProductForm({ productId, initialData, onSuccess }: Produ
   const set = (field: keyof ProductFormData, value: string | boolean) =>
     setForm((prev) => ({ ...prev, [field]: value }));
 
+  const toggleCategory = (categoryId: string, checked: boolean) =>
+    setForm((prev) => ({
+      ...prev,
+      categoryIds: checked
+        ? [...prev.categoryIds, categoryId]
+        : prev.categoryIds.filter((id) => id !== categoryId),
+    }));
+
   const handleNameChange = (v: string) => {
     set("name", v);
     if (!isEdit) set("slug", toSlug(v));
@@ -100,7 +108,7 @@ export default function ProductForm({ productId, initialData, onSuccess }: Produ
     const payload = {
       name: form.name,
       slug: form.slug,
-      categoryId: form.categoryId || null,
+      categoryIds: form.categoryIds,
       description: form.description || null,
       basePrice: parseInt(form.basePrice, 10),
       salePrice: form.salePrice ? parseInt(form.salePrice, 10) : null,
@@ -166,11 +174,22 @@ export default function ProductForm({ productId, initialData, onSuccess }: Produ
             <p className="admin-input-hint">소문자, 숫자, 하이픈만 허용 · 자동 생성됩니다</p>
           </div>
           <div className="admin-field">
-            <label className="admin-label">카테고리</label>
-            <select className="admin-select" value={form.categoryId} onChange={(e) => set("categoryId", e.target.value)}>
-              <option value="">카테고리 없음</option>
-              {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
+            <label className="admin-label">카테고리 <span style={{ fontWeight: 400, color: "#9ca3af" }}>(중복 선택 가능)</span></label>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem 1rem" }}>
+              {categories.length === 0 && (
+                <p className="admin-input-hint" style={{ margin: 0 }}>등록된 카테고리가 없습니다.</p>
+              )}
+              {categories.map((c) => (
+                <label key={c.id} style={{ display: "flex", alignItems: "center", gap: "0.375rem", cursor: "pointer", fontSize: "0.875rem" }}>
+                  <input
+                    type="checkbox"
+                    checked={form.categoryIds.includes(c.id)}
+                    onChange={(e) => toggleCategory(c.id, e.target.checked)}
+                  />
+                  {c.name}
+                </label>
+              ))}
+            </div>
           </div>
           <div className="admin-field" style={{ gridColumn: "1 / -1" }}>
             <label className="admin-label">상품 설명</label>

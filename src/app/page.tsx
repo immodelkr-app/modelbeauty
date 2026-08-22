@@ -129,7 +129,7 @@ async function getHomeData(): Promise<{
       .order("started_at", { ascending: false })
       .limit(1),
     getModelBeautyYoutubeVideos(8),
-    getModelBeautyInstagramPosts(9),
+    getModelBeautyInstagramPosts(12),
   ]);
 
   // 현재 라이브가 없으면 가장 최근 종료된 리플레이 조회

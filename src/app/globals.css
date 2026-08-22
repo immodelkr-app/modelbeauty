@@ -1226,6 +1226,17 @@ body {
   }
 }
 
+/* 모바일(3열)은 9개(3x3)까지만, PC(6열)는 12개(6x2)까지 꽉 채워서 노출 */
+.instagram-card:nth-child(n + 10) {
+  display: none;
+}
+
+@media (min-width: 768px) {
+  .instagram-card:nth-child(n + 10) {
+    display: block;
+  }
+}
+
 .instagram-card {
   position: relative;
   display: block;

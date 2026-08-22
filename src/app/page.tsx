@@ -128,7 +128,7 @@ async function getHomeData(): Promise<{
       .eq("status", "live")
       .order("started_at", { ascending: false })
       .limit(1),
-    getModelBeautyYoutubeVideos(8),
+    getModelBeautyYoutubeVideos(5),
     getModelBeautyInstagramPosts(12),
   ]);
 
@@ -545,7 +545,7 @@ export default async function HomePage() {
                       src={video.thumbnailUrl}
                       alt={video.title}
                       fill
-                      sizes="(min-width: 1024px) 25vw, 50vw"
+                      sizes="(min-width: 768px) 240px, 50vw"
                       style={{ objectFit: "cover" }}
                     />
                     <span className="youtube-card-play" aria-hidden="true">▶</span>

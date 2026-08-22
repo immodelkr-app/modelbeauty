@@ -1152,6 +1152,12 @@ body {
   gap: 1rem;
 }
 
+@media (max-width: 767px) {
+  .youtube-grid > :nth-child(5) {
+    display: none;
+  }
+}
+
 @media (min-width: 640px) {
   .youtube-grid {
     gap: 1.25rem;
@@ -1160,8 +1166,7 @@ body {
 
 @media (min-width: 768px) {
   .youtube-grid {
-    grid-template-columns: repeat(4, 1fr);
-    gap: 1.5rem;
+    grid-template-columns: repeat(5, 1fr);
   }
 }
 
@@ -1176,7 +1181,7 @@ body {
 .youtube-card-thumb {
   position: relative;
   width: 100%;
-  aspect-ratio: 16 / 9;
+  aspect-ratio: 9 / 16;
   border-radius: 14px;
   overflow: hidden;
   background: var(--mb-gray-100);

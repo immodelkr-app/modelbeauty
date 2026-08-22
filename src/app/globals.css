@@ -980,7 +980,7 @@ body {
 ============================================================ */
 
 .category-section {
-  padding: 4rem 1.5rem;
+  padding: 2.5rem 1.5rem;
   background: #fff;
 }
 
@@ -992,6 +992,10 @@ body {
   justify-content: space-between;
   gap: 1rem;
   flex-wrap: wrap;
+}
+
+.category-section .section-header {
+  margin-bottom: 1.5rem;
 }
 
 .section-eyebrow {
@@ -1040,7 +1044,7 @@ body {
   flex-direction: column;
   align-items: center;
   gap: 0.75rem;
-  padding: 1.5rem 1rem;
+  padding: 1.125rem 1rem;
   background: var(--mb-gray-50);
   border: 1.5px solid var(--mb-gray-100);
   border-radius: 20px;

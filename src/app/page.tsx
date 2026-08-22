@@ -12,6 +12,7 @@ import Footer from "@/components/layout/Footer";
 import ProductCard from "@/components/products/ProductCard";
 import HeroVideoCard from "@/components/home/HeroVideoCard";
 import { getModelBeautyYoutubeVideos, type YoutubeVideo } from "@/lib/youtube";
+import { getModelBeautyInstagramPosts, type InstagramPost } from "@/lib/instagram";
 import type { Category, Product } from "@/types";
 
 export const metadata: Metadata = {
@@ -94,12 +95,13 @@ async function getHomeData(): Promise<{
   featured: Product[];
   allProducts: Product[];
   youtubeVideos: YoutubeVideo[];
+  instagramPosts: InstagramPost[];
   activeStream: ActiveStream | null;
   lastStream: LastStream | null;
 }> {
   const supabase = await createSupabaseServerClient();
 
-  const [{ data: catData }, { data: prodData }, { data: allProdData }, { data: liveData }, youtubeVideos] = await Promise.all([
+  const [{ data: catData }, { data: prodData }, { data: allProdData }, { data: liveData }, youtubeVideos, instagramPosts] = await Promise.all([
     supabase
       .from("categories")
       .select("*")
@@ -127,6 +129,7 @@ async function getHomeData(): Promise<{
       .order("started_at", { ascending: false })
       .limit(1),
     getModelBeautyYoutubeVideos(8),
+    getModelBeautyInstagramPosts(8),
   ]);
 
   // 현재 라이브가 없으면 가장 최근 종료된 리플레이 조회
@@ -173,13 +176,13 @@ async function getHomeData(): Promise<{
     replayUrl: lastStreamData[0].replay_url ?? null,
   } : null;
 
-  return { categories, featured, allProducts, youtubeVideos, activeStream, lastStream };
+  return { categories, featured, allProducts, youtubeVideos, instagramPosts, activeStream, lastStream };
 }
 
 // ── 페이지 컴포넌트 ───────────────────────────────────────
 
 export default async function HomePage() {
-  const { categories, featured, allProducts, youtubeVideos, activeStream, lastStream } = await getHomeData();
+  const { categories, featured, allProducts, youtubeVideos, instagramPosts, activeStream, lastStream } = await getHomeData();
 
   const APP_URL = "https://www.modelbeauty.kr";
 
@@ -621,6 +624,48 @@ export default async function HomePage() {
                     <span className="youtube-card-play" aria-hidden="true">▶</span>
                   </div>
                   <p className="youtube-card-title">{video.title}</p>
+                </a>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {/* ── 인스타그램 섹션 (@im_modelbeauty 자체 게시물) ─── */}
+        {instagramPosts.length > 0 && (
+          <section className="products-section" aria-label="모델뷰티 인스타그램">
+            <div className="section-header">
+              <div>
+                <p className="section-eyebrow">Instagram</p>
+                <h2 className="section-title">📷 모델뷰티 인스타그램</h2>
+              </div>
+              <a
+                href="https://www.instagram.com/im_modelbeauty"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="section-link"
+              >
+                계정 바로가기 →
+              </a>
+            </div>
+            <div className="instagram-grid">
+              {instagramPosts.map((post) => (
+                <a
+                  key={post.id}
+                  href={post.permalink}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="instagram-card"
+                >
+                  <Image
+                    src={post.imageUrl}
+                    alt={post.caption.slice(0, 60) || "모델뷰티 인스타그램 게시물"}
+                    fill
+                    sizes="(min-width: 1024px) 16.6vw, 33vw"
+                    style={{ objectFit: "cover" }}
+                  />
+                  {post.mediaType === "VIDEO" && (
+                    <span className="youtube-card-play" aria-hidden="true">▶</span>
+                  )}
                 </a>
               ))}
             </div>

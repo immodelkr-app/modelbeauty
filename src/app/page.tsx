@@ -129,7 +129,7 @@ async function getHomeData(): Promise<{
       .order("started_at", { ascending: false })
       .limit(1),
     getModelBeautyYoutubeVideos(8),
-    getModelBeautyInstagramPosts(8),
+    getModelBeautyInstagramPosts(9),
   ]);
 
   // 현재 라이브가 없으면 가장 최근 종료된 리플레이 조회
@@ -513,79 +513,6 @@ export default async function HomePage() {
             </Link>
           </section>
         )}
-
-        {/* ── 브랜드 가치 섹션 ─────────────────────────── */}
-        <section
-          style={{
-            padding: "5rem 1.5rem",
-            background: "#fff",
-          }}
-          aria-label="브랜드 가치"
-        >
-          <div className="brand-value-grid">
-            {[
-              {
-                icon: "🧪",
-                title: "성분 검증",
-                desc: "현역 패션 모델들이 직접 써보고 검증한 최고의 성분만을 사용합니다.",
-              },
-              {
-                icon: "🌿",
-                title: "친환경 패키지",
-                desc: "지속 가능한 지구를 위한 친환경 포장재를 사용합니다.",
-              },
-              {
-                icon: "💝",
-                title: "적립 포인트",
-                desc: "구매 금액의 1%를 포인트로 적립해 다음 구매에 사용하세요.",
-              },
-              {
-                icon: "🔄",
-                title: "간편 반품",
-                desc: "수령 후 7일 이내 무조건 무료 반품을 보장합니다.",
-              },
-            ].map((item) => (
-              <div
-                key={item.title}
-                style={{
-                  display: "flex",
-                  flexDirection: "column",
-                  alignItems: "center",
-                  textAlign: "center",
-                  gap: "0.875rem",
-                  padding: "2rem 1rem",
-                  borderRadius: "20px",
-                  background: "var(--mb-gray-50)",
-                  border: "1px solid var(--mb-gray-100)",
-                }}
-              >
-                <span style={{ fontSize: "2.5rem" }} aria-hidden="true">
-                  {item.icon}
-                </span>
-                <h3
-                  style={{
-                    fontSize: "1.0625rem",
-                    fontWeight: 700,
-                    color: "var(--mb-gray-900)",
-                    margin: 0,
-                  }}
-                >
-                  {item.title}
-                </h3>
-                <p
-                  style={{
-                    fontSize: "0.875rem",
-                    color: "var(--mb-gray-500)",
-                    lineHeight: 1.7,
-                    margin: 0,
-                  }}
-                >
-                  {item.desc}
-                </p>
-              </div>
-            ))}
-          </div>
-        </section>
 
         {/* ── 유튜브 섹션 (#모델뷰티 해시태그 영상) ─────── */}
         {youtubeVideos.length > 0 && (

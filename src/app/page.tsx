@@ -451,7 +451,7 @@ export default async function HomePage() {
         {/* ── 전체 상품 섹션 (3단 8열 그리드) ─────────── */}
         {allProducts.length > 0 && (
           <section className="products-section" aria-label="모델뷰티 전체상품">
-            <div className="section-header" style={{ maxWidth: "1600px" }}>
+            <div className="section-header">
               <div>
                 <p className="section-eyebrow">All Products</p>
                 <h2 className="section-title">모델뷰티 전체상품</h2>

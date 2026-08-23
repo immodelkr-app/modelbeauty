@@ -42,3 +42,6 @@ next-env.d.ts
 
 .vercel
 .env*.local
+
+# Firebase (FCM 앱 푸시) — 기기별로 발급되는 프로젝트 설정 파일, 커밋하지 않음
+android-app/app/google-services.json

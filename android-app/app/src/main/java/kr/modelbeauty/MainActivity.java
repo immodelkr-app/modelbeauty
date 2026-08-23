@@ -1,9 +1,12 @@
 package kr.modelbeauty;
 
+import android.Manifest;
 import android.annotation.SuppressLint;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.content.pm.PackageManager;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -25,6 +28,7 @@ import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.biometric.BiometricManager;
 import androidx.biometric.BiometricPrompt;
+import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 
 import java.nio.charset.StandardCharsets;
@@ -56,9 +60,16 @@ public class MainActivity extends AppCompatActivity {
     private static final String AES_TRANSFORMATION =
             KeyProperties.KEY_ALGORITHM_AES + "/" + KeyProperties.BLOCK_MODE_GCM + "/" + KeyProperties.ENCRYPTION_PADDING_NONE;
 
+    // 앱 푸시(FCM) 관련 요청 코드
+    private static final int NOTIFICATION_PERMISSION_REQUEST_CODE = 2001;
+
+    // FcmService(별도 컴포넌트)가 토큰 갱신을 웹뷰로 즉시 전달할 수 있도록 유지하는 현재 액티비티 참조
+    private static MainActivity sCurrentInstance;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        sCurrentInstance = this;
 
         setContentView(R.layout.activity_main);
         mSplashOverlay = findViewById(R.id.splash_overlay);
@@ -71,6 +82,9 @@ public class MainActivity extends AppCompatActivity {
 
         // 웹뷰 기본 설정
         initWebViewSettings();
+
+        // 앱 푸시 알림 표시 권한 요청 (Android 13+)
+        requestNotificationPermissionIfNeeded();
 
         // 로딩이 오래 걸려도 스플래시가 영구히 남지 않도록 안전장치
         new Handler(Looper.getMainLooper()).postDelayed(this::hideSplash, SPLASH_TIMEOUT_MS);
@@ -87,8 +101,73 @@ public class MainActivity extends AppCompatActivity {
             }
         });
 
-        // URL 로드 시작
-        mWebView.loadUrl(TARGET_URL);
+        // URL 로드 시작 (모카/IMFF 등에서 딥링크로 들어온 경우 해당 경로로, 아니면 기본 홈으로)
+        mWebView.loadUrl(resolveTargetUrl(getIntent()));
+    }
+
+    // 앱이 이미 실행 중인 상태(singleTask)에서 딥링크로 재호출된 경우 처리
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        if (mWebView != null) {
+            mWebView.loadUrl(resolveTargetUrl(intent));
+        }
+    }
+
+    // modelbeauty://open?path=/products/123 형태의 딥링크에서 path 쿼리 파라미터를 꺼내
+    // 실서비스 URL 뒤에 붙여준다. 딥링크가 아니거나 path가 없으면 기본 홈 URL을 반환.
+    // 푸시 알림을 탭해서 들어온 경우(FcmService.EXTRA_LINK_URL)가 최우선.
+    private String resolveTargetUrl(Intent intent) {
+        String pushLinkUrl = (intent != null) ? intent.getStringExtra(FcmService.EXTRA_LINK_URL) : null;
+        if (pushLinkUrl != null && !pushLinkUrl.isEmpty()) {
+            return pushLinkUrl;
+        }
+
+        Uri data = (intent != null) ? intent.getData() : null;
+        if (data == null) {
+            return TARGET_URL;
+        }
+        String path = data.getQueryParameter("path");
+        if (path == null || path.isEmpty()) {
+            return TARGET_URL;
+        }
+        if (!path.startsWith("/")) {
+            path = "/" + path;
+        }
+        return TARGET_URL + path;
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        if (sCurrentInstance == this) {
+            sCurrentInstance = null;
+        }
+    }
+
+    // ===================== 앱 푸시(FCM) 관련 =====================
+
+    private void requestNotificationPermissionIfNeeded() {
+        if (Build.VERSION.SDK_INT >= 33) {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
+                    != PackageManager.PERMISSION_GRANTED) {
+                ActivityCompat.requestPermissions(
+                        this,
+                        new String[]{Manifest.permission.POST_NOTIFICATIONS},
+                        NOTIFICATION_PERMISSION_REQUEST_CODE);
+            }
+        }
+    }
+
+    // FcmService.onNewToken()에서 새 토큰이 발급될 때마다 호출되어, 웹뷰가 떠 있으면 즉시 JS로 전달한다.
+    // (웹뷰가 아직 없거나 다른 화면일 때는 무시 — 웹 쪽에서 다음 페이지 로드/로그인 시점에
+    //  window.AndroidPush.getToken()으로 캐시된 토큰을 다시 읽어가므로 유실되지 않는다)
+    static void notifyNewFcmToken(String token) {
+        MainActivity activity = sCurrentInstance;
+        if (activity == null) return;
+        activity.runOnUiThread(() ->
+                activity.notifyJs("window.__onFcmToken && window.__onFcmToken(" + activity.jsString(token) + ")"));
     }
 
     @SuppressLint("SetJavaScriptEnabled")
@@ -201,6 +280,20 @@ public class MainActivity extends AppCompatActivity {
 
         // 지문 로그인용 JS 브릿지 등록 (웹에서 window.AndroidBiometric으로 접근)
         mWebView.addJavascriptInterface(new BiometricBridge(), "AndroidBiometric");
+
+        // 앱 푸시(FCM)용 JS 브릿지 등록 (웹에서 window.AndroidPush으로 접근)
+        mWebView.addJavascriptInterface(new PushBridge(), "AndroidPush");
+    }
+
+    // 웹(JS)에서 window.AndroidPush.getToken()으로 호출하는 브릿지.
+    // FcmService가 SharedPreferences에 저장해둔 최신 FCM 토큰을 동기로 반환한다(없으면 빈 문자열).
+    private class PushBridge {
+        @JavascriptInterface
+        public String getToken() {
+            SharedPreferences prefs = getSharedPreferences(FcmService.PREFS_NAME, MODE_PRIVATE);
+            String token = prefs.getString(FcmService.PREF_TOKEN, "");
+            return token != null ? token : "";
+        }
     }
 
     // 스플래시 오버레이를 부드럽게 사라지게 함 (페이지 로딩 완료/오류/타임아웃 중 가장 먼저 발생하는 시점에 1회만 실행)

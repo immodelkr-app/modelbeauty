@@ -2,6 +2,12 @@ plugins {
     id 'com.android.application'
 }
 
+// google-services.json이 아직 없으면(Firebase 프로젝트 연동 전) 빌드가 깨지지 않도록 조건부 적용.
+// 파일을 추가하고 나면 다음 Gradle Sync부터 자동으로 활성화된다.
+if (file('google-services.json').exists()) {
+    apply plugin: 'com.google.gms.google-services'
+}
+
 android {
     namespace 'kr.modelbeauty'
     compileSdk 36
@@ -10,8 +16,8 @@ android {
         applicationId "kr.modelbeauty"
         minSdk 24
         targetSdk 36
-        versionCode 16
-        versionName "1.0.16"
+        versionCode 17
+        versionName "1.0.17"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -44,4 +50,8 @@ dependencies {
     implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
     implementation 'androidx.activity:activity:1.8.2'
     implementation 'androidx.biometric:biometric:1.1.0'
+
+    // 앱 푸시(FCM)
+    implementation platform('com.google.firebase:firebase-bom:34.5.0')
+    implementation 'com.google.firebase:firebase-messaging'
 }

@@ -11,6 +11,7 @@ import { useAuthStore } from "@/store/auth.store";
 import { useCartStore } from "@/store/cart.store";
 import { useWishlistStore } from "@/store/wishlist.store";
 import { getLoginAt, markLoginAt, clearLoginAt, isSessionExpired } from "@/lib/session-timeout";
+import { syncPushToken } from "@/lib/device/pushBridge";
 import type { MasterUser } from "@/types";
 
 // 세션 만료 여부를 확인할 주기 (라이브 방송 시청 등 조작 없는 상태에서도
@@ -41,6 +42,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         // 장바구니 / 위시리스트 병렬 로드
         fetchCart();
         fetchWishlist();
+        syncPushToken();
       } else {
         setMasterUser(null);
       }
@@ -77,6 +79,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
           await onSignedIn();
         } else {
           setMasterUser(null);
+          syncPushToken();
         }
       } catch {
         setMasterUser(null);

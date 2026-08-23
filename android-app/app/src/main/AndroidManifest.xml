@@ -14,6 +14,9 @@
     <!-- 지문 등 생체 인증 로그인 권한 -->
     <uses-permission android:name="android.permission.USE_BIOMETRIC" />
 
+    <!-- 앱 푸시 알림 표시 권한 (Android 13+에서는 런타임 동의도 필요) -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
     <application
         android:allowBackup="true"
         android:icon="@mipmap/ic_launcher"
@@ -26,13 +29,40 @@
         <activity
             android:name=".MainActivity"
             android:exported="true"
+            android:launchMode="singleTask"
             android:configChanges="orientation|screenSize|keyboardHidden"
             android:theme="@style/Theme.ModelBeauty.Splash">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+
+            <!-- 모카/IMFF 등 다른 아임모델 계열 앱에서 "모델뷰티 앱으로 이동" 버튼을 눌렀을 때
+                 modelbeauty://open?path=/xxx 형태로 호출하면 앱이 설치되어 있는 경우 바로 열림 -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="modelbeauty" android:host="open" />
+            </intent-filter>
         </activity>
+
+        <!-- 앱 푸시(FCM) 수신 서비스 -->
+        <service
+            android:name=".FcmService"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.google.firebase.MESSAGING_EVENT" />
+            </intent-filter>
+        </service>
+
+        <!-- 알림 기본 채널/아이콘/색상 (FcmService에서 채널 생성 시에도 동일 ID 사용) -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_icon"
+            android:resource="@mipmap/ic_launcher" />
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_channel_id"
+            android:value="model_beauty_default" />
     </application>
 
 </manifest>

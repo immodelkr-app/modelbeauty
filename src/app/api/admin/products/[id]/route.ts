@@ -33,7 +33,31 @@ export async function GET(
       .eq("product_id", id);
     const categoryIds = (categoryMappings ?? []).map((r) => r.category_id);
 
-    return Response.json({ success: true, data: { ...data, categoryIds } });
+    // 연관상품 (수동 지정) — 순서대로 상품 정보까지 함께 조회
+    const { data: relatedMappings } = await admin
+      .from("product_related_products")
+      .select("related_product_id, sort_order")
+      .eq("product_id", id)
+      .order("sort_order", { ascending: true });
+    const relatedIds = (relatedMappings ?? []).map((r) => r.related_product_id);
+    let relatedProducts: { id: string; name: string; thumbnail: string | null }[] = [];
+    if (relatedIds.length > 0) {
+      const { data: relatedRows } = await admin
+        .from("products")
+        .select("id, name, images")
+        .in("id", relatedIds);
+      const byId = new Map((relatedRows ?? []).map((r) => [r.id, r]));
+      relatedProducts = relatedIds
+        .map((rid) => byId.get(rid))
+        .filter((r): r is { id: string; name: string; images: unknown } => !!r)
+        .map((r) => ({
+          id: r.id,
+          name: r.name,
+          thumbnail: (r.images as { url: string }[] | null)?.[0]?.url ?? null,
+        }));
+    }
+
+    return Response.json({ success: true, data: { ...data, categoryIds, relatedProducts } });
   } catch (err) {
     console.error("[GET /api/admin/products/[id]]", err);
     return Response.json({ success: false, error: "서버 오류" }, { status: 500 });
@@ -67,6 +91,7 @@ export async function PATCH(
       isFeatured,
       recommenderCrewId,
       recommendationNote,
+      relatedProductIds,
     } = body;
 
     if (slug && !/^[a-z0-9-]+$/.test(slug)) {
@@ -85,6 +110,9 @@ export async function PATCH(
     // 업데이트할 필드만 포함
     const categoryIdList: string[] | undefined = Array.isArray(categoryIds)
       ? categoryIds.filter(Boolean)
+      : undefined;
+    const relatedProductIdList: string[] | undefined = Array.isArray(relatedProductIds)
+      ? relatedProductIds.filter((rid: string) => rid && rid !== id)
       : undefined;
 
     const updatePayload: Record<string, unknown> = {};
@@ -150,6 +178,25 @@ export async function PATCH(
           .insert(categoryIdList.map((categoryId) => ({ product_id: id, category_id: categoryId })));
         if (catError) {
           console.error("[PATCH /api/admin/products/[id]] Category mapping update error:", catError);
+        }
+      }
+    }
+
+    // 연관상품 매핑 갱신 — 기존 매핑 전체 삭제 후 순서대로 재삽입
+    if (relatedProductIdList !== undefined) {
+      await admin.from("product_related_products").delete().eq("product_id", id);
+      if (relatedProductIdList.length > 0) {
+        const { error: relatedError } = await admin
+          .from("product_related_products")
+          .insert(
+            relatedProductIdList.map((relatedId, idx) => ({
+              product_id: id,
+              related_product_id: relatedId,
+              sort_order: idx,
+            }))
+          );
+        if (relatedError) {
+          console.error("[PATCH /api/admin/products/[id]] Related product mapping update error:", relatedError);
         }
       }
     }

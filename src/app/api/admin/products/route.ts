@@ -116,6 +116,7 @@ export async function POST(request: Request) {
       variants,
       recommenderCrewId,
       recommendationNote,
+      relatedProductIds,
       vendorId,
       vendorCostType = "rate",
       vendorCostRate = 0,
@@ -194,6 +195,25 @@ export async function POST(request: Request) {
       if (catError) {
         console.error("[POST /api/admin/products] Category mapping insert error:", catError);
         // 매핑 등록 실패해도 상품은 유지, 경고만 로그
+      }
+    }
+
+    // 1.6. 연관상품 매핑 등록 (있는 경우)
+    const relatedProductIdList: string[] = Array.isArray(relatedProductIds)
+      ? relatedProductIds.filter((rid: string) => rid && rid !== product.id)
+      : [];
+    if (relatedProductIdList.length > 0) {
+      const { error: relatedError } = await admin
+        .from("product_related_products")
+        .insert(
+          relatedProductIdList.map((relatedId, idx) => ({
+            product_id: product.id,
+            related_product_id: relatedId,
+            sort_order: idx,
+          }))
+        );
+      if (relatedError) {
+        console.error("[POST /api/admin/products] Related product mapping insert error:", relatedError);
       }
     }
 

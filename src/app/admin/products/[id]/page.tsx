@@ -46,6 +46,7 @@ export default function EditProductPage({ params }: { params: Promise<{ id: stri
             isFeatured: data.is_featured ?? false,
             recommenderCrewId: data.recommender_crew_id ?? "",
             recommendationNote: data.recommendation_note ?? "",
+            relatedProducts: data.relatedProducts ?? [],
           });
         })
         .finally(() => setLoading(false));

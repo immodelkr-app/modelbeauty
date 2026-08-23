@@ -170,7 +170,38 @@ async function getProductOptions(productId: string): Promise<{
   return { options, variants };
 }
 
-async function getRelatedProducts(
+const RELATED_PRODUCT_SELECT = `id, name, slug, description, base_price, sale_price,
+       stock_quantity, sku, images, tags, is_active, is_featured,
+       created_at, updated_at, category_id,
+       categories!products_category_id_fkey ( id, name, slug )`;
+
+// 관리자가 수동으로 지정한 연관상품 (지정된 순서대로)
+async function getManualRelatedProducts(productId: string): Promise<Product[]> {
+  const supabase = await createSupabaseServerClient();
+  const { data: mappings } = await supabase
+    .from("product_related_products")
+    .select("related_product_id, sort_order")
+    .eq("product_id", productId)
+    .order("sort_order", { ascending: true });
+
+  const relatedIds = (mappings ?? []).map((m) => m.related_product_id);
+  if (relatedIds.length === 0) return [];
+
+  const { data } = await supabase
+    .from("products")
+    .select(RELATED_PRODUCT_SELECT)
+    .eq("is_active", true)
+    .in("id", relatedIds);
+
+  const byId = new Map((data ?? []).map((p) => [p.id, p]));
+  return relatedIds
+    .map((id) => byId.get(id))
+    .filter((p): p is NonNullable<typeof p> => !!p)
+    .map(mapRelatedProductRow);
+}
+
+// 수동 지정이 없을 때: 같은 카테고리 상품으로 자동 대체
+async function getCategoryRelatedProducts(
   categoryId: string | null,
   excludeId: string
 ): Promise<Product[]> {
@@ -179,40 +210,53 @@ async function getRelatedProducts(
   const supabase = await createSupabaseServerClient();
   const { data } = await supabase
     .from("products")
-    .select(
-      `id, name, slug, description, base_price, sale_price,
-       stock_quantity, sku, images, tags, is_active, is_featured,
-       created_at, updated_at, category_id,
-       categories!products_category_id_fkey ( id, name, slug )`
-    )
+    .select(RELATED_PRODUCT_SELECT)
     .eq("is_active", true)
     .eq("category_id", categoryId)
     .neq("id", excludeId)
     .order("created_at", { ascending: false })
     .limit(4);
 
-  return (data ?? []).map((p) => {
-    const cat = Array.isArray(p.categories) ? p.categories[0] : p.categories;
-    return {
-      id: p.id,
-      name: p.name,
-      slug: p.slug,
-      description: p.description,
-      content: null,
-      basePrice: p.base_price,
-      salePrice: p.sale_price,
-      stockQuantity: p.stock_quantity,
-      sku: p.sku,
-      images: (p.images as Product["images"]) ?? [],
-      tags: p.tags ?? [],
-      isActive: p.is_active,
-      isFeatured: p.is_featured,
-      createdAt: p.created_at,
-      updatedAt: p.updated_at,
-      categoryId: p.category_id,
-      category: cat ? { id: cat.id, name: cat.name, slug: cat.slug, parentId: null, sortOrder: 0, imageUrl: null, isActive: true, createdAt: "" } : undefined,
-    } satisfies Product;
-  });
+  return (data ?? []).map(mapRelatedProductRow);
+}
+
+async function getRelatedProducts(
+  productId: string,
+  categoryId: string | null
+): Promise<Product[]> {
+  const manual = await getManualRelatedProducts(productId);
+  if (manual.length > 0) return manual;
+  return getCategoryRelatedProducts(categoryId, productId);
+}
+
+function mapRelatedProductRow(p: {
+  id: string; name: string; slug: string; description: string | null;
+  base_price: number; sale_price: number | null; stock_quantity: number;
+  sku: string | null; images: unknown; tags: string[] | null;
+  is_active: boolean; is_featured: boolean; created_at: string; updated_at: string;
+  category_id: string | null;
+  categories: { id: string; name: string; slug: string } | { id: string; name: string; slug: string }[] | null;
+}): Product {
+  const cat = Array.isArray(p.categories) ? p.categories[0] : p.categories;
+  return {
+    id: p.id,
+    name: p.name,
+    slug: p.slug,
+    description: p.description,
+    content: null,
+    basePrice: p.base_price,
+    salePrice: p.sale_price,
+    stockQuantity: p.stock_quantity,
+    sku: p.sku,
+    images: (p.images as Product["images"]) ?? [],
+    tags: p.tags ?? [],
+    isActive: p.is_active,
+    isFeatured: p.is_featured,
+    createdAt: p.created_at,
+    updatedAt: p.updated_at,
+    categoryId: p.category_id,
+    category: cat ? { id: cat.id, name: cat.name, slug: cat.slug, parentId: null, sortOrder: 0, imageUrl: null, isActive: true, createdAt: "" } : undefined,
+  } satisfies Product;
 }
 
 // ── 유틸리티 ─────────────────────────────────────────────
@@ -269,7 +313,7 @@ export default async function ProductDetailPage({
   const [{ options, variants }, videos, relatedProducts] = await Promise.all([
     getProductOptions(product.id),
     getProductVideos(product.id),
-    getRelatedProducts(product.categoryId ?? null, product.id),
+    getRelatedProducts(product.id, product.categoryId ?? null),
   ]);
 
   const displayPrice = product.salePrice ?? product.basePrice;

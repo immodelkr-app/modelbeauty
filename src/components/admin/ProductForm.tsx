@@ -11,6 +11,7 @@ import MultiImageUploader, { type UploadedImage } from "./MultiImageUploader";
 interface Category { id: string; name: string; }
 interface Crew { id: string; name: string; nickname: string; }
 interface Vendor { id: string; name: string; default_cost_type: string; default_cost_rate: number; default_cost_price: number; }
+export interface RelatedProductPick { id: string; name: string; thumbnail: string | null; }
 
 export interface ProductFormData {
   name: string;
@@ -28,6 +29,7 @@ export interface ProductFormData {
   isFeatured: boolean;
   recommenderCrewId: string;   // 추천 크루 ID (없으면 빈 문자열)
   recommendationNote: string;  // 추천 한마디
+  relatedProducts: RelatedProductPick[]; // 연관상품 (순서대로)
   vendorId: string;
   vendorCostType: string;
   vendorCostRate: string;
@@ -40,6 +42,7 @@ const INITIAL: ProductFormData = {
   sku: "", images: [], detailImages: [], tags: "",
   isActive: true, isFeatured: false,
   recommenderCrewId: "", recommendationNote: "",
+  relatedProducts: [],
   vendorId: "", vendorCostType: "rate", vendorCostRate: "0", vendorSupplyPrice: "0",
 };
 
@@ -78,11 +81,47 @@ export default function ProductForm({ productId, initialData, onSuccess }: Produ
   const [error, setError] = useState("");
   const isEdit = !!productId;
 
+  const [relatedSearch, setRelatedSearch] = useState("");
+  const [relatedResults, setRelatedResults] = useState<{ id: string; name: string; thumbnail: string | null }[]>([]);
+  const [relatedSearching, setRelatedSearching] = useState(false);
+
   useEffect(() => {
     fetch("/api/categories").then((r) => r.json()).then(({ data }) => setCategories(data ?? []));
     fetch("/api/admin/crews").then((r) => r.json()).then(({ data }) => setCrews(data ?? []));
     fetch("/api/admin/vendors").then((r) => r.json()).then(({ data }) => setVendors(data ?? []));
   }, []);
+
+  useEffect(() => {
+    if (!relatedSearch.trim()) { setRelatedResults([]); return; }
+    const timer = setTimeout(() => {
+      setRelatedSearching(true);
+      fetch(`/api/admin/products?search=${encodeURIComponent(relatedSearch.trim())}&limit=8&status=all`)
+        .then((r) => r.json())
+        .then(({ data }) => setRelatedResults((data?.products ?? []).map((p: { id: string; name: string; thumbnail: string | null }) => ({ id: p.id, name: p.name, thumbnail: p.thumbnail }))))
+        .finally(() => setRelatedSearching(false));
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [relatedSearch]);
+
+  const addRelatedProduct = (p: RelatedProductPick) => {
+    if (p.id === productId) return;
+    setForm((prev) => (prev.relatedProducts.some((r) => r.id === p.id) ? prev : { ...prev, relatedProducts: [...prev.relatedProducts, p] }));
+    setRelatedSearch("");
+    setRelatedResults([]);
+  };
+
+  const removeRelatedProduct = (id: string) =>
+    setForm((prev) => ({ ...prev, relatedProducts: prev.relatedProducts.filter((r) => r.id !== id) }));
+
+  const moveRelatedProduct = (index: number, direction: -1 | 1) => {
+    const targetIndex = index + direction;
+    setForm((prev) => {
+      if (targetIndex < 0 || targetIndex >= prev.relatedProducts.length) return prev;
+      const reordered = [...prev.relatedProducts];
+      [reordered[index], reordered[targetIndex]] = [reordered[targetIndex], reordered[index]];
+      return { ...prev, relatedProducts: reordered };
+    });
+  };
 
   const set = (field: keyof ProductFormData, value: string | boolean) =>
     setForm((prev) => ({ ...prev, [field]: value }));
@@ -121,6 +160,7 @@ export default function ProductForm({ productId, initialData, onSuccess }: Produ
       isFeatured: form.isFeatured,
       recommenderCrewId: form.recommenderCrewId || null,
       recommendationNote: form.recommendationNote || null,
+      relatedProductIds: form.relatedProducts.map((r) => r.id),
       vendorId: form.vendorId || null,
       vendorCostType: form.vendorCostType,
       vendorCostRate: parseFloat(form.vendorCostRate) || 0,
@@ -341,6 +381,89 @@ export default function ProductForm({ productId, initialData, onSuccess }: Produ
             </div>
           )}
         </div>
+      </div>
+
+      {/* 연관상품 */}
+      <div className="admin-card" style={{ padding: "1.5rem" }}>
+        <h2 className="admin-card-title" style={{ marginBottom: "1.25rem" }}>🔗 연관상품 지정</h2>
+        <p style={{ fontSize: "0.8125rem", color: "#6b7280", margin: "0 0 1rem" }}>
+          상품 상세페이지 하단 &quot;연관 상품&quot;에 지정한 순서대로 표시됩니다. 지정하지 않으면 같은 카테고리 상품이 자동으로 표시됩니다.
+        </p>
+        <div className="admin-field" style={{ position: "relative", marginBottom: "1rem" }}>
+          <label className="admin-label">상품 검색으로 추가</label>
+          <input
+            className="admin-input"
+            value={relatedSearch}
+            onChange={(e) => setRelatedSearch(e.target.value)}
+            placeholder="상품명으로 검색..."
+          />
+          {relatedSearch.trim() && (
+            <div
+              className="admin-card"
+              style={{
+                position: "absolute", top: "100%", left: 0, right: 0, zIndex: 10,
+                marginTop: "0.25rem", padding: "0.5rem", maxHeight: "260px", overflowY: "auto",
+              }}
+            >
+              {relatedSearching ? (
+                <p style={{ fontSize: "0.8125rem", color: "#9ca3af", padding: "0.5rem" }}>검색 중...</p>
+              ) : relatedResults.length === 0 ? (
+                <p style={{ fontSize: "0.8125rem", color: "#9ca3af", padding: "0.5rem" }}>검색 결과가 없습니다.</p>
+              ) : (
+                relatedResults
+                  .filter((p) => p.id !== productId)
+                  .map((p) => (
+                    <button
+                      type="button"
+                      key={p.id}
+                      onClick={() => addRelatedProduct(p)}
+                      style={{
+                        display: "flex", alignItems: "center", gap: "0.625rem", width: "100%",
+                        padding: "0.5rem", background: "none", border: "none", cursor: "pointer",
+                        textAlign: "left", fontSize: "0.875rem", borderRadius: "6px",
+                      }}
+                      onMouseEnter={(e) => (e.currentTarget.style.background = "#f3f4f6")}
+                      onMouseLeave={(e) => (e.currentTarget.style.background = "none")}
+                    >
+                      {p.thumbnail ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={p.thumbnail} alt="" style={{ width: "32px", height: "32px", objectFit: "cover", borderRadius: "4px" }} />
+                      ) : (
+                        <div style={{ width: "32px", height: "32px", borderRadius: "4px", background: "#f3f4f6" }} />
+                      )}
+                      <span>{p.name}</span>
+                    </button>
+                  ))
+              )}
+            </div>
+          )}
+        </div>
+        {form.relatedProducts.length === 0 ? (
+          <p style={{ fontSize: "0.8125rem", color: "#9ca3af" }}>지정된 연관상품이 없습니다.</p>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+            {form.relatedProducts.map((p, index) => (
+              <div
+                key={p.id}
+                style={{
+                  display: "flex", alignItems: "center", gap: "0.625rem",
+                  padding: "0.5rem 0.75rem", border: "1px solid #e5e7eb", borderRadius: "8px",
+                }}
+              >
+                {p.thumbnail ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={p.thumbnail} alt="" style={{ width: "32px", height: "32px", objectFit: "cover", borderRadius: "4px" }} />
+                ) : (
+                  <div style={{ width: "32px", height: "32px", borderRadius: "4px", background: "#f3f4f6" }} />
+                )}
+                <span style={{ flex: 1, fontSize: "0.875rem" }}>{p.name}</span>
+                <button type="button" className="admin-btn admin-btn-secondary admin-btn-sm" onClick={() => moveRelatedProduct(index, -1)} disabled={index === 0} title="위로 이동">▲</button>
+                <button type="button" className="admin-btn admin-btn-secondary admin-btn-sm" onClick={() => moveRelatedProduct(index, 1)} disabled={index === form.relatedProducts.length - 1} title="아래로 이동">▼</button>
+                <button type="button" className="admin-btn admin-btn-danger admin-btn-sm" onClick={() => removeRelatedProduct(p.id)}>삭제</button>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* 태그 / 설정 */}

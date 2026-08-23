@@ -75,6 +75,33 @@ export default function AdminCategoriesPage() {
     fetchCategories();
   };
 
+  const handleMove = async (index: number, direction: -1 | 1) => {
+    const targetIndex = index + direction;
+    if (targetIndex < 0 || targetIndex >= categories.length) return;
+    const current = categories[index];
+    const target = categories[targetIndex];
+
+    // 화면에는 즉시 반영
+    const reordered = [...categories];
+    reordered[index] = target;
+    reordered[targetIndex] = current;
+    setCategories(reordered);
+
+    await Promise.all([
+      fetch(`/api/admin/categories/${current.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sortOrder: target.sort_order }),
+      }),
+      fetch(`/api/admin/categories/${target.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sortOrder: current.sort_order }),
+      }),
+    ]);
+    fetchCategories();
+  };
+
   return (
     <>
       <div className="admin-section-header">
@@ -125,7 +152,7 @@ export default function AdminCategoriesPage() {
                 </tr>
               </thead>
               <tbody>
-                {categories.map((cat) => (
+                {categories.map((cat, index) => (
                   <tr key={cat.id}>
                     <td>
                       {editId === cat.id ? (
@@ -147,6 +174,24 @@ export default function AdminCategoriesPage() {
                     </td>
                     <td>
                       <div style={{ display: "flex", gap: "0.375rem" }}>
+                        <button
+                          type="button"
+                          className="admin-btn admin-btn-secondary admin-btn-sm"
+                          onClick={() => handleMove(index, -1)}
+                          disabled={index === 0}
+                          title="위로 이동"
+                        >
+                          ▲
+                        </button>
+                        <button
+                          type="button"
+                          className="admin-btn admin-btn-secondary admin-btn-sm"
+                          onClick={() => handleMove(index, 1)}
+                          disabled={index === categories.length - 1}
+                          title="아래로 이동"
+                        >
+                          ▼
+                        </button>
                         {editId === cat.id ? (
                           <>
                             <button className="admin-btn admin-btn-primary admin-btn-sm" onClick={() => handleEditSave(cat.id)}>저장</button>

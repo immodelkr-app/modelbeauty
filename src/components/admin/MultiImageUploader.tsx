@@ -24,6 +24,7 @@ const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
 export default function MultiImageUploader({ images, onChange, hint }: MultiImageUploaderProps) {
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState("");
+  const [urlInput, setUrlInput] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
 
   const uploadFile = async (file: File): Promise<string> => {
@@ -77,6 +78,21 @@ export default function MultiImageUploader({ images, onChange, hint }: MultiImag
     const next = [...images];
     [next[idx], next[target]] = [next[target], next[idx]];
     onChange(next);
+  };
+
+  const handleAddUrl = () => {
+    const url = urlInput.trim();
+    if (!url) return;
+    try {
+      const parsed = new URL(url);
+      if (parsed.protocol !== "http:" && parsed.protocol !== "https:") throw new Error();
+    } catch {
+      setError("올바른 이미지 URL(http:// 또는 https://)을 입력해주세요.");
+      return;
+    }
+    setError("");
+    onChange([...images, { url, alt: "" }]);
+    setUrlInput("");
   };
 
   return (
@@ -161,6 +177,27 @@ export default function MultiImageUploader({ images, onChange, hint }: MultiImag
       <p className="admin-input-hint" style={{ marginTop: "0.5rem" }}>
         {hint ?? "jpg/png/webp/gif, 장당 5MB 이하. 여러 장 동시 선택 가능. 첫 번째 이미지가 대표 이미지입니다."}
       </p>
+
+      <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginTop: "0.75rem" }}>
+        <div style={{ flex: "0 0 auto", fontSize: "0.75rem", color: "#9ca3af" }}>또는</div>
+        <input
+          type="text"
+          className="admin-input"
+          value={urlInput}
+          onChange={(e) => setUrlInput(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleAddUrl(); } }}
+          placeholder="이미 클라우드에 올려둔 이미지 URL 붙여넣기 (https://...)"
+          style={{ flex: 1, padding: "0.375rem 0.625rem", fontSize: "0.8125rem" }}
+        />
+        <button
+          type="button"
+          onClick={handleAddUrl}
+          className="admin-btn admin-btn-secondary admin-btn-sm"
+        >
+          링크 추가
+        </button>
+      </div>
+
       {error && <p style={{ color: "#ef4444", fontSize: "0.8125rem", marginTop: "0.375rem" }}>{error}</p>}
     </div>
   );

@@ -40,8 +40,8 @@ export default function ProductVideosManager({ productId }: ProductVideosManager
   const fetchVideos = useCallback(async () => {
     setLoading(true);
     try {
-      // 관리자 API로 상품 비디오 전체 조회 (비활성된 것도 포함하여 조회하기 위해 requireAdmin을 거치는 api 호출)
-      const res = await fetch(`/api/products/${productId}/videos`);
+      // 관리자 전용 API로 조회 — 공개 API는 is_active=true만 반환해 비활성 영상이 화면에서 사라지므로 사용 금지
+      const res = await fetch(`/api/admin/products/${productId}/videos`);
       const { data, success } = await res.json();
       if (success) {
         setVideos(data ?? []);

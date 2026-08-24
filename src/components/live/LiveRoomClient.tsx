@@ -59,16 +59,22 @@ interface ChatMessage {
   createdAt: string;
 }
 
+interface GameWinner {
+  nickname: string;
+  couponIssueStatus: "not_applicable" | "pending" | "issued" | "failed";
+}
+
 interface GameRound {
   id: string;
   status: "active" | "ended" | "cancelled";
   minValue: number;
   maxValue: number;
   prizeLabel: string;
-  winnerNickname: string | null;
-  couponIssueStatus: "not_applicable" | "pending" | "issued" | "failed";
+  winnerCount: number;
+  currentWinners: number;
+  winners: GameWinner[];
   entryCount: number;
-  myEntry: { guess: number; isCorrect: boolean } | null;
+  myEntry: { guess: number; isCorrect: boolean; isWinner: boolean } | null;
 }
 
 interface LiveRoomClientProps {
@@ -111,7 +117,7 @@ export default function LiveRoomClient({ initialStream, initialChats }: LiveRoom
   const [gameRound, setGameRound] = useState<GameRound | null>(null);
   const [guessInput, setGuessInput] = useState("");
   const [guessSubmitting, setGuessSubmitting] = useState(false);
-  const [guessResult, setGuessResult] = useState<{ isCorrect: boolean; isWinner: boolean; prizeLabel?: string } | null>(null);
+  const [guessResult, setGuessResult] = useState<{ isCorrect: boolean; isWinner: boolean; prizeLabel?: string; winnerRank?: number; winnerCount?: number } | null>(null);
   const seenRoundIdRef = useRef<string | null>(null);
 
   const chatEndRef = useRef<HTMLDivElement>(null);
@@ -905,14 +911,17 @@ export default function LiveRoomClient({ initialStream, initialChats }: LiveRoom
               <div className="game-banner-title">
                 🎮 숫자 맞추기 진행 중! {gameRound.minValue}~{gameRound.maxValue} 중 하나를 맞혀보세요
               </div>
-              <div className="game-banner-prize">🎁 경품: {gameRound.prizeLabel}</div>
+              <div className="game-banner-prize">
+                🎁 경품: {gameRound.prizeLabel}
+                {gameRound.winnerCount > 1 && ` · 선착순 ${gameRound.winnerCount}명`}
+              </div>
 
               {guessResult ? (
                 <div className={`game-result${guessResult.isWinner ? " winner" : ""}`}>
                   {guessResult.isWinner
-                    ? `🎉 정답! 우승하셨습니다 — ${guessResult.prizeLabel ?? gameRound.prizeLabel}`
+                    ? `🎉 정답! 우승하셨습니다${guessResult.winnerRank && guessResult.winnerCount && guessResult.winnerCount > 1 ? ` (${guessResult.winnerRank}/${guessResult.winnerCount}번째)` : ""} — ${guessResult.prizeLabel ?? gameRound.prizeLabel}`
                     : guessResult.isCorrect
-                    ? "😢 정답은 맞혔지만 다른 분이 먼저 맞혀서 마감됐어요."
+                    ? "😢 정답은 맞혔지만 우승 인원이 마감됐어요."
                     : "❌ 아쉽지만 오답이에요. 다음 게임을 기다려주세요!"}
                 </div>
               ) : gameRound.myEntry ? (
@@ -935,12 +944,16 @@ export default function LiveRoomClient({ initialStream, initialChats }: LiveRoom
                   </button>
                 </form>
               )}
-              <div className="game-banner-count">👥 {gameRound.entryCount}명 참여 중</div>
+              <div className="game-banner-count">
+                👥 {gameRound.entryCount}명 참여 중 · 우승 {gameRound.currentWinners}/{gameRound.winnerCount}명
+              </div>
             </div>
           )}
-          {gameRound && gameRound.status === "ended" && gameRound.winnerNickname && !guessResult && (
+          {gameRound && gameRound.status === "ended" && gameRound.winners.length > 0 && !guessResult && (
             <div className="game-banner ended">
-              <div className="game-banner-title">🏆 게임 종료! 우승자: {gameRound.winnerNickname}</div>
+              <div className="game-banner-title">
+                🏆 게임 종료! 우승자: {gameRound.winners.map((w) => w.nickname).join(", ")}
+              </div>
               <div className="game-banner-prize">경품: {gameRound.prizeLabel}</div>
             </div>
           )}

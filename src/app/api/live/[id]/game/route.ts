@@ -18,7 +18,7 @@ export async function GET(
 
     const { data: round } = await admin
       .from("live_game_rounds")
-      .select("id, status, min_value, max_value, prize_label, winner_nickname, coupon_issue_status, created_at, ended_at")
+      .select("id, status, min_value, max_value, prize_label, winner_count, current_winners, created_at, ended_at")
       .eq("stream_id", id)
       .order("created_at", { ascending: false })
       .limit(1)
@@ -33,8 +33,16 @@ export async function GET(
       .select("id", { count: "exact", head: true })
       .eq("round_id", round.id);
 
-    // 로그인한 유저의 본인 제출 여부/결과 확인 (정답 값은 절대 내려주지 않음)
-    let myEntry: { guess: number; isCorrect: boolean } | null = null;
+    // 우승자 목록 (선착순 N명) — 정답 값은 절대 내려주지 않음
+    const { data: winnerEntries } = await admin
+      .from("live_game_entries")
+      .select("nickname, coupon_issue_status")
+      .eq("round_id", round.id)
+      .eq("is_winner", true)
+      .order("created_at", { ascending: true });
+
+    // 로그인한 유저의 본인 제출 여부/결과 확인
+    let myEntry: { guess: number; isCorrect: boolean; isWinner: boolean } | null = null;
     const {
       data: { user },
     } = await supabase.auth.getUser();
@@ -42,11 +50,11 @@ export async function GET(
       const masterUserId = (user.user_metadata?.master_user_id as string | undefined) ?? user.id;
       const { data: entry } = await admin
         .from("live_game_entries")
-        .select("guess, is_correct")
+        .select("guess, is_correct, is_winner")
         .eq("round_id", round.id)
         .eq("master_user_id", masterUserId)
         .maybeSingle();
-      if (entry) myEntry = { guess: entry.guess, isCorrect: entry.is_correct };
+      if (entry) myEntry = { guess: entry.guess, isCorrect: entry.is_correct, isWinner: entry.is_winner };
     }
 
     return Response.json({
@@ -57,8 +65,9 @@ export async function GET(
         minValue: round.min_value,
         maxValue: round.max_value,
         prizeLabel: round.prize_label,
-        winnerNickname: round.status !== "active" ? round.winner_nickname : null,
-        couponIssueStatus: round.coupon_issue_status,
+        winnerCount: round.winner_count,
+        currentWinners: round.current_winners,
+        winners: (winnerEntries ?? []).map((w) => ({ nickname: w.nickname, couponIssueStatus: w.coupon_issue_status })),
         entryCount: entryCount ?? 0,
         createdAt: round.created_at,
         endedAt: round.ended_at,
@@ -81,7 +90,9 @@ export async function POST(
   try {
     const { id } = await params;
     const body = await request.json();
-    const { minValue, maxValue, answer, prizeLabel, couponTemplateId } = body;
+    const { minValue, maxValue, answer, prizeLabel, couponTemplateId, winnerCount } = body;
+
+    const parsedWinnerCount = winnerCount == null ? 1 : Number(winnerCount);
 
     if (
       typeof minValue !== "number" ||
@@ -90,7 +101,9 @@ export async function POST(
       !prizeLabel ||
       minValue >= maxValue ||
       answer < minValue ||
-      answer > maxValue
+      answer > maxValue ||
+      !Number.isInteger(parsedWinnerCount) ||
+      parsedWinnerCount < 1
     ) {
       return Response.json({ success: false, error: "입력값을 확인해 주세요." }, { status: 400 });
     }
@@ -113,7 +126,7 @@ export async function POST(
         answer,
         prize_label: prizeLabel,
         coupon_template_id: couponTemplateId || null,
-        coupon_issue_status: couponTemplateId ? "pending" : "not_applicable",
+        winner_count: parsedWinnerCount,
       })
       .select("id")
       .single();

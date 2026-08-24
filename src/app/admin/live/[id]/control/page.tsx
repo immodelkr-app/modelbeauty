@@ -51,14 +51,20 @@ interface ChatMessage {
   createdAt: string;
 }
 
+interface GameWinner {
+  nickname: string;
+  couponIssueStatus: "not_applicable" | "pending" | "issued" | "failed";
+}
+
 interface GameRound {
   id: string;
   status: "active" | "ended" | "cancelled";
   minValue: number;
   maxValue: number;
   prizeLabel: string;
-  winnerNickname: string | null;
-  couponIssueStatus: "not_applicable" | "pending" | "issued" | "failed";
+  winnerCount: number;
+  currentWinners: number;
+  winners: GameWinner[];
   entryCount: number;
   createdAt: string;
   endedAt: string | null;
@@ -97,6 +103,7 @@ export default function AdminLiveControlPage({ params }: { params: Promise<{ id:
   const [gameMin, setGameMin] = useState("1");
   const [gameMax, setGameMax] = useState("50");
   const [gameAnswer, setGameAnswer] = useState("");
+  const [gameWinnerCount, setGameWinnerCount] = useState("1");
   const [gamePrizeLabel, setGamePrizeLabel] = useState("");
   const [gameCouponTemplateId, setGameCouponTemplateId] = useState("");
   const [gameSubmitting, setGameSubmitting] = useState(false);
@@ -414,7 +421,12 @@ export default function AdminLiveControlPage({ params }: { params: Promise<{ id:
       alert("경품 설명을 입력해 주세요. (예: 배송비 무료 쿠폰)");
       return;
     }
-    if (!confirm(`${min}~${max} 중 정답 [${answer}]로 게임을 시작할까요? 시청자 화면에 즉시 참여창이 뜹니다.`)) return;
+    const winnerCount = parseInt(gameWinnerCount, 10);
+    if (Number.isNaN(winnerCount) || winnerCount < 1) {
+      alert("우승 인원수는 1명 이상이어야 합니다.");
+      return;
+    }
+    if (!confirm(`${min}~${max} 중 정답 [${answer}]로 게임을 시작할까요? 선착순 ${winnerCount}명 우승 · 시청자 화면에 즉시 참여창이 뜹니다.`)) return;
 
     setGameSubmitting(true);
     try {
@@ -427,6 +439,7 @@ export default function AdminLiveControlPage({ params }: { params: Promise<{ id:
           answer,
           prizeLabel: gamePrizeLabel.trim(),
           couponTemplateId: gameCouponTemplateId || null,
+          winnerCount,
         }),
       });
       const { success, error } = await res.json();
@@ -863,7 +876,7 @@ export default function AdminLiveControlPage({ params }: { params: Promise<{ id:
           <div className="admin-card control-card" style={{ marginTop: "1.5rem" }}>
             <h2 className="admin-card-title">🎮 미니게임 — 숫자 맞추기</h2>
             <p style={{ fontSize: "0.8125rem", color: "#6b7280", margin: "0.5rem 0 1rem" }}>
-              범위 안에서 정답을 정하고 시작하면 시청자 화면에 즉시 참여창이 뜹니다. 가장 먼저 맞힌 1명이 자동으로 우승 처리됩니다.
+              범위 안에서 정답을 정하고 시작하면 시청자 화면에 즉시 참여창이 뜹니다. 지정한 우승 인원수만큼 선착순으로 자동 우승 처리됩니다.
             </p>
 
             {gameRound && gameRound.status === "active" ? (
@@ -871,9 +884,20 @@ export default function AdminLiveControlPage({ params }: { params: Promise<{ id:
                 <div style={{ fontWeight: 700, marginBottom: "0.375rem" }}>
                   진행 중: {gameRound.minValue}~{gameRound.maxValue} 사이 숫자 · 경품: {gameRound.prizeLabel}
                 </div>
-                <div style={{ fontSize: "0.8125rem", color: "#6b7280", marginBottom: "0.75rem" }}>
-                  참여자 {gameRound.entryCount}명
+                <div style={{ fontSize: "0.8125rem", color: "#6b7280", marginBottom: "0.375rem" }}>
+                  참여자 {gameRound.entryCount}명 · 우승 {gameRound.currentWinners}/{gameRound.winnerCount}명
                 </div>
+                {gameRound.winners.length > 0 && (
+                  <div style={{ fontSize: "0.8125rem", marginBottom: "0.75rem" }}>
+                    {gameRound.winners.map((w, i) => (
+                      <div key={i}>
+                        🏆 {w.nickname}
+                        {w.couponIssueStatus === "issued" && <span style={{ color: "#059669", marginLeft: "0.375rem" }}>✓ 쿠폰 발급 완료</span>}
+                        {w.couponIssueStatus === "failed" && <span style={{ color: "#dc2626", marginLeft: "0.375rem" }}>⚠ 발급 실패 — 수동 발급 필요</span>}
+                      </div>
+                    ))}
+                  </div>
+                )}
                 <button
                   onClick={handleCancelGame}
                   disabled={gameSubmitting}
@@ -889,9 +913,16 @@ export default function AdminLiveControlPage({ params }: { params: Promise<{ id:
                     background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: "10px",
                     padding: "0.75rem 1rem", marginBottom: "1rem", fontSize: "0.8125rem",
                   }}>
-                    🏆 지난 라운드 우승: <strong>{gameRound.winnerNickname}</strong> · 경품: {gameRound.prizeLabel}
-                    {gameRound.couponIssueStatus === "issued" && <span style={{ color: "#059669", marginLeft: "0.5rem" }}>✓ 쿠폰 자동 발급 완료</span>}
-                    {gameRound.couponIssueStatus === "failed" && <span style={{ color: "#dc2626", marginLeft: "0.5rem" }}>⚠ 쿠폰 발급 실패 — 수동 발급 필요 ({gameRound.winnerNickname})</span>}
+                    <div style={{ marginBottom: "0.375rem" }}>
+                      🏆 지난 라운드 우승 ({gameRound.currentWinners}/{gameRound.winnerCount}명) · 경품: {gameRound.prizeLabel}
+                    </div>
+                    {gameRound.winners.map((w, i) => (
+                      <div key={i}>
+                        <strong>{w.nickname}</strong>
+                        {w.couponIssueStatus === "issued" && <span style={{ color: "#059669", marginLeft: "0.5rem" }}>✓ 쿠폰 자동 발급 완료</span>}
+                        {w.couponIssueStatus === "failed" && <span style={{ color: "#dc2626", marginLeft: "0.5rem" }}>⚠ 쿠폰 발급 실패 — 수동 발급 필요</span>}
+                      </div>
+                    ))}
                   </div>
                 )}
 
@@ -901,6 +932,11 @@ export default function AdminLiveControlPage({ params }: { params: Promise<{ id:
                     <span>~</span>
                     <input className="admin-input" type="number" value={gameMax} onChange={(e) => setGameMax(e.target.value)} placeholder="최대값" style={{ width: "90px" }} />
                     <input className="admin-input" type="number" value={gameAnswer} onChange={(e) => setGameAnswer(e.target.value)} placeholder="정답 숫자" style={{ width: "110px" }} />
+                  </div>
+                  <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
+                    <label style={{ fontSize: "0.8125rem", color: "#6b7280" }}>우승 인원수</label>
+                    <input className="admin-input" type="number" min={1} value={gameWinnerCount} onChange={(e) => setGameWinnerCount(e.target.value)} placeholder="1" style={{ width: "80px" }} />
+                    <span style={{ fontSize: "0.75rem", color: "#9ca3af" }}>선착순으로 이 인원수까지 자동 우승 처리됩니다</span>
                   </div>
                   <input
                     className="admin-input"

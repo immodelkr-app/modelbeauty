@@ -1,7 +1,7 @@
 // ============================================================
 // POST /api/live/[id]/game/guess — 숫자 맞추기 정답 제출
-// 라운드당 1인 1회, 최초 정답자만 우승 처리 (조건부 UPDATE로 동시성 보장)
-// 우승 시 쿠폰 템플릿이 지정되어 있으면 아임모델 공화국에 자동 발급 요청
+// 라운드당 1인 1회, 선착순 winner_count명까지 우승 처리 (원자적 슬롯 선점으로 동시성 보장)
+// 우승 시 쿠폰 템플릿이 지정되어 있으면 아임모델 공화국에 자동 발급 요청 (우승자별 발급 상태 기록)
 // ============================================================
 
 import { createSupabaseServerClient, createSupabaseAdmin } from "@/lib/supabase/server";
@@ -73,31 +73,41 @@ export async function POST(
       return Response.json({ success: true, data: { isCorrect: false, isWinner: false } });
     }
 
-    // 최초 정답자만 우승 처리 — status='active' 조건부 UPDATE라 동시 요청 중 하나만 성공
-    const { data: wonRound } = await admin
-      .from("live_game_rounds")
-      .update({
-        status: "ended",
-        winner_master_user_id: masterUserId,
-        winner_nickname: nickname,
-        ended_at: new Date().toISOString(),
-      })
-      .eq("id", roundId)
-      .eq("status", "active")
-      .select("id, coupon_template_id, prize_label")
-      .maybeSingle();
+    // 선착순 N명 우승 슬롯을 원자적으로 선점 (동시 요청도 정확히 winner_count명만 통과)
+    const { data: claimRows, error: claimError } = await admin.rpc("claim_live_game_winner_slot", {
+      p_round_id: roundId,
+    });
 
-    if (!wonRound) {
-      // 정답은 맞았지만 이미 다른 사람이 먼저 맞혀 라운드가 마감됨
+    if (claimError) throw claimError;
+
+    const claimResult = (claimRows?.[0] as
+      | {
+          claimed: boolean;
+          winner_rank: number | null;
+          winner_count: number | null;
+          round_ended: boolean;
+          coupon_template_id: string | null;
+          prize_label: string | null;
+        }
+      | undefined) ?? null;
+
+    if (!claimResult?.claimed) {
+      // 정답은 맞았지만 이미 우승 인원이 마감됨
       return Response.json({ success: true, data: { isCorrect: true, isWinner: false } });
     }
 
+    await admin
+      .from("live_game_entries")
+      .update({ is_winner: true })
+      .eq("round_id", roundId)
+      .eq("master_user_id", masterUserId);
+
     let couponIssueStatus: "issued" | "failed" | "not_applicable" = "not_applicable";
-    if (wonRound.coupon_template_id) {
+    if (claimResult.coupon_template_id) {
       try {
         await issueCoupon({
           masterUserId,
-          couponTemplateId: wonRound.coupon_template_id,
+          couponTemplateId: claimResult.coupon_template_id,
           issuedBy: "model_beauty_live_game",
         });
         couponIssueStatus = "issued";
@@ -106,9 +116,10 @@ export async function POST(
         couponIssueStatus = "failed";
       }
       await admin
-        .from("live_game_rounds")
+        .from("live_game_entries")
         .update({ coupon_issue_status: couponIssueStatus })
-        .eq("id", roundId);
+        .eq("round_id", roundId)
+        .eq("master_user_id", masterUserId);
     }
 
     return Response.json({
@@ -116,7 +127,9 @@ export async function POST(
       data: {
         isCorrect: true,
         isWinner: true,
-        prizeLabel: wonRound.prize_label,
+        prizeLabel: claimResult.prize_label,
+        winnerRank: claimResult.winner_rank,
+        winnerCount: claimResult.winner_count,
         couponIssueStatus,
       },
     });

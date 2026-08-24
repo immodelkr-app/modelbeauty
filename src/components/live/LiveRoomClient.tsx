@@ -77,6 +77,17 @@ interface GameRound {
   myEntry: { guess: number; isCorrect: boolean; isWinner: boolean } | null;
 }
 
+interface KeywordEvent {
+  id: string;
+  status: "active" | "ended" | "cancelled";
+  prizeLabel: string;
+  winnerCount: number;
+  currentWinners: number;
+  winners: GameWinner[];
+  entryCount: number;
+  myEntry: { isWinner: boolean } | null;
+}
+
 interface LiveRoomClientProps {
   initialStream: LiveStream;
   initialChats: ChatMessage[];
@@ -119,6 +130,11 @@ export default function LiveRoomClient({ initialStream, initialChats }: LiveRoom
   const [guessSubmitting, setGuessSubmitting] = useState(false);
   const [guessResult, setGuessResult] = useState<{ isCorrect: boolean; isWinner: boolean; prizeLabel?: string; winnerRank?: number; winnerCount?: number } | null>(null);
   const seenRoundIdRef = useRef<string | null>(null);
+
+  // ── 미니게임 (선착순 댓글 이벤트) ─────────────────────────────
+  const [keywordEvent, setKeywordEvent] = useState<KeywordEvent | null>(null);
+  const [keywordToast, setKeywordToast] = useState<{ isWinner: boolean; matched: boolean; prizeLabel?: string; winnerRank?: number; winnerCount?: number } | null>(null);
+  const seenKeywordEventIdRef = useRef<string | null>(null);
 
   const chatEndRef = useRef<HTMLDivElement>(null);
   const heartsContainerRef = useRef<HTMLDivElement>(null);
@@ -193,6 +209,24 @@ export default function LiveRoomClient({ initialStream, initialChats }: LiveRoom
       }
     }, 5000);
 
+    // 미니게임(선착순 댓글 이벤트) 폴링: 5초마다 갱신 (새 이벤트 시작/종료를 빠르게 감지)
+    const keywordTimer = setInterval(async () => {
+      try {
+        const res = await fetch(`/api/live/${stream.id}/keyword-event`);
+        const { data, success } = await res.json();
+        if (success) {
+          if (data && data.id !== seenKeywordEventIdRef.current) {
+            // 새 이벤트로 전환됨 — 이전 이벤트의 결과 토스트 초기화
+            setKeywordToast(null);
+            seenKeywordEventIdRef.current = data.id;
+          }
+          setKeywordEvent(data);
+        }
+      } catch (e) {
+        console.error("[KeywordEventPoll]", e);
+      }
+    }, 5000);
+
     // 방송 상태 + 시청자 수 + 전시상품 폴링: 10초마다 갱신
     const streamTimer = setInterval(async () => {
       try {
@@ -231,11 +265,12 @@ export default function LiveRoomClient({ initialStream, initialChats }: LiveRoom
     return () => {
       clearInterval(chatTimer);
       clearInterval(gameTimer);
+      clearInterval(keywordTimer);
       clearInterval(streamTimer);
     };
   }, [stream.id]);
 
-  // 최초 진입 시 진행 중인 게임이 있는지 즉시 확인 (5초 폴링 대기 없이)
+  // 최초 진입 시 진행 중인 게임/이벤트가 있는지 즉시 확인 (5초 폴링 대기 없이)
   useEffect(() => {
     if (!stream.id) return;
     fetch(`/api/live/${stream.id}/game`)
@@ -244,6 +279,15 @@ export default function LiveRoomClient({ initialStream, initialChats }: LiveRoom
         if (success && data) {
           seenRoundIdRef.current = data.id;
           setGameRound(data);
+        }
+      })
+      .catch(() => {});
+    fetch(`/api/live/${stream.id}/keyword-event`)
+      .then((res) => res.json())
+      .then(({ data, success }) => {
+        if (success && data) {
+          seenKeywordEventIdRef.current = data.id;
+          setKeywordEvent(data);
         }
       })
       .catch(() => {});
@@ -324,9 +368,11 @@ export default function LiveRoomClient({ initialStream, initialChats }: LiveRoom
         body: JSON.stringify({ message: chatContent }),
       });
 
-      const { success, error } = await res.json();
+      const { success, error, keywordEvent: keywordEventResult } = await res.json();
       if (!success) {
         console.error("Failed to persist chat:", error);
+      } else if (keywordEventResult) {
+        setKeywordToast(keywordEventResult);
       }
     } catch (e) {
       console.error(e);
@@ -955,6 +1001,39 @@ export default function LiveRoomClient({ initialStream, initialChats }: LiveRoom
                 🏆 게임 종료! 우승자: {gameRound.winners.map((w) => w.nickname).join(", ")}
               </div>
               <div className="game-banner-prize">경품: {gameRound.prizeLabel}</div>
+            </div>
+          )}
+
+          {/* 미니게임: 선착순 댓글 이벤트 — 정답 키워드는 방송에서 구두로만 안내됨 */}
+          {keywordEvent && keywordEvent.status === "active" && (
+            <div className="game-banner">
+              <div className="game-banner-title">
+                🎯 선착순 댓글 이벤트 진행 중! 방송에서 안내하는 키워드를 채팅에 입력해 보세요
+              </div>
+              <div className="game-banner-prize">
+                🎁 경품: {keywordEvent.prizeLabel}
+                {keywordEvent.winnerCount > 1 && ` · 선착순 ${keywordEvent.winnerCount}명`}
+              </div>
+              {keywordToast ? (
+                <div className={`game-result${keywordToast.isWinner ? " winner" : ""}`}>
+                  {keywordToast.isWinner
+                    ? `🎉 정답! 당첨되셨습니다${keywordToast.winnerRank && keywordToast.winnerCount && keywordToast.winnerCount > 1 ? ` (${keywordToast.winnerRank}/${keywordToast.winnerCount}번째)` : ""} — ${keywordToast.prizeLabel ?? keywordEvent.prizeLabel}`
+                    : "😢 키워드는 맞았지만 당첨 인원이 마감됐어요."}
+                </div>
+              ) : keywordEvent.myEntry ? (
+                <div className="game-result">이미 참여하셨어요. 결과를 확인해 보세요!</div>
+              ) : null}
+              <div className="game-banner-count">
+                👥 {keywordEvent.entryCount}명 참여 중 · 당첨 {keywordEvent.currentWinners}/{keywordEvent.winnerCount}명
+              </div>
+            </div>
+          )}
+          {keywordEvent && keywordEvent.status === "ended" && keywordEvent.winners.length > 0 && !keywordToast && (
+            <div className="game-banner ended">
+              <div className="game-banner-title">
+                🏆 이벤트 종료! 당첨자: {keywordEvent.winners.map((w) => w.nickname).join(", ")}
+              </div>
+              <div className="game-banner-prize">경품: {keywordEvent.prizeLabel}</div>
             </div>
           )}
 

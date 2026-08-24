@@ -3,8 +3,8 @@
 // POST /api/live/[id]/chat — 라이브 채팅 메시지 등록 (Persist)
 // ============================================================
 
-import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { syncMasterUser } from "@/lib/core-auth";
+import { createSupabaseServerClient, createSupabaseAdmin } from "@/lib/supabase/server";
+import { syncMasterUser, issueCoupon } from "@/lib/core-auth";
 import { isAdmin } from "@/lib/auth-admin";
 
 export async function GET(
@@ -140,6 +140,89 @@ export async function POST(
 
     if (insertError) throw insertError;
 
+    // ── 선착순 댓글(키워드) 이벤트 매칭 확인 ───────────────────
+    // 방송에서 구두로 안내한 키워드와 채팅 내용이 일치하면 참여 처리.
+    // 실패해도 채팅 자체는 이미 저장됐으므로 이벤트 처리 오류가 채팅 전송을 막지 않는다.
+    let keywordEventResult: {
+      isWinner: boolean;
+      matched: boolean;
+      prizeLabel?: string;
+      winnerRank?: number;
+      winnerCount?: number;
+      couponIssueStatus?: "issued" | "failed" | "not_applicable";
+    } | null = null;
+
+    try {
+      const admin = createSupabaseAdmin();
+      const { data: activeEvent } = await admin
+        .from("live_keyword_events")
+        .select("id, keyword, coupon_template_id, prize_label")
+        .eq("stream_id", id)
+        .eq("status", "active")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (activeEvent && message.trim().toLowerCase() === activeEvent.keyword.trim().toLowerCase()) {
+        const { error: entryInsertError } = await admin.from("live_keyword_entries").insert({
+          event_id: activeEvent.id,
+          master_user_id: masterUserId,
+          nickname,
+        });
+
+        // UNIQUE(event_id, master_user_id) 위반 = 이미 참여함 → 조용히 무시 (일반 채팅으로만 처리)
+        if (!entryInsertError) {
+          const { data: claimRows } = await admin.rpc("claim_live_keyword_winner_slot", {
+            p_event_id: activeEvent.id,
+          });
+          const claim = claimRows?.[0] as
+            | { claimed: boolean; winner_rank: number | null; winner_count: number | null; coupon_template_id: string | null; prize_label: string | null }
+            | undefined;
+
+          if (claim?.claimed) {
+            await admin
+              .from("live_keyword_entries")
+              .update({ is_winner: true })
+              .eq("event_id", activeEvent.id)
+              .eq("master_user_id", masterUserId);
+
+            let couponIssueStatus: "issued" | "failed" | "not_applicable" = "not_applicable";
+            if (claim.coupon_template_id) {
+              try {
+                await issueCoupon({
+                  masterUserId,
+                  couponTemplateId: claim.coupon_template_id,
+                  issuedBy: "model_beauty_live_keyword_event",
+                });
+                couponIssueStatus = "issued";
+              } catch (couponError) {
+                console.error("[POST /api/live/[id]/chat] 키워드 이벤트 쿠폰 자동 발급 실패:", couponError);
+                couponIssueStatus = "failed";
+              }
+              await admin
+                .from("live_keyword_entries")
+                .update({ coupon_issue_status: couponIssueStatus })
+                .eq("event_id", activeEvent.id)
+                .eq("master_user_id", masterUserId);
+            }
+
+            keywordEventResult = {
+              isWinner: true,
+              matched: true,
+              prizeLabel: claim.prize_label ?? undefined,
+              winnerRank: claim.winner_rank ?? undefined,
+              winnerCount: claim.winner_count ?? undefined,
+              couponIssueStatus,
+            };
+          } else {
+            keywordEventResult = { isWinner: false, matched: true };
+          }
+        }
+      }
+    } catch (keywordError) {
+      console.error("[POST /api/live/[id]/chat] 키워드 이벤트 처리 실패:", keywordError);
+    }
+
     return Response.json({
       success: true,
       data: {
@@ -150,6 +233,7 @@ export async function POST(
         message: newChat.message,
         createdAt: newChat.created_at,
       },
+      keywordEvent: keywordEventResult,
     });
   } catch (err: any) {
     console.error("[POST /api/live/[id]/chat] Error:", err);

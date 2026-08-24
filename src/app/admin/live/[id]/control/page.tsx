@@ -70,6 +70,18 @@ interface GameRound {
   endedAt: string | null;
 }
 
+interface KeywordEvent {
+  id: string;
+  status: "active" | "ended" | "cancelled";
+  prizeLabel: string;
+  winnerCount: number;
+  currentWinners: number;
+  winners: GameWinner[];
+  entryCount: number;
+  createdAt: string;
+  endedAt: string | null;
+}
+
 interface CouponTemplate {
   id: string;
   name: string;
@@ -107,6 +119,14 @@ export default function AdminLiveControlPage({ params }: { params: Promise<{ id:
   const [gamePrizeLabel, setGamePrizeLabel] = useState("");
   const [gameCouponTemplateId, setGameCouponTemplateId] = useState("");
   const [gameSubmitting, setGameSubmitting] = useState(false);
+
+  // 미니게임 (선착순 댓글 이벤트)
+  const [keywordEvent, setKeywordEvent] = useState<KeywordEvent | null>(null);
+  const [keywordInput, setKeywordInput] = useState("");
+  const [keywordWinnerCount, setKeywordWinnerCount] = useState("1");
+  const [keywordPrizeLabel, setKeywordPrizeLabel] = useState("");
+  const [keywordCouponTemplateId, setKeywordCouponTemplateId] = useState("");
+  const [keywordSubmitting, setKeywordSubmitting] = useState(false);
 
   // 5분 전 경고 배너 상태
   const [showAlertBanner, setShowAlertBanner] = useState(false);
@@ -154,6 +174,16 @@ export default function AdminLiveControlPage({ params }: { params: Promise<{ id:
     }
   }, [streamId]);
 
+  const fetchKeywordEvent = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/live/${streamId}/keyword-event`);
+      const { data, success } = await res.json();
+      if (success) setKeywordEvent(data);
+    } catch (e) {
+      console.error(e);
+    }
+  }, [streamId]);
+
   const fetchCouponTemplates = useCallback(async () => {
     setCouponTemplatesLoading(true);
     try {
@@ -171,8 +201,9 @@ export default function AdminLiveControlPage({ params }: { params: Promise<{ id:
     fetchStreamData();
     fetchChats();
     fetchGameRound();
+    fetchKeywordEvent();
     fetchCouponTemplates();
-  }, [fetchStreamData, fetchChats, fetchGameRound, fetchCouponTemplates]);
+  }, [fetchStreamData, fetchChats, fetchGameRound, fetchKeywordEvent, fetchCouponTemplates]);
 
   // ── 5분 전 커운트다운 타이머 및 웹 알림 유도 ─────────────────
   useEffect(() => {
@@ -277,6 +308,7 @@ export default function AdminLiveControlPage({ params }: { params: Promise<{ id:
           });
         }
         fetchGameRound();
+        fetchKeywordEvent();
       } catch (e) {
         console.error("[StreamPoll]", e);
       }
@@ -477,6 +509,75 @@ export default function AdminLiveControlPage({ params }: { params: Promise<{ id:
       alert("네트워크 오류가 발생했습니다.");
     } finally {
       setGameSubmitting(false);
+    }
+  };
+
+  // ── 미니게임: 선착순 댓글(키워드) 이벤트 시작 ──────────────────
+  const handleStartKeywordEvent = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const cleanKeyword = keywordInput.trim();
+    if (!cleanKeyword) {
+      alert("정답 키워드를 입력해 주세요.");
+      return;
+    }
+    if (!keywordPrizeLabel.trim()) {
+      alert("경품 설명을 입력해 주세요. (예: 배송비 무료 쿠폰)");
+      return;
+    }
+    const winnerCount = parseInt(keywordWinnerCount, 10);
+    if (Number.isNaN(winnerCount) || winnerCount < 1) {
+      alert("우승 인원수는 1명 이상이어야 합니다.");
+      return;
+    }
+    if (!confirm(`정답 키워드 [${cleanKeyword}]로 이벤트를 시작할까요? 선착순 ${winnerCount}명 우승 · 방송에서 직접 키워드를 안내해 주세요.`)) return;
+
+    setKeywordSubmitting(true);
+    try {
+      const res = await fetch(`/api/live/${streamId}/keyword-event`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          keyword: cleanKeyword,
+          prizeLabel: keywordPrizeLabel.trim(),
+          couponTemplateId: keywordCouponTemplateId || null,
+          winnerCount,
+        }),
+      });
+      const { success, error } = await res.json();
+      if (success) {
+        setKeywordInput("");
+        await fetchKeywordEvent();
+      } else {
+        alert(error ?? "이벤트 시작 실패");
+      }
+    } catch (e) {
+      console.error(e);
+      alert("네트워크 오류가 발생했습니다.");
+    } finally {
+      setKeywordSubmitting(false);
+    }
+  };
+
+  const handleCancelKeywordEvent = async () => {
+    if (!keywordEvent || !confirm("진행 중인 이벤트를 취소할까요?")) return;
+    setKeywordSubmitting(true);
+    try {
+      const res = await fetch(`/api/live/${streamId}/keyword-event`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ eventId: keywordEvent.id }),
+      });
+      const { success, error } = await res.json();
+      if (success) {
+        await fetchKeywordEvent();
+      } else {
+        alert(error ?? "이벤트 취소 실패");
+      }
+    } catch (e) {
+      console.error(e);
+      alert("네트워크 오류가 발생했습니다.");
+    } finally {
+      setKeywordSubmitting(false);
     }
   };
 
@@ -971,6 +1072,112 @@ export default function AdminLiveControlPage({ params }: { params: Promise<{ id:
                     style={{ alignSelf: "flex-end" }}
                   >
                     {stream.status !== "live" ? "방송 중에만 시작 가능" : "🎮 게임 시작"}
+                  </button>
+                </form>
+              </>
+            )}
+          </div>
+
+          {/* 미니게임: 선착순 댓글 이벤트 */}
+          <div className="admin-card control-card" style={{ marginTop: "1.5rem" }}>
+            <h2 className="admin-card-title">🎯 미니게임 — 선착순 댓글 이벤트</h2>
+            <p style={{ fontSize: "0.8125rem", color: "#6b7280", margin: "0.5rem 0 1rem" }}>
+              정답 키워드는 시청자 화면에 노출되지 않습니다. 방송에서 직접 키워드를 안내하면, 채팅에 그 키워드를 가장 먼저 입력한 인원수만큼 자동 우승 처리됩니다.
+            </p>
+
+            {keywordEvent && keywordEvent.status === "active" ? (
+              <div style={{ background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: "10px", padding: "1rem" }}>
+                <div style={{ fontWeight: 700, marginBottom: "0.375rem" }}>
+                  진행 중 · 경품: {keywordEvent.prizeLabel}
+                </div>
+                <div style={{ fontSize: "0.8125rem", color: "#6b7280", marginBottom: "0.375rem" }}>
+                  참여자 {keywordEvent.entryCount}명 · 우승 {keywordEvent.currentWinners}/{keywordEvent.winnerCount}명
+                </div>
+                {keywordEvent.winners.length > 0 && (
+                  <div style={{ fontSize: "0.8125rem", marginBottom: "0.75rem" }}>
+                    {keywordEvent.winners.map((w, i) => (
+                      <div key={i}>
+                        🏆 {w.nickname}
+                        {w.couponIssueStatus === "issued" && <span style={{ color: "#059669", marginLeft: "0.375rem" }}>✓ 쿠폰 발급 완료</span>}
+                        {w.couponIssueStatus === "failed" && <span style={{ color: "#dc2626", marginLeft: "0.375rem" }}>⚠ 발급 실패 — 수동 발급 필요</span>}
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <button
+                  onClick={handleCancelKeywordEvent}
+                  disabled={keywordSubmitting}
+                  className="admin-btn admin-btn-secondary admin-btn-sm"
+                >
+                  이벤트 취소
+                </button>
+              </div>
+            ) : (
+              <>
+                {keywordEvent && keywordEvent.status === "ended" && (
+                  <div style={{
+                    background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: "10px",
+                    padding: "0.75rem 1rem", marginBottom: "1rem", fontSize: "0.8125rem",
+                  }}>
+                    <div style={{ marginBottom: "0.375rem" }}>
+                      🏆 지난 이벤트 우승 ({keywordEvent.currentWinners}/{keywordEvent.winnerCount}명) · 경품: {keywordEvent.prizeLabel}
+                    </div>
+                    {keywordEvent.winners.map((w, i) => (
+                      <div key={i}>
+                        <strong>{w.nickname}</strong>
+                        {w.couponIssueStatus === "issued" && <span style={{ color: "#059669", marginLeft: "0.5rem" }}>✓ 쿠폰 자동 발급 완료</span>}
+                        {w.couponIssueStatus === "failed" && <span style={{ color: "#dc2626", marginLeft: "0.5rem" }}>⚠ 쿠폰 발급 실패 — 수동 발급 필요</span>}
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <form onSubmit={handleStartKeywordEvent} style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+                  <input
+                    className="admin-input"
+                    value={keywordInput}
+                    onChange={(e) => setKeywordInput(e.target.value)}
+                    placeholder="정답 키워드 (예: 모델뷰티)"
+                    maxLength={40}
+                  />
+                  <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
+                    <label style={{ fontSize: "0.8125rem", color: "#6b7280" }}>우승 인원수</label>
+                    <input className="admin-input" type="number" min={1} value={keywordWinnerCount} onChange={(e) => setKeywordWinnerCount(e.target.value)} placeholder="1" style={{ width: "80px" }} />
+                    <span style={{ fontSize: "0.75rem", color: "#9ca3af" }}>선착순으로 이 인원수까지 자동 우승 처리됩니다</span>
+                  </div>
+                  <input
+                    className="admin-input"
+                    value={keywordPrizeLabel}
+                    onChange={(e) => setKeywordPrizeLabel(e.target.value)}
+                    placeholder="경품 설명 (예: 배송비 무료 쿠폰, 20% 할인 쿠폰)"
+                    maxLength={60}
+                  />
+                  <div>
+                    <label style={{ fontSize: "0.75rem", fontWeight: 600, color: "#6b7280", display: "block", marginBottom: "0.375rem" }}>
+                      자동 발급할 쿠폰 (선택 — 아임모델 공화국 쿠폰 템플릿)
+                    </label>
+                    <select
+                      className="admin-input"
+                      value={keywordCouponTemplateId}
+                      onChange={(e) => setKeywordCouponTemplateId(e.target.value)}
+                    >
+                      <option value="">쿠폰 자동발급 안 함 (수동 처리)</option>
+                      {couponTemplatesLoading ? (
+                        <option disabled>불러오는 중...</option>
+                      ) : (
+                        couponTemplates.map((t) => (
+                          <option key={t.id} value={t.id}>{t.name}</option>
+                        ))
+                      )}
+                    </select>
+                  </div>
+                  <button
+                    type="submit"
+                    disabled={keywordSubmitting || stream.status !== "live"}
+                    className="admin-btn admin-btn-primary"
+                    style={{ alignSelf: "flex-end" }}
+                  >
+                    {stream.status !== "live" ? "방송 중에만 시작 가능" : "🎯 이벤트 시작"}
                   </button>
                 </form>
               </>

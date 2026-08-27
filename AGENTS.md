@@ -25,9 +25,12 @@ This version has breaking changes — APIs, conventions, and file structure may 
 
 # 🔑 안드로이드 앱 서명 키 정보 (Android Keystore Metadata)
 향후 안드로이드 스튜디오에서 패키징(AAB 빌드) 업데이트 시 아래 서명 키 정보를 사용합니다:
-- **서명 키 파일 경로:** `C:\Users\myday\modelbeauty_key2.jks`
+- **서명 키 파일 경로:** `C:\Users\myday\modelbeauty_key.jks` (2026-08-02 기준 확인: 과거 `_key2.jks`로 잘못 기록되어 있었음 — 실제 파일명은 "2" 없는 이 경로)
 - **Key Alias (별칭):** `key0`
-- **비밀번호:** 사용자가 지정한 통합 비밀번호 (예: `modelbeauty123!`)
+- **비밀번호:** 이 저장소는 공개(public)이므로 비밀번호를 여기에 적지 않습니다.
+  실제 값은 커밋되지 않는 `android-app/keystore.properties`에 보관되어 있으며,
+  Gradle이 빌드 시 이 파일에서 자동으로 읽어갑니다. (양식: `android-app/keystore.properties.example`)
+  해당 파일이 없으면 `keystore.properties.example`을 복사해 값을 채워 넣으세요.
 
 
 

@@ -115,12 +115,28 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    // 신뢰할 수 있는 실서비스 호스트만 허용 (교차 앱 스크립팅 방지용 화이트리스트)
+    private static final String TRUSTED_HOST = "www.modelbeauty.kr";
+
+    // MainActivity는 android:exported="true"이므로 다른 앱(악성 앱 포함)이 임의의 Intent를
+    // 직접 보낼 수 있다. 그 Intent에 담긴 값(딥링크 path, 푸시 링크 등)을 검증 없이
+    // WebView.loadUrl()에 넘기면 javascript:/file:// 스킴이나 피싱 도메인을 로드시켜
+    // AndroidBiometric/AndroidPush JS 브릿지를 악용당할 수 있다(Cross-App Scripting).
+    // 따라서 외부에서 들어온 값은 반드시 TRUSTED_HOST로만 귀결되는지 검증한다.
+    private boolean isTrustedUrl(String url) {
+        if (url == null) return false;
+        Uri uri = Uri.parse(url);
+        String scheme = uri.getScheme();
+        String host = uri.getHost();
+        return "https".equals(scheme) && TRUSTED_HOST.equals(host);
+    }
+
     // modelbeauty://open?path=/products/123 형태의 딥링크에서 path 쿼리 파라미터를 꺼내
     // 실서비스 URL 뒤에 붙여준다. 딥링크가 아니거나 path가 없으면 기본 홈 URL을 반환.
     // 푸시 알림을 탭해서 들어온 경우(FcmService.EXTRA_LINK_URL)가 최우선.
     private String resolveTargetUrl(Intent intent) {
         String pushLinkUrl = (intent != null) ? intent.getStringExtra(FcmService.EXTRA_LINK_URL) : null;
-        if (pushLinkUrl != null && !pushLinkUrl.isEmpty()) {
+        if (pushLinkUrl != null && !pushLinkUrl.isEmpty() && isTrustedUrl(pushLinkUrl)) {
             return pushLinkUrl;
         }
 
@@ -135,7 +151,10 @@ public class MainActivity extends AppCompatActivity {
         if (!path.startsWith("/")) {
             path = "/" + path;
         }
-        return TARGET_URL + path;
+        // path 값 자체로 스킴/호스트를 바꿔치기(예: "//evil.com" → 프로토콜 상대 URL)하지
+        // 못하도록, 최종적으로 만들어진 URL이 여전히 신뢰 호스트인지 다시 한번 검증한다.
+        String candidate = TARGET_URL + path;
+        return isTrustedUrl(candidate) ? candidate : TARGET_URL;
     }
 
     @Override

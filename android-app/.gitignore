@@ -1,0 +1,14 @@
+# 서명 키 및 비밀번호 (절대 커밋 금지)
+keystore.properties
+*.jks
+*.keystore
+local.properties
+
+# 빌드 산출물
+build/
+.gradle/
+.cxx/
+
+# IDE 설정
+.idea/
+*.iml

@@ -14,6 +14,7 @@ import type { Product } from "@/types";
 
 interface ProductCardProps {
   product: Product;
+  variant?: "default" | "compact";
 }
 
 function formatPrice(price: number): string {
@@ -24,7 +25,7 @@ function calcDiscountRate(base: number, sale: number): number {
   return Math.round(((base - sale) / base) * 100);
 }
 
-export default function ProductCard({ product }: ProductCardProps) {
+export default function ProductCard({ product, variant = "default" }: ProductCardProps) {
   const { toggleWishlist, isWishlisted } = useWishlistStore();
   const { isLoggedIn } = useAuthStore();
   const router = useRouter();
@@ -49,7 +50,10 @@ export default function ProductCard({ product }: ProductCardProps) {
   };
 
   return (
-    <Link href={`/products/${product.slug}`} className="product-card">
+    <Link
+      href={`/products/${product.slug}`}
+      className={`product-card${variant === "compact" ? " product-card-compact" : ""}`}
+    >
       {/* 상품 이미지 */}
       <div className="product-card-image">
         {firstImage ? (

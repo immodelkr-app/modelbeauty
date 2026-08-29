@@ -448,7 +448,7 @@ export default async function HomePage() {
           </section>
         )}
 
-        {/* ── 전체 상품 섹션 (3단 8열 그리드) ─────────── */}
+        {/* ── 전체 상품 섹션 (모바일 2열 → 데스크탑 8열, 컴팩트 카드) ─────────── */}
         {allProducts.length > 0 && (
           <section className="products-section" aria-label="모델뷰티 전체상품">
             <div className="section-header">
@@ -462,7 +462,7 @@ export default async function HomePage() {
             </div>
             <div className="product-grid-8col">
               {allProducts.map((product) => (
-                <ProductCard key={product.id} product={product} />
+                <ProductCard key={product.id} product={product} variant="compact" />
               ))}
             </div>
           </section>

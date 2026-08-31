@@ -158,10 +158,52 @@ public class MainActivity extends AppCompatActivity {
     }
 
     @Override
+    protected void onPause() {
+        super.onPause();
+        // 백그라운드로 전환되면 웹뷰 타이머/렌더링을 멈춰 불필요한 CPU/메모리 사용을 줄인다
+        // (Google Play 정책: 비트맵 등은 앱이 보이지 않는 상태에서 장시간 메모리에 유지되면 안 됨)
+        if (mWebView != null) {
+            mWebView.onPause();
+            mWebView.pauseTimers();
+        }
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        if (mWebView != null) {
+            mWebView.onResume();
+            mWebView.resumeTimers();
+        }
+    }
+
+    @Override
+    public void onTrimMemory(int level) {
+        super.onTrimMemory(level);
+        // 시스템이 메모리 부족을 알리면(백그라운드 캐시 단계 이상) 웹뷰 렌더 캐시를 비워
+        // 앱이 비트맵/RSS 메모리를 과도하게 붙들고 있지 않도록 한다
+        if (mWebView != null && level >= TRIM_MEMORY_BACKGROUND) {
+            mWebView.clearCache(false);
+        }
+    }
+
+    @Override
     protected void onDestroy() {
         super.onDestroy();
         if (sCurrentInstance == this) {
             sCurrentInstance = null;
+        }
+        // 웹뷰가 액티비티 소멸 후에도 렌더러/네이티브 리소스를 붙들고 있지 않도록 명시적으로 해제
+        if (mWebView != null) {
+            FrameLayout webViewContainer = findViewById(R.id.webview_container);
+            if (webViewContainer != null) {
+                webViewContainer.removeView(mWebView);
+            }
+            mWebView.stopLoading();
+            mWebView.clearHistory();
+            mWebView.removeAllViews();
+            mWebView.destroy();
+            mWebView = null;
         }
     }
 

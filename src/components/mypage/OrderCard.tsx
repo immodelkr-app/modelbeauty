@@ -2,6 +2,7 @@
 // OrderCard — 주문 목록 카드
 // ============================================================
 
+import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import OrderStatusBadge from "@/components/mypage/OrderStatusBadge";
@@ -31,6 +32,7 @@ interface OrderCardData {
 
 interface OrderCardProps {
   order: OrderCardData;
+  onCancelled?: (orderId: string) => void;
 }
 
 function formatPrice(price: number): string {
@@ -46,12 +48,35 @@ function formatDate(dateStr: string): string {
   });
 }
 
-export default function OrderCard({ order }: OrderCardProps) {
+export default function OrderCard({ order, onCancelled }: OrderCardProps) {
   const { firstItem, shippingInfo } = order;
   const moreCount = order.itemCount - 1;
   const optionText = firstItem?.variantInfo
     ? Object.values(firstItem.variantInfo).join(" / ")
     : null;
+  const [isCancelling, setIsCancelling] = useState(false);
+
+  const handleCancel = async () => {
+    if (isCancelling) return;
+    if (!window.confirm("주문을 취소하시겠습니까?")) return;
+
+    setIsCancelling(true);
+    try {
+      const res = await fetch(`/api/mypage/orders/${order.id}/cancel`, {
+        method: "POST",
+      });
+      const result = await res.json();
+      if (!res.ok || !result.success) {
+        alert(result.error ?? "주문 취소에 실패했습니다.");
+        return;
+      }
+      onCancelled?.(order.id);
+    } catch {
+      alert("주문 취소 중 오류가 발생했습니다.");
+    } finally {
+      setIsCancelling(false);
+    }
+  };
 
   return (
     <article className="order-card" aria-label={`주문 ${order.orderNumber}`}>
@@ -133,8 +158,12 @@ export default function OrderCard({ order }: OrderCardProps) {
           )}
           {/* 취소 (결제 대기/완료 시) */}
           {(order.status === "pending" || order.status === "paid") && (
-            <button className="order-action-btn order-action-btn-outline">
-              주문 취소
+            <button
+              className="order-action-btn order-action-btn-outline"
+              onClick={handleCancel}
+              disabled={isCancelling}
+            >
+              {isCancelling ? "취소 중..." : "주문 취소"}
             </button>
           )}
           {/* 다시 주문 */}

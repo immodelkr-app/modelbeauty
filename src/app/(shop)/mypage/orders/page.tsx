@@ -71,6 +71,12 @@ export default function OrdersPage() {
     fetchOrders(nextPage, true);
   };
 
+  const handleCancelled = (orderId: string) => {
+    setOrders((prev) =>
+      prev.map((o) => (o.id === orderId ? { ...o, status: "cancelled" } : o))
+    );
+  };
+
   return (
     <>
       <div
@@ -120,7 +126,7 @@ export default function OrdersPage() {
         <>
           <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
             {orders.map((order) => (
-              <OrderCard key={order.id} order={order} />
+              <OrderCard key={order.id} order={order} onCancelled={handleCancelled} />
             ))}
           </div>
 

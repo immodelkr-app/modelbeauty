@@ -1029,7 +1029,15 @@ export default function MypagePage() {
         ) : recentOrders.length > 0 ? (
           <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
             {recentOrders.map((order) => (
-              <OrderCard key={order.id} order={order} />
+              <OrderCard
+                key={order.id}
+                order={order}
+                onCancelled={(orderId) =>
+                  setRecentOrders((prev) =>
+                    prev.map((o) => (o.id === orderId ? { ...o, status: "cancelled" } : o))
+                  )
+                }
+              />
             ))}
           </div>
         ) : (

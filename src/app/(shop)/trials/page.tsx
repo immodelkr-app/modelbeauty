@@ -3,7 +3,7 @@
 // ============================================================
 
 import type { Metadata } from "next";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createSupabaseServerClient, createSupabaseAdmin } from "@/lib/supabase/server";
 import TrialsGrid from "@/components/trials/TrialsGrid";
 import type { TrialCampaign } from "@/types";
 
@@ -30,9 +30,12 @@ async function getCampaigns(): Promise<{ campaigns: TrialCampaign[]; myApplicati
     return { campaigns: [], myApplications: [] };
   }
 
+  // trial_applications는 RLS가 서비스 롤 전용(공개 정책 없음)이라 admin 클라이언트로 조회한다.
+  const admin = createSupabaseAdmin();
+
   const campaignIds = (campaigns ?? []).map((c) => c.id);
   const { data: applications } = campaignIds.length
-    ? await supabase.from("trial_applications").select("campaign_id").in("campaign_id", campaignIds)
+    ? await admin.from("trial_applications").select("campaign_id").in("campaign_id", campaignIds)
     : { data: [] as { campaign_id: string }[] };
 
   const countByCampaign = new Map<string, number>();
@@ -44,7 +47,7 @@ async function getCampaigns(): Promise<{ campaigns: TrialCampaign[]; myApplicati
   let myApplications: string[] = [];
   if (user) {
     const masterUserId = (user.user_metadata?.master_user_id as string | undefined) ?? user.id;
-    const { data: mine } = await supabase
+    const { data: mine } = await admin
       .from("trial_applications")
       .select("campaign_id")
       .eq("master_user_id", masterUserId)

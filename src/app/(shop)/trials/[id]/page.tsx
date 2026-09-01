@@ -6,7 +6,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
 import type { Metadata } from "next";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createSupabaseServerClient, createSupabaseAdmin } from "@/lib/supabase/server";
 import TrialApplyPanel from "@/components/trials/TrialApplyPanel";
 import TrialReviews from "@/components/trials/TrialReviews";
 import type { TrialCampaign, TrialReview } from "@/types";
@@ -31,7 +31,10 @@ async function getCampaign(id: string): Promise<{
 
   if (error || !campaign) return null;
 
-  const { count } = await supabase
+  // trial_applications는 RLS가 서비스 롤 전용(공개 정책 없음)이라 admin 클라이언트로 조회한다.
+  const admin = createSupabaseAdmin();
+
+  const { count } = await admin
     .from("trial_applications")
     .select("id", { count: "exact", head: true })
     .eq("campaign_id", id);
@@ -62,7 +65,7 @@ async function getCampaign(id: string): Promise<{
   let canWriteReview = false;
   if (user) {
     const masterUserId = (user.user_metadata?.master_user_id as string | undefined) ?? user.id;
-    const { data: mine } = await supabase
+    const { data: mine } = await admin
       .from("trial_applications")
       .select("id, status")
       .eq("campaign_id", id)

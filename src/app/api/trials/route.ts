@@ -2,11 +2,13 @@
 // GET /api/trials — 진행중인 체험단 캠페인 목록 (공개)
 // ============================================================
 
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createSupabaseServerClient, createSupabaseAdmin } from "@/lib/supabase/server";
 
 export async function GET() {
   try {
     const supabase = await createSupabaseServerClient();
+    // trial_applications는 RLS가 서비스 롤 전용(공개 정책 없음)이라 admin 클라이언트로 조회한다.
+    const admin = createSupabaseAdmin();
 
     const { data: campaigns, error } = await supabase
       .from("trial_campaigns")
@@ -22,7 +24,7 @@ export async function GET() {
 
     const campaignIds = (campaigns ?? []).map((c) => c.id);
     const { data: applications } = campaignIds.length
-      ? await supabase
+      ? await admin
           .from("trial_applications")
           .select("campaign_id")
           .in("campaign_id", campaignIds)
@@ -38,7 +40,7 @@ export async function GET() {
     let myApplications: string[] = [];
     if (user) {
       const masterUserId = (user.user_metadata?.master_user_id as string | undefined) ?? user.id;
-      const { data: mine } = await supabase
+      const { data: mine } = await admin
         .from("trial_applications")
         .select("campaign_id")
         .eq("master_user_id", masterUserId)

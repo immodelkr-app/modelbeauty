@@ -32,7 +32,19 @@ interface Applicant {
   message: string | null;
   status: "applied" | "selected" | "rejected";
   applied_at: string;
+  notified_at: string | null;
 }
+
+const APPLICANT_STATUS_LABEL: Record<Applicant["status"], string> = {
+  applied: "심사중",
+  selected: "선정됨",
+  rejected: "반려됨",
+};
+const APPLICANT_STATUS_COLOR: Record<Applicant["status"], { bg: string; fg: string }> = {
+  applied: { bg: "#f3f4f6", fg: "#6b7280" },
+  selected: { bg: "#dcfce7", fg: "#15803d" },
+  rejected: { bg: "#fee2e2", fg: "#b91c1c" },
+};
 
 const STATUS_LABEL: Record<Campaign["status"], string> = {
   draft: "임시저장",
@@ -231,11 +243,10 @@ export default function AdminTrialsPage() {
     }
   };
 
-  const openApplicants = async (campaign: Campaign) => {
-    setApplicantsFor(campaign);
+  const loadApplicants = async (campaignId: string) => {
     setApplicantsLoading(true);
     try {
-      const res = await fetch(`/api/admin/trials/${campaign.id}/applicants`);
+      const res = await fetch(`/api/admin/trials/${campaignId}/applicants`);
       const result = await res.json();
       if (result.success) setApplicants(result.data ?? []);
       else alert(result.error ?? "신청자 목록을 불러올 수 없습니다.");
@@ -243,6 +254,44 @@ export default function AdminTrialsPage() {
       alert("네트워크 오류가 발생했습니다.");
     } finally {
       setApplicantsLoading(false);
+    }
+  };
+
+  const openApplicants = async (campaign: Campaign) => {
+    setApplicantsFor(campaign);
+    await loadApplicants(campaign.id);
+  };
+
+  const handleApplicantDecision = async (applicant: Applicant, status: "selected" | "rejected") => {
+    if (!applicantsFor) return;
+    if (
+      status === "selected" &&
+      !confirm("선정 처리하시겠습니까? 즉시 앱푸시 + 문자로 선정 안내가 자동 발송됩니다.")
+    ) return;
+    if (status === "rejected" && !confirm("반려 처리하시겠습니까?")) return;
+
+    try {
+      const res = await fetch(`/api/admin/trials/${applicantsFor.id}/applicants/${applicant.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status }),
+      });
+      const result = await res.json();
+      if (result.success) {
+        if (status === "selected") {
+          const pushMsg = { sent: "발송됨", no_token: "앱 미설치/로그아웃", failed: "발송 실패", skipped: "-" }[result.pushResult as string] ?? result.pushResult;
+          const smsMsg = { sent: "발송됨", no_phone: "연락처 없음", failed: "발송 실패", skipped: "-" }[result.smsResult as string] ?? result.smsResult;
+          alert(`✅ 선정 처리 완료\n앱푸시: ${pushMsg}\n문자: ${smsMsg}`);
+        } else {
+          alert("반려 처리되었습니다.");
+        }
+        loadApplicants(applicantsFor.id);
+        fetchCampaigns();
+      } else {
+        alert(result.error ?? "처리에 실패했습니다.");
+      }
+    } catch {
+      alert("네트워크 오류가 발생했습니다.");
     }
   };
 
@@ -468,6 +517,8 @@ export default function AdminTrialsPage() {
                       <th>채널 링크</th>
                       <th>지원 동기</th>
                       <th>신청일</th>
+                      <th>상태</th>
+                      <th>관리</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -482,14 +533,52 @@ export default function AdminTrialsPage() {
                         <td style={{ fontSize: "0.75rem", color: "#6b7280" }}>
                           {new Date(a.applied_at).toLocaleString("ko-KR")}
                         </td>
+                        <td>
+                          <span style={{
+                            display: "inline-block", padding: "2px 8px", borderRadius: 9999,
+                            fontSize: "0.72rem", fontWeight: 700,
+                            background: APPLICANT_STATUS_COLOR[a.status].bg, color: APPLICANT_STATUS_COLOR[a.status].fg,
+                          }}>
+                            {APPLICANT_STATUS_LABEL[a.status]}
+                          </span>
+                          {a.notified_at && (
+                            <div style={{ fontSize: "0.68rem", color: "#9ca3af", marginTop: "2px" }}>
+                              알림 {new Date(a.notified_at).toLocaleDateString("ko-KR")}
+                            </div>
+                          )}
+                        </td>
+                        <td>
+                          {a.status === "applied" ? (
+                            <div style={{ display: "flex", gap: "0.3rem" }}>
+                              <button
+                                onClick={() => handleApplicantDecision(a, "selected")}
+                                className="admin-btn admin-btn-sm"
+                                style={{ borderColor: "#15803d", color: "#15803d", backgroundColor: "#f0fdf4", fontSize: "0.72rem" }}
+                              >
+                                선정
+                              </button>
+                              <button
+                                onClick={() => handleApplicantDecision(a, "rejected")}
+                                className="admin-btn admin-btn-sm"
+                                style={{ borderColor: "#ef4444", color: "#ef4444", backgroundColor: "#fef2f2", fontSize: "0.72rem" }}
+                              >
+                                반려
+                              </button>
+                            </div>
+                          ) : (
+                            <span style={{ fontSize: "0.72rem", color: "#9ca3af" }}>—</span>
+                          )}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               )}
-              <p style={{ fontSize: "0.78rem", color: "#9ca3af", marginTop: "1rem" }}>
-                선정 처리·결제 안내·알림 발송 기능은 다음 단계에서 추가될 예정입니다.
-              </p>
+              {applicants.length > 0 && (
+                <p style={{ fontSize: "0.78rem", color: "#9ca3af", marginTop: "1rem" }}>
+                  참가비 결제 연동은 다음 단계에서 추가될 예정입니다. 지금은 선정 알림(앱푸시/문자)만 자동 발송됩니다.
+                </p>
+              )}
             </div>
           </div>
         </div>

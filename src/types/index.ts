@@ -312,3 +312,38 @@ export interface ProductReviewSummary {
   count: number;
 }
 
+export interface TrialCampaign {
+  id: string;
+  productId: string;
+  vendorId: string | null;
+  title: string;
+  description: string | null;
+  campaignType: "free" | "paid";
+  price: number;
+  quota: number;
+  recruitStart: string;
+  recruitEnd: string;
+  status: "draft" | "recruiting" | "selecting" | "closed";
+  createdAt: string;
+  updatedAt: string;
+  product: {
+    id: string;
+    name: string;
+    slug: string;
+    images: { url: string }[];
+    basePrice: number;
+    salePrice: number | null;
+  };
+  applicantCount: number;
+}
+
+export interface TrialApplication {
+  id: string;
+  campaignId: string;
+  masterUserId: string;
+  channelUrl: string;
+  message: string | null;
+  status: "applied" | "selected" | "rejected";
+  appliedAt: string;
+}
+

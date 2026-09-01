@@ -23,6 +23,7 @@ export default async function Header() {
     ...(categories ?? []).map((c) => ({ href: `/products?category=${c.slug}`, label: c.name })),
     { href: "/products?featured=true", label: "베스트" },
     { href: "/live", label: "📺 라이브" },
+    { href: "/trials", label: "🎁 체험단" },
   ];
 
   return (

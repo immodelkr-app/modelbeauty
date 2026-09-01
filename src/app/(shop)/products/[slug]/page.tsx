@@ -12,7 +12,9 @@ import ProductCard from "@/components/products/ProductCard";
 import ProductDetailTabs from "@/components/products/ProductDetailTabs";
 import CrewRecommendBanner from "@/components/products/CrewRecommendBanner";
 import ShareButtons from "@/components/products/ShareButtons";
-import type { Product, ProductOption, ProductVariant, ProductVideo } from "@/types";
+import type { Product, ProductOption, ProductVariant, ProductVideo, ProductReview, ProductReviewSummary } from "@/types";
+
+const REVIEW_PAGE_SIZE = 10;
 
 const APP_URL = "https://www.modelbeauty.kr";
 
@@ -295,6 +297,52 @@ async function getProductVideos(productId: string): Promise<ProductVideo[]> {
   }));
 }
 
+async function getProductReviews(productId: string): Promise<{
+  reviews: ProductReview[];
+  summary: ProductReviewSummary;
+  nextCursor: string | null;
+}> {
+  const supabase = await createSupabaseServerClient();
+
+  const [{ data: rows }, { data: ratingRows }] = await Promise.all([
+    supabase
+      .from("product_reviews")
+      .select("id, product_id, master_user_id, order_id, rating, body, images, external_link, created_at")
+      .eq("product_id", productId)
+      .order("created_at", { ascending: false })
+      .limit(REVIEW_PAGE_SIZE + 1),
+    supabase.from("product_reviews").select("rating").eq("product_id", productId),
+  ]);
+
+  const allRows = rows ?? [];
+  const hasMore = allRows.length > REVIEW_PAGE_SIZE;
+  const pageRows = allRows.slice(0, REVIEW_PAGE_SIZE);
+
+  const count = ratingRows?.length ?? 0;
+  const average = count > 0
+    ? Math.round((ratingRows!.reduce((sum, r) => sum + r.rating, 0) / count) * 10) / 10
+    : 0;
+
+  return {
+    reviews: pageRows.map((r) => ({
+      id: r.id,
+      productId: r.product_id,
+      masterUserId: r.master_user_id,
+      orderId: r.order_id,
+      rating: r.rating,
+      body: r.body,
+      images: (r.images as { url: string }[]) ?? [],
+      externalLink: r.external_link,
+      isHidden: false,
+      hiddenReason: null,
+      createdAt: r.created_at,
+      updatedAt: r.created_at,
+    })),
+    summary: { average, count },
+    nextCursor: hasMore ? pageRows[pageRows.length - 1]?.created_at ?? null : null,
+  };
+}
+
 // ── 페이지 컴포넌트 ───────────────────────────────────────
 
 export default async function ProductDetailPage({
@@ -310,10 +358,11 @@ export default async function ProductDetailPage({
   const product = await getProduct(slug);
   if (!product) notFound();
 
-  const [{ options, variants }, videos, relatedProducts] = await Promise.all([
+  const [{ options, variants }, videos, relatedProducts, reviewData] = await Promise.all([
     getProductOptions(product.id),
     getProductVideos(product.id),
     getRelatedProducts(product.id, product.categoryId ?? null),
+    getProductReviews(product.id),
   ]);
 
   const displayPrice = product.salePrice ?? product.basePrice;
@@ -559,8 +608,15 @@ export default async function ProductDetailPage({
         </div>
       </div>
 
-      {/* 상세 설명 및 라이브 영상 탭 */}
-      <ProductDetailTabs content={product.content} videos={videos} />
+      {/* 상세 설명 / 라이브 영상 / 리뷰 탭 */}
+      <ProductDetailTabs
+        content={product.content}
+        videos={videos}
+        productSlug={product.slug}
+        reviews={reviewData.reviews}
+        reviewSummary={reviewData.summary}
+        reviewNextCursor={reviewData.nextCursor}
+      />
 
       {/* 연관 상품 */}
       {relatedProducts.length > 0 && (

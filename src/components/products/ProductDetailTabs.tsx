@@ -6,6 +6,8 @@
 
 import { useState } from "react";
 import Image from "next/image";
+import ProductReviews from "./ProductReviews";
+import type { ProductReview, ProductReviewSummary } from "@/types";
 
 interface ProductVideo {
   id: string;
@@ -24,6 +26,10 @@ interface ProductVideo {
 interface ProductDetailTabsProps {
   content: string | null;
   videos: ProductVideo[];
+  productSlug: string;
+  reviews: ProductReview[];
+  reviewSummary: ProductReviewSummary;
+  reviewNextCursor: string | null;
 }
 
 function getEmbedUrl(url: string): { type: "youtube" | "vimeo" | "direct"; url: string } {
@@ -44,8 +50,15 @@ function getEmbedUrl(url: string): { type: "youtube" | "vimeo" | "direct"; url: 
   return { type: "direct", url };
 }
 
-export default function ProductDetailTabs({ content, videos }: ProductDetailTabsProps) {
-  const [activeTab, setActiveTab] = useState<"detail" | "video">("detail");
+export default function ProductDetailTabs({
+  content,
+  videos,
+  productSlug,
+  reviews,
+  reviewSummary,
+  reviewNextCursor,
+}: ProductDetailTabsProps) {
+  const [activeTab, setActiveTab] = useState<"detail" | "video" | "review">("detail");
   const [activeVideoUrl, setActiveVideoUrl] = useState<string | null>(null);
 
   // 비디오 재생 레이아웃 오버레이 열기
@@ -110,6 +123,38 @@ export default function ProductDetailTabs({ content, videos }: ProductDetailTabs
             </span>
           </button>
         )}
+
+        <button
+          onClick={() => setActiveTab("review")}
+          className={`product-content-tab${activeTab === "review" ? " active" : ""}`}
+          style={{
+            padding: "1rem 1.5rem",
+            fontSize: "1rem",
+            fontWeight: 700,
+            border: "none",
+            background: "none",
+            cursor: "pointer",
+            borderBottom: activeTab === "review" ? "2px solid var(--mb-pink-600)" : "2px solid transparent",
+            color: activeTab === "review" ? "var(--mb-pink-600)" : "var(--mb-gray-500)",
+            display: "flex",
+            alignItems: "center",
+            gap: "4px",
+          }}
+        >
+          리뷰
+          <span
+            style={{
+              fontSize: "0.6875rem",
+              background: "var(--mb-pink-100)",
+              color: "var(--mb-pink-600)",
+              padding: "2px 6px",
+              borderRadius: "100px",
+              fontWeight: 800,
+            }}
+          >
+            {reviewSummary.count}
+          </span>
+        </button>
       </div>
 
       {/* 탭 바디 */}
@@ -304,6 +349,15 @@ export default function ProductDetailTabs({ content, videos }: ProductDetailTabs
               ))}
             </div>
           </div>
+        )}
+
+        {activeTab === "review" && (
+          <ProductReviews
+            productSlug={productSlug}
+            initialReviews={reviews}
+            initialSummary={reviewSummary}
+            initialNextCursor={reviewNextCursor}
+          />
         )}
       </div>
 

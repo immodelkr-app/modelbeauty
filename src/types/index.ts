@@ -292,3 +292,23 @@ export interface ProductVideo {
   createdAt: string;
 }
 
+export interface ProductReview {
+  id: string;
+  productId: string;
+  masterUserId: string;
+  orderId: string;
+  rating: number;
+  body: string;
+  images: { url: string }[];
+  externalLink: string | null;
+  isHidden: boolean;
+  hiddenReason: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ProductReviewSummary {
+  average: number;
+  count: number;
+}
+

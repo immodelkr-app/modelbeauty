@@ -1,12 +1,14 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import MultiImageUploader, { type UploadedImage } from "@/components/admin/MultiImageUploader";
 
 interface Campaign {
   id: string;
   product_id: string;
   title: string;
   description: string | null;
+  content: string | null;
   campaign_type: "free" | "paid";
   price: number;
   quota: number;
@@ -49,6 +51,8 @@ const EMPTY_FORM = {
   productId: "",
   title: "",
   description: "",
+  contentText: "",
+  contentImages: [] as UploadedImage[],
   campaignType: "free" as "free" | "paid",
   price: 0,
   quota: 5,
@@ -64,11 +68,38 @@ function toLocalInput(iso: string | null): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
+// 상세 안내(글+사진)를 안전한 HTML로 조합 (검증된 업로드 URL만 사용하므로 XSS 위험 없음)
+function buildCampaignContentHtml(text: string, images: UploadedImage[]): string | null {
+  const parts: string[] = [];
+  const escape = (s: string) => s.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  if (text.trim()) {
+    parts.push(`<p style="white-space:pre-wrap;line-height:1.7;">${escape(text.trim())}</p>`);
+  }
+  for (const img of images) {
+    parts.push(`<img src="${escape(img.url)}" alt="${escape(img.alt || "")}" style="width:100%;display:block;margin-top:0.75rem;" />`);
+  }
+  return parts.length > 0 ? parts.join("\n") : null;
+}
+
+// 저장된 content HTML에서 글/사진을 다시 분리해 수정 화면에 채워준다.
+function parseCampaignContent(html: string | null): { text: string; images: UploadedImage[] } {
+  if (!html) return { text: "", images: [] };
+  const unescape = (s: string) => s.replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&amp;/g, "&");
+  const textMatch = html.match(/<p[^>]*>([\s\S]*?)<\/p>/);
+  const text = textMatch ? unescape(textMatch[1]) : "";
+  const images = Array.from(html.matchAll(/<img[^>]*\ssrc="([^"]*)"[^>]*\salt="([^"]*)"[^>]*>/g)).map((m) => ({
+    url: m[1],
+    alt: unescape(m[2]),
+  }));
+  return { text, images };
+}
+
 export default function AdminTrialsPage() {
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [products, setProducts] = useState<ProductOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
+  const [editingCampaign, setEditingCampaign] = useState<Campaign | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [form, setForm] = useState(EMPTY_FORM);
 
@@ -103,7 +134,27 @@ export default function AdminTrialsPage() {
   }, [fetchCampaigns]);
 
   const openCreate = () => {
+    setEditingCampaign(null);
     setForm(EMPTY_FORM);
+    setShowModal(true);
+  };
+
+  const openEdit = (campaign: Campaign) => {
+    const { text, images } = parseCampaignContent(campaign.content);
+    setEditingCampaign(campaign);
+    setForm({
+      productId: campaign.product_id,
+      title: campaign.title,
+      description: campaign.description ?? "",
+      contentText: text,
+      contentImages: images,
+      campaignType: campaign.campaign_type,
+      price: campaign.price,
+      quota: campaign.quota,
+      recruitStart: toLocalInput(campaign.recruit_start),
+      recruitEnd: toLocalInput(campaign.recruit_end),
+      status: campaign.status,
+    });
     setShowModal(true);
   };
 
@@ -118,22 +169,33 @@ export default function AdminTrialsPage() {
 
     setSubmitting(true);
     try {
-      const res = await fetch("/api/admin/trials", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...form,
-          recruitStart: new Date(form.recruitStart).toISOString(),
-          recruitEnd: new Date(form.recruitEnd).toISOString(),
-        }),
-      });
+      const payload = {
+        productId: form.productId,
+        title: form.title,
+        description: form.description,
+        content: buildCampaignContentHtml(form.contentText, form.contentImages),
+        campaignType: form.campaignType,
+        price: form.price,
+        quota: form.quota,
+        status: form.status,
+        recruitStart: new Date(form.recruitStart).toISOString(),
+        recruitEnd: new Date(form.recruitEnd).toISOString(),
+      };
+      const res = await fetch(
+        editingCampaign ? `/api/admin/trials/${editingCampaign.id}` : "/api/admin/trials",
+        {
+          method: editingCampaign ? "PATCH" : "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        }
+      );
       const result = await res.json();
       if (result.success) {
         setShowModal(false);
         fetchCampaigns();
-        alert("✅ 체험단이 개설되었습니다.");
+        alert(editingCampaign ? "✅ 체험단이 수정되었습니다." : "✅ 체험단이 개설되었습니다.");
       } else {
-        alert(result.error ?? "개설에 실패했습니다.");
+        alert(result.error ?? "저장에 실패했습니다.");
       }
     } catch {
       alert("네트워크 오류가 발생했습니다.");
@@ -252,6 +314,9 @@ export default function AdminTrialsPage() {
                     </td>
                     <td>
                       <div style={{ display: "flex", gap: "0.35rem" }}>
+                        <button onClick={() => openEdit(c)} className="admin-btn admin-btn-secondary admin-btn-sm">
+                          ✏️ 수정
+                        </button>
                         <button onClick={() => openApplicants(c)} className="admin-btn admin-btn-secondary admin-btn-sm">
                           신청자 보기
                         </button>
@@ -277,7 +342,7 @@ export default function AdminTrialsPage() {
         <div className="admin-modal-overlay">
           <div className="admin-modal-container" style={{ maxWidth: 560 }}>
             <div className="admin-modal-header">
-              <h2 className="admin-modal-title">＋ 체험단 개설</h2>
+              <h2 className="admin-modal-title">{editingCampaign ? "✏️ 체험단 수정" : "＋ 체험단 개설"}</h2>
               <button onClick={() => setShowModal(false)} className="admin-modal-close-btn">✕</button>
             </div>
             <form onSubmit={handleSubmit} className="admin-form">
@@ -298,8 +363,28 @@ export default function AdminTrialsPage() {
                 </div>
 
                 <div className="admin-field">
-                  <label className="admin-label">지원 조건 / 안내</label>
-                  <textarea className="admin-textarea" value={form.description} onChange={(e) => setF("description", e.target.value)} rows={3} placeholder="지원 조건, 진행 방식 등을 안내해주세요." />
+                  <label className="admin-label">한 줄 소개</label>
+                  <textarea className="admin-textarea" value={form.description} onChange={(e) => setF("description", e.target.value)} rows={2} placeholder="목록 카드에 짧게 보여줄 소개 문구" />
+                </div>
+
+                <div className="admin-field" style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 8, padding: "0.75rem 1rem" }}>
+                  <label className="admin-label" style={{ fontWeight: 700, color: "#374151" }}>📄 상세페이지 내용 (지원 조건 · 진행 방식 등)</label>
+                  <p style={{ fontSize: "0.75rem", color: "#6b7280", margin: "0.15rem 0 0.6rem" }}>
+                    체험단 상세페이지 본문에 노출됩니다. 글과 사진을 함께 올릴 수 있어요.
+                  </p>
+                  <textarea
+                    className="admin-textarea"
+                    value={form.contentText}
+                    onChange={(e) => setF("contentText", e.target.value)}
+                    rows={5}
+                    placeholder="지원 조건, 선정 기준, 진행 방식, 유의사항 등을 자유롭게 작성해주세요."
+                    style={{ marginBottom: "0.75rem" }}
+                  />
+                  <MultiImageUploader
+                    images={form.contentImages}
+                    onChange={(contentImages) => setF("contentImages", contentImages)}
+                    hint="상세페이지 하단에 순서대로 이어붙여 표시됩니다."
+                  />
                 </div>
 
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
@@ -344,14 +429,16 @@ export default function AdminTrialsPage() {
                   <label className="admin-label">등록 상태</label>
                   <select className="admin-input" value={form.status} onChange={(e) => setF("status", e.target.value)} style={{ maxWidth: 200 }}>
                     <option value="draft">임시저장 (비공개)</option>
-                    <option value="recruiting">바로 모집 시작 (공개)</option>
+                    <option value="recruiting">모집중 (공개)</option>
+                    <option value="selecting">선정중 (공개)</option>
+                    <option value="closed">종료 (공개, 신청 불가)</option>
                   </select>
                 </div>
               </div>
               <div className="admin-modal-footer">
                 <button type="button" className="admin-btn admin-btn-secondary" onClick={() => setShowModal(false)}>취소</button>
                 <button type="submit" className="admin-btn admin-btn-primary" disabled={submitting}>
-                  {submitting ? "저장 중..." : "체험단 개설"}
+                  {submitting ? "저장 중..." : editingCampaign ? "수정 완료" : "체험단 개설"}
                 </button>
               </div>
             </form>

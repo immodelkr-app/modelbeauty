@@ -318,6 +318,7 @@ export interface TrialCampaign {
   vendorId: string | null;
   title: string;
   description: string | null;
+  content: string | null;
   campaignType: "free" | "paid";
   price: number;
   quota: number;

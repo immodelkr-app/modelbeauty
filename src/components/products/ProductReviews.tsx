@@ -39,7 +39,6 @@ export default function ProductReviews({
   const [showForm, setShowForm] = useState(false);
   const [rating, setRating] = useState(5);
   const [text, setText] = useState("");
-  const [externalLink, setExternalLink] = useState("");
   const [images, setImages] = useState<string[]>([]);
   const [uploading, setUploading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -100,7 +99,6 @@ export default function ProductReviews({
           rating,
           body: text.trim(),
           images,
-          externalLink: externalLink.trim() || undefined,
         }),
       });
       const result = await res.json();
@@ -108,7 +106,6 @@ export default function ProductReviews({
         alert("리뷰가 등록되었습니다. 감사합니다!");
         setShowForm(false);
         setText("");
-        setExternalLink("");
         setImages([]);
         setRating(5);
         // 새로 쓴 리뷰가 맨 위에 보이도록 목록/요약 다시 불러오기
@@ -283,24 +280,6 @@ export default function ProductReviews({
             </div>
           </div>
 
-          <div style={{ marginBottom: "1.25rem" }}>
-            <div style={{ fontSize: "0.8125rem", fontWeight: 700, marginBottom: "0.4rem" }}>
-              블로그·유튜브·인스타 링크 <span style={{ fontWeight: 400, color: "var(--mb-gray-500)" }}>(선택)</span>
-            </div>
-            <input
-              value={externalLink}
-              onChange={(e) => setExternalLink(e.target.value)}
-              placeholder="https://..."
-              style={{
-                width: "100%",
-                border: "1px solid var(--mb-gray-200)",
-                borderRadius: "10px",
-                padding: "0.65rem 0.75rem",
-                fontSize: "0.875rem",
-              }}
-            />
-          </div>
-
           <button
             onClick={handleSubmit}
             disabled={submitting || uploading}
@@ -351,16 +330,6 @@ export default function ProductReviews({
                     />
                   ))}
                 </div>
-              )}
-              {r.externalLink && (
-                <a
-                  href={r.externalLink}
-                  target="_blank"
-                  rel="noreferrer"
-                  style={{ fontSize: "0.78rem", color: "var(--mb-pink-600)", fontWeight: 600 }}
-                >
-                  🔗 작성자의 SNS 포스팅 보기
-                </a>
               )}
             </div>
           ))}

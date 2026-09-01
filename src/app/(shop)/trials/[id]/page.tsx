@@ -8,9 +8,15 @@ import Image from "next/image";
 import type { Metadata } from "next";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import TrialApplyPanel from "@/components/trials/TrialApplyPanel";
-import type { TrialCampaign } from "@/types";
+import TrialReviews from "@/components/trials/TrialReviews";
+import type { TrialCampaign, TrialReview } from "@/types";
 
-async function getCampaign(id: string): Promise<{ campaign: TrialCampaign; alreadyApplied: boolean } | null> {
+async function getCampaign(id: string): Promise<{
+  campaign: TrialCampaign;
+  alreadyApplied: boolean;
+  canWriteReview: boolean;
+  reviews: TrialReview[];
+} | null> {
   const supabase = await createSupabaseServerClient();
 
   const { data: campaign, error } = await supabase
@@ -30,23 +36,51 @@ async function getCampaign(id: string): Promise<{ campaign: TrialCampaign; alrea
     .select("id", { count: "exact", head: true })
     .eq("campaign_id", id);
 
+  const { data: reviewRows } = await supabase
+    .from("trial_reviews")
+    .select("id, campaign_id, trial_application_id, master_user_id, title, body, images, external_link, created_at")
+    .eq("campaign_id", id)
+    .order("created_at", { ascending: false });
+
+  const reviews: TrialReview[] = (reviewRows ?? []).map((r) => ({
+    id: r.id,
+    campaignId: r.campaign_id,
+    trialApplicationId: r.trial_application_id,
+    masterUserId: r.master_user_id,
+    title: r.title,
+    body: r.body,
+    images: (r.images as { url: string }[]) ?? [],
+    externalLink: r.external_link,
+    isHidden: false,
+    hiddenReason: null,
+    createdAt: r.created_at,
+    updatedAt: r.created_at,
+  }));
+
   const { data: { user } } = await supabase.auth.getUser();
   let alreadyApplied = false;
+  let canWriteReview = false;
   if (user) {
     const masterUserId = (user.user_metadata?.master_user_id as string | undefined) ?? user.id;
     const { data: mine } = await supabase
       .from("trial_applications")
-      .select("id")
+      .select("id, status")
       .eq("campaign_id", id)
       .eq("master_user_id", masterUserId)
       .maybeSingle();
     alreadyApplied = !!mine;
+    if (mine?.status === "selected") {
+      const alreadyReviewed = reviews.some((r) => r.trialApplicationId === mine.id);
+      canWriteReview = !alreadyReviewed;
+    }
   }
 
   const productRaw = Array.isArray(campaign.products) ? campaign.products[0] : campaign.products;
   if (!productRaw) return null;
 
   return {
+    canWriteReview,
+    reviews,
     campaign: {
       id: campaign.id,
       productId: campaign.product_id,
@@ -106,7 +140,7 @@ export default async function TrialDetailPage({
   const result = await getCampaign(id);
   if (!result) notFound();
 
-  const { campaign, alreadyApplied } = result;
+  const { campaign, alreadyApplied, canWriteReview, reviews } = result;
   const thumbnail = campaign.product.images?.[0]?.url ?? null;
   const dday = formatDday(campaign.recruitEnd);
   const isClosed = campaign.status !== "recruiting" || dday === "마감";
@@ -189,6 +223,8 @@ export default async function TrialDetailPage({
           dangerouslySetInnerHTML={{ __html: campaign.content }}
         />
       )}
+
+      <TrialReviews campaignId={campaign.id} initialReviews={reviews} canWrite={canWriteReview} />
     </div>
   );
 }

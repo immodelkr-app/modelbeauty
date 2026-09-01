@@ -46,7 +46,7 @@ export async function GET(
 
     let query = supabase
       .from("product_reviews")
-      .select("id, product_id, master_user_id, order_id, rating, body, images, external_link, created_at")
+      .select("id, product_id, master_user_id, order_id, rating, body, images, created_at")
       .eq("product_id", productId)
       .order("created_at", { ascending: false })
       .limit(PAGE_SIZE + 1);
@@ -81,7 +81,6 @@ export async function GET(
           rating: r.rating,
           body: r.body,
           images: r.images ?? [],
-          externalLink: r.external_link,
           createdAt: r.created_at,
         })),
         summary: { average, count },
@@ -116,7 +115,6 @@ export async function POST(
     const rating = Number(body.rating);
     const reviewBody = String(body.body ?? "").trim();
     const images = Array.isArray(body.images) ? body.images.slice(0, 5) : [];
-    const externalLink = body.externalLink ? String(body.externalLink).trim() : null;
 
     if (!Number.isInteger(rating) || rating < 1 || rating > 5) {
       return Response.json({ success: false, error: "별점은 1~5 사이여야 합니다." }, { status: 400 });
@@ -126,9 +124,6 @@ export async function POST(
     }
     if (!images.every((img: unknown) => typeof img === "string" && /^https?:\/\//.test(img))) {
       return Response.json({ success: false, error: "이미지 형식이 올바르지 않습니다." }, { status: 400 });
-    }
-    if (externalLink && !/^https?:\/\//.test(externalLink)) {
-      return Response.json({ success: false, error: "SNS 링크는 http(s):// 로 시작해야 합니다." }, { status: 400 });
     }
 
     const admin = createSupabaseAdmin();
@@ -176,7 +171,6 @@ export async function POST(
         rating,
         body: reviewBody,
         images: images.map((url: string) => ({ url })),
-        external_link: externalLink,
       })
       .select()
       .single();

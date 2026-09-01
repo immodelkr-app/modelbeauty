@@ -13,7 +13,7 @@ import ProductCard from "@/components/products/ProductCard";
 import HeroVideoCard from "@/components/home/HeroVideoCard";
 import { getModelBeautyYoutubeVideos, type YoutubeVideo } from "@/lib/youtube";
 import { getModelBeautyInstagramPosts, type InstagramPost } from "@/lib/instagram";
-import type { Category, Product } from "@/types";
+import type { Category, Product, TrialReview } from "@/types";
 
 export const metadata: Metadata = {
   title: "모델뷰티 | 뷰티의 시작",
@@ -98,10 +98,11 @@ async function getHomeData(): Promise<{
   instagramPosts: InstagramPost[];
   activeStream: ActiveStream | null;
   lastStream: LastStream | null;
+  trialReviews: TrialReview[];
 }> {
   const supabase = await createSupabaseServerClient();
 
-  const [{ data: catData }, { data: prodData }, { data: allProdData }, { data: liveData }, youtubeVideos, instagramPosts] = await Promise.all([
+  const [{ data: catData }, { data: prodData }, { data: allProdData }, { data: liveData }, youtubeVideos, instagramPosts, { data: trialReviewData }] = await Promise.all([
     supabase
       .from("categories")
       .select("*")
@@ -130,6 +131,14 @@ async function getHomeData(): Promise<{
       .limit(1),
     getModelBeautyYoutubeVideos(5),
     getModelBeautyInstagramPosts(12),
+    supabase
+      .from("trial_reviews")
+      .select(
+        `id, campaign_id, trial_application_id, master_user_id, title, body, images, external_link, created_at,
+         trial_campaigns ( id, title, product_id, products ( id, name, slug ) )`
+      )
+      .order("created_at", { ascending: false })
+      .limit(8),
   ]);
 
   // 현재 라이브가 없으면 가장 최근 종료된 리플레이 조회
@@ -176,13 +185,36 @@ async function getHomeData(): Promise<{
     replayUrl: lastStreamData[0].replay_url ?? null,
   } : null;
 
-  return { categories, featured, allProducts, youtubeVideos, instagramPosts, activeStream, lastStream };
+  const trialReviews: TrialReview[] = (trialReviewData ?? []).map((r: any) => {
+    const campaignRaw = Array.isArray(r.trial_campaigns) ? r.trial_campaigns[0] : r.trial_campaigns;
+    const productRaw = campaignRaw
+      ? (Array.isArray(campaignRaw.products) ? campaignRaw.products[0] : campaignRaw.products)
+      : null;
+    return {
+      id: r.id,
+      campaignId: r.campaign_id,
+      trialApplicationId: r.trial_application_id,
+      masterUserId: r.master_user_id,
+      title: r.title,
+      body: r.body,
+      images: r.images ?? [],
+      externalLink: r.external_link,
+      isHidden: false,
+      hiddenReason: null,
+      createdAt: r.created_at,
+      updatedAt: r.created_at,
+      campaign: campaignRaw ? { id: campaignRaw.id, title: campaignRaw.title } : undefined,
+      product: productRaw ? { id: productRaw.id, name: productRaw.name, slug: productRaw.slug } : undefined,
+    };
+  });
+
+  return { categories, featured, allProducts, youtubeVideos, instagramPosts, activeStream, lastStream, trialReviews };
 }
 
 // ── 페이지 컴포넌트 ───────────────────────────────────────
 
 export default async function HomePage() {
-  const { categories, featured, allProducts, youtubeVideos, instagramPosts, activeStream, lastStream } = await getHomeData();
+  const { categories, featured, allProducts, youtubeVideos, instagramPosts, activeStream, lastStream, trialReviews } = await getHomeData();
 
   const APP_URL = "https://www.modelbeauty.kr";
 
@@ -511,6 +543,54 @@ export default async function HomePage() {
             <Link href="/products" className="hero-cta-primary">
               상품 둘러보기 →
             </Link>
+          </section>
+        )}
+
+        {/* ── 체험 후기 섹션 (체험단이 직접 쓴 블로그형 후기) ─── */}
+        {trialReviews.length > 0 && (
+          <section className="products-section" aria-label="모델뷰티 체험 후기">
+            <div className="section-header">
+              <div>
+                <p className="section-eyebrow">Trial Reviews</p>
+                <h2 className="section-title">🎁 체험 후기</h2>
+              </div>
+              <Link href="/trials" className="section-link">
+                체험단 보기 →
+              </Link>
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: "1.25rem" }}>
+              {trialReviews.map((r) => {
+                const thumb = r.images?.[0]?.url;
+                return (
+                  <Link
+                    key={r.id}
+                    href={`/trial-reviews/${r.id}`}
+                    style={{ border: "1px solid var(--mb-gray-200)", borderRadius: "16px", overflow: "hidden", textDecoration: "none", color: "inherit", background: "#fff", display: "block" }}
+                  >
+                    <div style={{ position: "relative", aspectRatio: "4/3", background: "var(--mb-gray-50)" }}>
+                      {thumb ? (
+                        <Image src={thumb} alt={r.title} fill sizes="(max-width: 768px) 45vw, 220px" style={{ objectFit: "cover" }} />
+                      ) : (
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", fontSize: "1.75rem" }}>📷</div>
+                      )}
+                    </div>
+                    <div style={{ padding: "0.9rem" }}>
+                      {r.product && (
+                        <p style={{ margin: "0 0 0.3rem", fontSize: "0.7rem", color: "var(--mb-pink-600)", fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                          {r.product.name}
+                        </p>
+                      )}
+                      <h3 style={{ margin: "0 0 0.35rem", fontSize: "0.9375rem", fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: "var(--mb-gray-900)" }}>
+                        {r.title}
+                      </h3>
+                      <p style={{ margin: 0, fontSize: "0.78rem", color: "var(--mb-gray-500)", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
+                        {r.body}
+                      </p>
+                    </div>
+                  </Link>
+                );
+              })}
+            </div>
           </section>
         )}
 

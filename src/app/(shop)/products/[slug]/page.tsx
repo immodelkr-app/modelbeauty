@@ -307,7 +307,7 @@ async function getProductReviews(productId: string): Promise<{
   const [{ data: rows }, { data: ratingRows }] = await Promise.all([
     supabase
       .from("product_reviews")
-      .select("id, product_id, master_user_id, order_id, rating, body, images, external_link, created_at")
+      .select("id, product_id, master_user_id, order_id, rating, body, images, created_at")
       .eq("product_id", productId)
       .order("created_at", { ascending: false })
       .limit(REVIEW_PAGE_SIZE + 1),
@@ -332,7 +332,6 @@ async function getProductReviews(productId: string): Promise<{
       rating: r.rating,
       body: r.body,
       images: (r.images as { url: string }[]) ?? [],
-      externalLink: r.external_link,
       isHidden: false,
       hiddenReason: null,
       createdAt: r.created_at,

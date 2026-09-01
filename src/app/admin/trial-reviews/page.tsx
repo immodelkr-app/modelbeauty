@@ -2,34 +2,34 @@
 
 import { useState, useEffect, useCallback } from "react";
 
-interface Review {
+interface TrialReviewRow {
   id: string;
-  product_id: string;
+  campaign_id: string;
   master_user_id: string;
-  order_id: string;
-  rating: number;
+  title: string;
   body: string;
   images: { url: string }[];
+  external_link: string | null;
   is_hidden: boolean;
   hidden_reason: string | null;
   points_granted: number;
   points_granted_at: string | null;
   created_at: string;
-  products: { name: string; slug: string } | null;
+  trial_campaigns: { title: string; products: { name: string; slug: string } | null } | null;
 }
 
-export default function AdminReviewsPage() {
-  const [reviews, setReviews] = useState<Review[]>([]);
+export default function AdminTrialReviewsPage() {
+  const [reviews, setReviews] = useState<TrialReviewRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<"all" | "hidden">("all");
 
   const fetchReviews = useCallback(async (f: "all" | "hidden") => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/admin/reviews${f === "hidden" ? "?hidden=true" : ""}`);
+      const res = await fetch(`/api/admin/trial-reviews${f === "hidden" ? "?hidden=true" : ""}`);
       const result = await res.json();
       if (result.success) setReviews(result.data ?? []);
-      else alert(result.error ?? "리뷰 목록을 불러올 수 없습니다.");
+      else alert(result.error ?? "체험 후기 목록을 불러올 수 없습니다.");
     } catch {
       alert("네트워크 오류가 발생했습니다.");
     } finally {
@@ -39,11 +39,11 @@ export default function AdminReviewsPage() {
 
   useEffect(() => { fetchReviews(filter); }, [filter, fetchReviews]);
 
-  const handleToggleHidden = async (review: Review) => {
+  const handleToggleHidden = async (review: TrialReviewRow) => {
     const willHide = !review.is_hidden;
     const reason = willHide ? prompt("숨김 사유를 입력해주세요 (선택)") ?? "" : "";
     try {
-      const res = await fetch(`/api/admin/reviews/${review.id}`, {
+      const res = await fetch(`/api/admin/trial-reviews/${review.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ isHidden: willHide, hiddenReason: reason }),
@@ -56,7 +56,7 @@ export default function AdminReviewsPage() {
     }
   };
 
-  const handleGrantPoints = async (review: Review) => {
+  const handleGrantPoints = async (review: TrialReviewRow) => {
     const input = prompt(
       review.points_granted > 0
         ? `추가로 지급할 포인트를 입력하세요. (지금까지 ${review.points_granted.toLocaleString()}P 지급됨)`
@@ -68,9 +68,9 @@ export default function AdminReviewsPage() {
       alert("1 이상의 숫자를 입력해주세요.");
       return;
     }
-    const description = prompt("지급 사유(선택, 예: 사진 정성 리뷰 / SNS 링크 첨부)") ?? "";
+    const description = prompt("지급 사유(선택)") ?? "";
     try {
-      const res = await fetch(`/api/admin/reviews/${review.id}/points`, {
+      const res = await fetch(`/api/admin/trial-reviews/${review.id}/points`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ amount, description }),
@@ -87,10 +87,10 @@ export default function AdminReviewsPage() {
     }
   };
 
-  const handleDelete = async (review: Review) => {
-    if (!confirm("이 리뷰를 완전히 삭제하시겠습니까? 되돌릴 수 없습니다.")) return;
+  const handleDelete = async (review: TrialReviewRow) => {
+    if (!confirm("이 체험 후기를 완전히 삭제하시겠습니까? 되돌릴 수 없습니다.")) return;
     try {
-      const res = await fetch(`/api/admin/reviews/${review.id}`, { method: "DELETE" });
+      const res = await fetch(`/api/admin/trial-reviews/${review.id}`, { method: "DELETE" });
       const result = await res.json();
       if (result.success) fetchReviews(filter);
       else alert(result.error ?? "삭제에 실패했습니다.");
@@ -103,9 +103,9 @@ export default function AdminReviewsPage() {
     <>
       <div className="admin-section-header">
         <h1 className="admin-section-title">
-          구매 후기 관리{" "}
+          체험 후기 관리{" "}
           <span style={{ fontSize: "0.9rem", fontWeight: 500, color: "#9ca3af" }}>
-            ({reviews.length}건)
+            ({reviews.length}건 · 메인페이지 노출)
           </span>
         </h1>
         <div style={{ display: "flex", gap: "0.5rem" }}>
@@ -132,16 +132,16 @@ export default function AdminReviewsPage() {
             <div className="admin-empty">
               <div className="admin-empty-icon">📝</div>
               <p className="admin-empty-title">
-                {filter === "hidden" ? "숨김 처리된 리뷰가 없습니다" : "등록된 리뷰가 없습니다"}
+                {filter === "hidden" ? "숨김 처리된 체험 후기가 없습니다" : "등록된 체험 후기가 없습니다"}
               </p>
             </div>
           ) : (
             <table className="admin-table">
               <thead>
                 <tr>
+                  <th>체험단</th>
                   <th>상품</th>
-                  <th>별점</th>
-                  <th>내용</th>
+                  <th>제목</th>
                   <th>사진</th>
                   <th>작성자</th>
                   <th>작성일</th>
@@ -153,10 +153,12 @@ export default function AdminReviewsPage() {
               <tbody>
                 {reviews.map((r) => (
                   <tr key={r.id}>
-                    <td style={{ fontWeight: 600, maxWidth: 140 }}>{r.products?.name ?? "—"}</td>
-                    <td style={{ color: "#f59e0b", fontWeight: 700 }}>{"★".repeat(r.rating)}</td>
-                    <td style={{ maxWidth: 280, fontSize: "0.82rem", color: "#374151" }}>
-                      {r.body.length > 60 ? `${r.body.slice(0, 60)}…` : r.body}
+                    <td style={{ fontSize: "0.8rem", maxWidth: 140 }}>{r.trial_campaigns?.title ?? "—"}</td>
+                    <td style={{ fontSize: "0.8rem", maxWidth: 120 }}>{r.trial_campaigns?.products?.name ?? "—"}</td>
+                    <td style={{ fontWeight: 600, maxWidth: 200 }}>
+                      <a href={`/trial-reviews/${r.id}`} target="_blank" rel="noreferrer" style={{ color: "inherit", textDecoration: "none" }}>
+                        {r.title}
+                      </a>
                     </td>
                     <td>{r.images?.length ? `📷 ${r.images.length}` : "—"}</td>
                     <td className="admin-text-mono" style={{ fontSize: "0.72rem" }}>

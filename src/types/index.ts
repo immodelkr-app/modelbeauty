@@ -300,7 +300,6 @@ export interface ProductReview {
   rating: number;
   body: string;
   images: { url: string }[];
-  externalLink: string | null;
   isHidden: boolean;
   hiddenReason: string | null;
   createdAt: string;
@@ -308,6 +307,28 @@ export interface ProductReview {
 }
 
 export interface ProductReviewSummary {
+  average: number;
+  count: number;
+}
+
+export interface TrialReview {
+  id: string;
+  campaignId: string;
+  trialApplicationId: string;
+  masterUserId: string;
+  title: string;
+  body: string;
+  images: { url: string }[];
+  externalLink: string | null;
+  isHidden: boolean;
+  hiddenReason: string | null;
+  createdAt: string;
+  updatedAt: string;
+  campaign?: { id: string; title: string };
+  product?: { id: string; name: string; slug: string };
+}
+
+export interface TrialReviewSummary {
   average: number;
   count: number;
 }

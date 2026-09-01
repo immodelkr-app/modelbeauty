@@ -436,26 +436,16 @@ export default function AdminTrialsPage() {
                   />
                 </div>
 
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
-                  <div className="admin-field">
-                    <label className="admin-label">캠페인 유형</label>
-                    <div style={{ display: "flex", gap: "1rem", marginTop: "0.25rem" }}>
-                      <label style={{ display: "flex", alignItems: "center", gap: "0.4rem", cursor: "pointer" }}>
-                        <input type="radio" checked={form.campaignType === "free"} onChange={() => setF("campaignType", "free")} />
-                        <span>무료</span>
-                      </label>
-                      <label style={{ display: "flex", alignItems: "center", gap: "0.4rem", cursor: "pointer" }}>
-                        <input type="radio" checked={form.campaignType === "paid"} onChange={() => setF("campaignType", "paid")} />
-                        <span>유료(참가비)</span>
-                      </label>
-                    </div>
-                  </div>
-                  {form.campaignType === "paid" && (
-                    <div className="admin-field">
-                      <label className="admin-label">참가비(원)</label>
-                      <input className="admin-input" type="number" min={0} value={form.price} onChange={(e) => setF("price", parseInt(e.target.value, 10) || 0)} />
-                    </div>
-                  )}
+                <div
+                  style={{
+                    display: "flex", alignItems: "center", gap: "0.5rem",
+                    fontSize: "0.8rem", color: "#6b7280",
+                    background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 8,
+                    padding: "0.6rem 0.9rem",
+                  }}
+                >
+                  <span style={{ fontWeight: 700, color: "var(--mb-pink-600, #db2777)" }}>무료 체험단</span>
+                  참가비 결제 연동 전까지는 무료 체험단만 운영합니다.
                 </div>
 
                 <div className="admin-field">

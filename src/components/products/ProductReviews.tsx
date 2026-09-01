@@ -285,7 +285,7 @@ export default function ProductReviews({
 
           <div style={{ marginBottom: "1.25rem" }}>
             <div style={{ fontSize: "0.8125rem", fontWeight: 700, marginBottom: "0.4rem" }}>
-              블로그·유튜브·인스타 링크 <span style={{ fontWeight: 400, color: "var(--mb-gray-500)" }}>(선택 — 첨부 시 포인트 추가 적립)</span>
+              블로그·유튜브·인스타 링크 <span style={{ fontWeight: 400, color: "var(--mb-gray-500)" }}>(선택)</span>
             </div>
             <input
               value={externalLink}

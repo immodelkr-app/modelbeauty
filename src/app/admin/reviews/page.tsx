@@ -13,6 +13,8 @@ interface Review {
   external_link: string | null;
   is_hidden: boolean;
   hidden_reason: string | null;
+  points_granted: number;
+  points_granted_at: string | null;
   created_at: string;
   products: { name: string; slug: string } | null;
 }
@@ -50,6 +52,37 @@ export default function AdminReviewsPage() {
       const result = await res.json();
       if (result.success) fetchReviews(filter);
       else alert(result.error ?? "처리에 실패했습니다.");
+    } catch {
+      alert("네트워크 오류가 발생했습니다.");
+    }
+  };
+
+  const handleGrantPoints = async (review: Review) => {
+    const input = prompt(
+      review.points_granted > 0
+        ? `추가로 지급할 포인트를 입력하세요. (지금까지 ${review.points_granted.toLocaleString()}P 지급됨)`
+        : "지급할 포인트를 입력하세요."
+    );
+    if (!input) return;
+    const amount = parseInt(input, 10);
+    if (!Number.isInteger(amount) || amount <= 0) {
+      alert("1 이상의 숫자를 입력해주세요.");
+      return;
+    }
+    const description = prompt("지급 사유(선택, 예: 사진 정성 리뷰 / SNS 링크 첨부)") ?? "";
+    try {
+      const res = await fetch(`/api/admin/reviews/${review.id}/points`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ amount, description }),
+      });
+      const result = await res.json();
+      if (result.success) {
+        alert(`✅ ${amount.toLocaleString()}P 지급 완료 (잔액 ${result.newBalance?.toLocaleString() ?? "-"}P)`);
+        fetchReviews(filter);
+      } else {
+        alert(result.error ?? "포인트 지급에 실패했습니다.");
+      }
     } catch {
       alert("네트워크 오류가 발생했습니다.");
     }
@@ -115,6 +148,7 @@ export default function AdminReviewsPage() {
                   <th>작성자</th>
                   <th>작성일</th>
                   <th>상태</th>
+                  <th>포인트</th>
                   <th>관리</th>
                 </tr>
               </thead>
@@ -150,8 +184,18 @@ export default function AdminReviewsPage() {
                         {r.is_hidden ? "숨김" : "노출중"}
                       </span>
                     </td>
+                    <td style={{ fontSize: "0.8rem", fontWeight: r.points_granted > 0 ? 700 : 400, color: r.points_granted > 0 ? "#15803d" : "#9ca3af" }}>
+                      {r.points_granted > 0 ? `${r.points_granted.toLocaleString()}P` : "미지급"}
+                    </td>
                     <td>
                       <div style={{ display: "flex", gap: "0.35rem" }}>
+                        <button
+                          onClick={() => handleGrantPoints(r)}
+                          className="admin-btn admin-btn-secondary admin-btn-sm"
+                          style={{ borderColor: "#15803d", color: "#15803d" }}
+                        >
+                          💰 포인트 지급
+                        </button>
                         <button
                           onClick={() => handleToggleHidden(r)}
                           className="admin-btn admin-btn-secondary admin-btn-sm"

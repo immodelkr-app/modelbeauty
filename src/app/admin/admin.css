@@ -320,6 +320,61 @@
   object-fit: cover;
 }
 
+/* ── 모달(인라인 패널) ──────────────────────────────────── */
+/* admin-modal-overlay는 오버레이/배경 없이 페이지 흐름 안에 그대로
+   펼쳐지는 인라인 패널로 쓰인다. 여기서는 헤더 정렬과 카드 형태만 잡는다. */
+
+.admin-modal-container {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+  padding: 1.25rem 1.5rem;
+  margin: 1rem 0;
+}
+
+.admin-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.admin-modal-title {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: #111827;
+}
+
+.admin-modal-close-btn {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: #f3f4f6;
+  border-radius: 999px;
+  color: #6b7280;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.admin-modal-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+
+.admin-modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin-top: 1.25rem;
+}
+
 /* ── 버튼 ───────────────────────────────────────────────── */
 
 .admin-btn {

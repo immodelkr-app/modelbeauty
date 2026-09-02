@@ -438,7 +438,7 @@ export default function AdminTrialsPage() {
       {/* 개설 모달 */}
       {showModal && (
         <div className="admin-modal-overlay">
-          <div className="admin-modal-container" style={{ maxWidth: 560 }}>
+          <div className="admin-modal-container" style={{ maxWidth: 860, width: "92vw" }}>
             <div className="admin-modal-header">
               <h2 className="admin-modal-title">{editingCampaign ? "✏️ 체험단 수정" : "＋ 체험단 개설"}</h2>
               <button onClick={() => setShowModal(false)} className="admin-modal-close-btn">✕</button>

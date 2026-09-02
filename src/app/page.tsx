@@ -53,6 +53,23 @@ interface LastStream {
   replayUrl: string | null;
 }
 
+interface HomeTrialCampaign {
+  id: string;
+  title: string;
+  thumbnail: string | null;
+  campaignType: "free" | "paid";
+  price: number;
+  quota: number;
+  recruitEnd: string;
+}
+
+function formatDday(recruitEnd: string): string {
+  const diffDays = Math.ceil((new Date(recruitEnd).getTime() - Date.now()) / 86400000);
+  if (diffDays < 0) return "마감";
+  if (diffDays === 0) return "오늘 마감";
+  return `D-${diffDays}`;
+}
+
 const PRODUCT_SELECT = `id, name, slug, description, base_price, sale_price,
          stock_quantity, sku, images, tags, is_active, is_featured,
          created_at, updated_at, category_id,
@@ -99,10 +116,11 @@ async function getHomeData(): Promise<{
   activeStream: ActiveStream | null;
   lastStream: LastStream | null;
   trialReviews: TrialReview[];
+  trialCampaigns: HomeTrialCampaign[];
 }> {
   const supabase = await createSupabaseServerClient();
 
-  const [{ data: catData }, { data: prodData }, { data: allProdData }, { data: liveData }, youtubeVideos, instagramPosts, { data: trialReviewData }] = await Promise.all([
+  const [{ data: catData }, { data: prodData }, { data: allProdData }, { data: liveData }, youtubeVideos, instagramPosts, { data: trialReviewData }, { data: trialCampaignData }] = await Promise.all([
     supabase
       .from("categories")
       .select("*")
@@ -138,6 +156,12 @@ async function getHomeData(): Promise<{
          trial_campaigns ( id, title, product_id, products ( id, name, slug ) )`
       )
       .order("created_at", { ascending: false })
+      .limit(8),
+    supabase
+      .from("trial_campaigns")
+      .select("id, title, thumbnail, campaign_type, price, quota, recruit_end, products ( images )")
+      .eq("status", "recruiting")
+      .order("recruit_end", { ascending: true })
       .limit(8),
   ]);
 
@@ -208,13 +232,27 @@ async function getHomeData(): Promise<{
     };
   });
 
-  return { categories, featured, allProducts, youtubeVideos, instagramPosts, activeStream, lastStream, trialReviews };
+  const trialCampaigns: HomeTrialCampaign[] = (trialCampaignData ?? []).map((c: any) => {
+    const productRaw = Array.isArray(c.products) ? c.products[0] : c.products;
+    const productThumb = (productRaw?.images as { url: string }[] | undefined)?.[0]?.url ?? null;
+    return {
+      id: c.id,
+      title: c.title,
+      thumbnail: c.thumbnail ?? productThumb,
+      campaignType: c.campaign_type as "free" | "paid",
+      price: c.price,
+      quota: c.quota,
+      recruitEnd: c.recruit_end,
+    };
+  });
+
+  return { categories, featured, allProducts, youtubeVideos, instagramPosts, activeStream, lastStream, trialReviews, trialCampaigns };
 }
 
 // ── 페이지 컴포넌트 ───────────────────────────────────────
 
 export default async function HomePage() {
-  const { categories, featured, allProducts, youtubeVideos, instagramPosts, activeStream, lastStream, trialReviews } = await getHomeData();
+  const { categories, featured, allProducts, youtubeVideos, instagramPosts, activeStream, lastStream, trialReviews, trialCampaigns } = await getHomeData();
 
   const APP_URL = "https://www.modelbeauty.kr";
 
@@ -459,6 +497,65 @@ export default async function HomePage() {
             )}
           </div>
         </section>
+
+        {/* ── 체험단 모집중 섹션 (포스터 카드 + 신청 진입점) ─── */}
+        {trialCampaigns.length > 0 && (
+          <section className="products-section" aria-label="모델뷰티 체험단 모집중">
+            <div className="section-header">
+              <div>
+                <p className="section-eyebrow">Trial Recruiting</p>
+                <h2 className="section-title">🎁 체험단 모집중</h2>
+              </div>
+              <Link href="/trials" className="section-link">
+                전체 보기 →
+              </Link>
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: "1.25rem" }}>
+              {trialCampaigns.map((c) => {
+                const dday = formatDday(c.recruitEnd);
+                return (
+                  <Link
+                    key={c.id}
+                    href={`/trials/${c.id}`}
+                    style={{ border: "1px solid var(--mb-gray-200)", borderRadius: "16px", overflow: "hidden", textDecoration: "none", color: "inherit", background: "#fff", display: "block" }}
+                  >
+                    <div style={{ position: "relative", aspectRatio: "1/1", background: "var(--mb-gray-50)" }}>
+                      {c.thumbnail ? (
+                        <Image src={c.thumbnail} alt={c.title} fill sizes="(max-width: 768px) 45vw, 220px" style={{ objectFit: "cover" }} />
+                      ) : (
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", fontSize: "1.75rem" }}>🎁</div>
+                      )}
+                      <span
+                        style={{
+                          position: "absolute", top: "0.6rem", left: "0.6rem",
+                          fontSize: "0.68rem", fontWeight: 800, padding: "0.22rem 0.55rem", borderRadius: "999px",
+                          background: c.campaignType === "free" ? "var(--mb-pink-600)" : "#191919", color: "#fff",
+                        }}
+                      >
+                        {c.campaignType === "free" ? "무료 체험단" : `참가비 ${c.price.toLocaleString()}원`}
+                      </span>
+                      <span
+                        style={{
+                          position: "absolute", top: "0.6rem", right: "0.6rem",
+                          fontSize: "0.68rem", fontWeight: 700, padding: "0.22rem 0.55rem", borderRadius: "999px",
+                          background: "rgba(0,0,0,0.6)", color: "#fff",
+                        }}
+                      >
+                        {dday}
+                      </span>
+                    </div>
+                    <div style={{ padding: "0.9rem" }}>
+                      <h3 style={{ margin: "0 0 0.35rem", fontSize: "0.9375rem", fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: "var(--mb-gray-900)" }}>
+                        {c.title}
+                      </h3>
+                      <p style={{ margin: 0, fontSize: "0.78rem", color: "var(--mb-gray-500)" }}>모집 정원 {c.quota}명</p>
+                    </div>
+                  </Link>
+                );
+              })}
+            </div>
+          </section>
+        )}
 
         {/* ── 추천 상품 섹션 ──────────────────────────── */}
         {featured.length > 0 && (

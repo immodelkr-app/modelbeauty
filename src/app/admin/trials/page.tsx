@@ -5,7 +5,7 @@ import MultiImageUploader, { type UploadedImage } from "@/components/admin/Multi
 
 interface Campaign {
   id: string;
-  product_id: string;
+  product_id: string | null;
   title: string;
   description: string | null;
   content: string | null;
@@ -166,7 +166,7 @@ export default function AdminTrialsPage() {
     const { text, images } = parseCampaignContent(campaign.content);
     setEditingCampaign(campaign);
     setForm({
-      productId: campaign.product_id,
+      productId: campaign.product_id ?? "",
       title: campaign.title,
       description: campaign.description ?? "",
       thumbnailImage: campaign.thumbnail ? [{ url: campaign.thumbnail, alt: "" }] : [],
@@ -187,14 +187,13 @@ export default function AdminTrialsPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.productId) { alert("상품을 선택해주세요."); return; }
     if (!form.title.trim()) { alert("제목은 필수입니다."); return; }
     if (!form.recruitStart || !form.recruitEnd) { alert("모집 기간을 입력해주세요."); return; }
 
     setSubmitting(true);
     try {
       const payload = {
-        productId: form.productId,
+        productId: form.productId || null,
         title: form.title,
         description: form.description,
         thumbnail: form.thumbnailImage[0]?.url || null,
@@ -446,9 +445,12 @@ export default function AdminTrialsPage() {
             <form onSubmit={handleSubmit} className="admin-form">
               <div className="admin-modal-body" style={{ display: "flex", flexDirection: "column", gap: "0.9rem", flex: 1, overflowY: "auto" }}>
                 <div className="admin-field">
-                  <label className="admin-label admin-label-required">상품</label>
-                  <select className="admin-input" value={form.productId} onChange={(e) => setF("productId", e.target.value)} required>
-                    <option value="">상품 선택</option>
+                  <label className="admin-label">상품 연결 (선택)</label>
+                  <p style={{ fontSize: "0.75rem", color: "#6b7280", margin: "0.15rem 0 0.6rem" }}>
+                    상품이 아직 등록되기 전이어도 체험단을 먼저 개설할 수 있습니다. 나중에 상품이 등록되면 수정 화면에서 연결해주세요.
+                  </p>
+                  <select className="admin-input" value={form.productId} onChange={(e) => setF("productId", e.target.value)}>
+                    <option value="">연결 안 함</option>
                     {products.map((p) => (
                       <option key={p.id} value={p.id}>{p.name}</option>
                     ))}

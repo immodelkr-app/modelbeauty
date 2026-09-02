@@ -17,7 +17,7 @@ export async function PATCH(
     const body = await request.json();
     const update: Record<string, unknown> = {};
 
-    if (body.productId !== undefined) update.product_id = body.productId;
+    if (body.productId !== undefined) update.product_id = body.productId || null;
     if (body.title !== undefined) update.title = String(body.title).trim();
     if (body.description !== undefined) update.description = body.description?.trim() || null;
     if (body.content !== undefined) update.content = body.content || null;

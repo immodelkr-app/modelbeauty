@@ -55,37 +55,37 @@ async function getCampaigns(): Promise<{ campaigns: TrialCampaign[]; myApplicati
     myApplications = (mine ?? []).map((m) => m.campaign_id);
   }
 
-  const mapped: TrialCampaign[] = (campaigns ?? [])
-    .map((c) => {
-      const productRaw = Array.isArray(c.products) ? c.products[0] : c.products;
-      if (!productRaw) return null;
-      return {
-        id: c.id,
-        productId: c.product_id,
-        vendorId: c.vendor_id,
-        title: c.title,
-        description: c.description,
-        thumbnail: c.thumbnail,
-        campaignType: c.campaign_type as "free" | "paid",
-        price: c.price,
-        quota: c.quota,
-        recruitStart: c.recruit_start,
-        recruitEnd: c.recruit_end,
-        status: c.status as TrialCampaign["status"],
-        createdAt: c.created_at,
-        updatedAt: c.updated_at,
-        product: {
-          id: productRaw.id,
-          name: productRaw.name,
-          slug: productRaw.slug,
-          images: (productRaw.images as { url: string }[]) ?? [],
-          basePrice: productRaw.base_price,
-          salePrice: productRaw.sale_price,
-        },
-        applicantCount: countByCampaign.get(c.id) ?? 0,
-      };
-    })
-    .filter((c): c is TrialCampaign => c !== null);
+  const mapped: TrialCampaign[] = (campaigns ?? []).map((c) => {
+    const productRaw = Array.isArray(c.products) ? c.products[0] : c.products;
+    return {
+      id: c.id,
+      productId: c.product_id,
+      vendorId: c.vendor_id,
+      title: c.title,
+      description: c.description,
+      content: null,
+      thumbnail: c.thumbnail,
+      campaignType: c.campaign_type as "free" | "paid",
+      price: c.price,
+      quota: c.quota,
+      recruitStart: c.recruit_start,
+      recruitEnd: c.recruit_end,
+      status: c.status as TrialCampaign["status"],
+      createdAt: c.created_at,
+      updatedAt: c.updated_at,
+      product: productRaw
+        ? {
+            id: productRaw.id,
+            name: productRaw.name,
+            slug: productRaw.slug,
+            images: (productRaw.images as { url: string }[]) ?? [],
+            basePrice: productRaw.base_price,
+            salePrice: productRaw.sale_price,
+          }
+        : null,
+      applicantCount: countByCampaign.get(c.id) ?? 0,
+    };
+  });
 
   return { campaigns: mapped, myApplications };
 }

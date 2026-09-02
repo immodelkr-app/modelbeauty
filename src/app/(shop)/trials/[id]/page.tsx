@@ -79,7 +79,6 @@ async function getCampaign(id: string): Promise<{
   }
 
   const productRaw = Array.isArray(campaign.products) ? campaign.products[0] : campaign.products;
-  if (!productRaw) return null;
 
   return {
     canWriteReview,
@@ -100,14 +99,16 @@ async function getCampaign(id: string): Promise<{
       status: campaign.status as TrialCampaign["status"],
       createdAt: campaign.created_at,
       updatedAt: campaign.updated_at,
-      product: {
-        id: productRaw.id,
-        name: productRaw.name,
-        slug: productRaw.slug,
-        images: (productRaw.images as { url: string }[]) ?? [],
-        basePrice: productRaw.base_price,
-        salePrice: productRaw.sale_price,
-      },
+      product: productRaw
+        ? {
+            id: productRaw.id,
+            name: productRaw.name,
+            slug: productRaw.slug,
+            images: (productRaw.images as { url: string }[]) ?? [],
+            basePrice: productRaw.base_price,
+            salePrice: productRaw.sale_price,
+          }
+        : null,
       applicantCount: count ?? 0,
     },
     alreadyApplied,
@@ -124,7 +125,7 @@ export async function generateMetadata({
   if (!result) return { title: "체험단을 찾을 수 없습니다" };
   return {
     title: `${result.campaign.title} | 모델뷰티 체험단`,
-    description: result.campaign.description ?? `${result.campaign.product.name} 체험단 모집`,
+    description: result.campaign.description ?? (result.campaign.product ? `${result.campaign.product.name} 체험단 모집` : `${result.campaign.title} 체험단 모집`),
   };
 }
 
@@ -145,7 +146,7 @@ export default async function TrialDetailPage({
   if (!result) notFound();
 
   const { campaign, alreadyApplied, canWriteReview, reviews } = result;
-  const thumbnail = campaign.thumbnail ?? campaign.product.images?.[0]?.url ?? null;
+  const thumbnail = campaign.thumbnail ?? campaign.product?.images?.[0]?.url ?? null;
   const dday = formatDday(campaign.recruitEnd);
   const isClosed = campaign.status !== "recruiting" || dday === "마감";
 
@@ -159,7 +160,7 @@ export default async function TrialDetailPage({
 
       <div style={{ position: "relative", width: "100%", aspectRatio: "1/1", borderRadius: "20px", overflow: "hidden", background: "var(--mb-gray-50)" }}>
         {thumbnail ? (
-          <Image src={thumbnail} alt={campaign.product.name} fill sizes="(max-width: 768px) 100vw, 720px" style={{ objectFit: "cover" }} priority />
+          <Image src={thumbnail} alt={campaign.product?.name ?? campaign.title} fill sizes="(max-width: 768px) 100vw, 720px" style={{ objectFit: "cover" }} priority />
         ) : (
           <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", fontSize: "3rem" }}>✨</div>
         )}
@@ -180,9 +181,11 @@ export default async function TrialDetailPage({
         </span>
       </div>
 
-      <Link href={`/products/${campaign.product.slug}`} style={{ fontSize: "0.8125rem", color: "var(--mb-gray-500)", textDecoration: "underline" }}>
-        {campaign.product.name} 상품 보기 →
-      </Link>
+      {campaign.product && (
+        <Link href={`/products/${campaign.product.slug}`} style={{ fontSize: "0.8125rem", color: "var(--mb-gray-500)", textDecoration: "underline" }}>
+          {campaign.product.name} 상품 보기 →
+        </Link>
+      )}
 
       <h1 style={{ fontSize: "1.5rem", fontWeight: 800, margin: "0.5rem 0 0.75rem", color: "var(--mb-gray-900)" }}>
         {campaign.title}

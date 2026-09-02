@@ -60,8 +60,8 @@ export async function POST(request: NextRequest) {
       status = "draft",
     } = body;
 
-    if (!productId || !title?.trim() || !quota || !recruitStart || !recruitEnd) {
-      return NextResponse.json({ success: false, error: "상품, 제목, 정원, 모집 기간은 필수입니다." }, { status: 400 });
+    if (!title?.trim() || !quota || !recruitStart || !recruitEnd) {
+      return NextResponse.json({ success: false, error: "제목, 정원, 모집 기간은 필수입니다." }, { status: 400 });
     }
     if (!["free", "paid"].includes(campaignType)) {
       return NextResponse.json({ success: false, error: "캠페인 유형은 free 또는 paid여야 합니다." }, { status: 400 });
@@ -74,7 +74,7 @@ export async function POST(request: NextRequest) {
     const { data, error } = await admin
       .from("trial_campaigns")
       .insert({
-        product_id: productId,
+        product_id: productId || null,
         vendor_id: vendorId || null,
         title: title.trim(),
         description: description?.trim() || null,

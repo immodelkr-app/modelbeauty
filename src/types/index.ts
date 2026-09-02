@@ -335,7 +335,7 @@ export interface TrialReviewSummary {
 
 export interface TrialCampaign {
   id: string;
-  productId: string;
+  productId: string | null;
   vendorId: string | null;
   title: string;
   description: string | null;
@@ -356,7 +356,7 @@ export interface TrialCampaign {
     images: { url: string }[];
     basePrice: number;
     salePrice: number | null;
-  };
+  } | null;
   applicantCount: number;
 }
 

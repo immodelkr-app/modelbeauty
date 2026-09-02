@@ -42,7 +42,7 @@ export default function TrialsGrid({ campaigns, initialMyApplications }: TrialsG
       }}
     >
       {campaigns.map((c) => {
-        const thumbnail = c.thumbnail ?? c.product.images?.[0]?.url ?? null;
+        const thumbnail = c.thumbnail ?? c.product?.images?.[0]?.url ?? null;
         const applied = myApplications.has(c.id);
         const dday = formatDday(c.recruitEnd);
         const isClosed = c.status !== "recruiting" || dday === "마감";
@@ -64,7 +64,7 @@ export default function TrialsGrid({ campaigns, initialMyApplications }: TrialsG
           >
             <div style={{ position: "relative", aspectRatio: "1/1", background: "var(--mb-gray-50)" }}>
               {thumbnail ? (
-                <Image src={thumbnail} alt={c.product.name} fill sizes="(max-width: 768px) 100vw, 30vw" style={{ objectFit: "cover" }} />
+                <Image src={thumbnail} alt={c.product?.name ?? c.title} fill sizes="(max-width: 768px) 100vw, 30vw" style={{ objectFit: "cover" }} />
               ) : (
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", fontSize: "2rem" }}>✨</div>
               )}
@@ -101,7 +101,9 @@ export default function TrialsGrid({ campaigns, initialMyApplications }: TrialsG
             </div>
 
             <div style={{ padding: "1rem", display: "flex", flexDirection: "column", gap: "0.5rem", flex: 1 }}>
-              <p style={{ margin: 0, fontSize: "0.75rem", color: "var(--mb-gray-500)" }}>{c.product.name}</p>
+              {c.product && (
+                <p style={{ margin: 0, fontSize: "0.75rem", color: "var(--mb-gray-500)" }}>{c.product.name}</p>
+              )}
               <h3 style={{ margin: 0, fontSize: "1rem", fontWeight: 700, color: "var(--mb-gray-900)" }}>{c.title}</h3>
               {c.description && (
                 <p style={{ margin: 0, fontSize: "0.8125rem", color: "var(--mb-gray-600)", lineHeight: 1.5, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>

@@ -46,7 +46,7 @@ export async function GET(
       "유튜브 채널": a.youtube_channel ?? "",
       "인스타그램 아이디": a.instagram_id ?? "",
       "기타 링크": a.channel_url ?? "",
-      "지원 동기": a.message ?? "",
+      "활동소개": a.message ?? "",
       "상태": STATUS_LABEL[a.status] ?? a.status,
       "신청일시": new Date(a.applied_at).toLocaleString("ko-KR"),
     }));
@@ -64,7 +64,7 @@ export async function GET(
       { wch: 28 }, // 유튜브 채널
       { wch: 20 }, // 인스타그램 아이디
       { wch: 28 }, // 기타 링크
-      { wch: 30 }, // 지원 동기
+      { wch: 30 }, // 활동소개
       { wch: 10 }, // 상태
       { wch: 18 }, // 신청일시
     ];

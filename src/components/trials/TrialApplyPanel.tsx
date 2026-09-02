@@ -230,7 +230,7 @@ export default function TrialApplyPanel({ campaignId, isClosed, initialApplied }
 
             <div style={{ marginBottom: "1.25rem" }}>
               <div style={labelStyle}>
-                지원 동기 <span style={{ fontWeight: 400, color: "var(--mb-gray-500)" }}>(선택)</span>
+                활동소개 <span style={{ fontWeight: 400, color: "var(--mb-gray-500)" }}>(선택)</span>
               </div>
               <textarea
                 value={form.message}

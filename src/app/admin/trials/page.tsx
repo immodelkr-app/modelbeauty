@@ -579,7 +579,7 @@ export default function AdminTrialsPage() {
                       <th>연락처</th>
                       <th>배송지</th>
                       <th>SNS</th>
-                      <th>지원 동기</th>
+                      <th>활동소개</th>
                       <th>신청일</th>
                       <th>상태</th>
                       <th>관리</th>

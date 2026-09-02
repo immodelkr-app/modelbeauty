@@ -15,7 +15,7 @@ export async function GET(
     const { data: r, error } = await supabase
       .from("trial_reviews")
       .select(
-        `id, campaign_id, trial_application_id, master_user_id, title, body, images, external_link, created_at,
+        `id, campaign_id, trial_application_id, master_user_id, title, body, rating, images, external_link, created_at,
          trial_campaigns ( id, title, product_id, products ( id, name, slug, images, base_price, sale_price ) )`
       )
       .eq("id", id)
@@ -39,6 +39,7 @@ export async function GET(
         masterUserId: r.master_user_id,
         title: r.title,
         body: r.body,
+        rating: r.rating,
         images: r.images ?? [],
         externalLink: r.external_link,
         createdAt: r.created_at,

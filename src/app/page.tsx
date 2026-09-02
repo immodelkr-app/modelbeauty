@@ -11,6 +11,7 @@ import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
 import ProductCard from "@/components/products/ProductCard";
 import HeroVideoCard from "@/components/home/HeroVideoCard";
+import { StarRatingDisplay } from "@/components/trials/StarRating";
 import { getModelBeautyYoutubeVideos, type YoutubeVideo } from "@/lib/youtube";
 import { getModelBeautyInstagramPosts, type InstagramPost } from "@/lib/instagram";
 import type { Category, Product, TrialReview } from "@/types";
@@ -152,7 +153,7 @@ async function getHomeData(): Promise<{
     supabase
       .from("trial_reviews")
       .select(
-        `id, campaign_id, trial_application_id, master_user_id, title, body, images, external_link, created_at,
+        `id, campaign_id, trial_application_id, master_user_id, title, body, rating, images, external_link, created_at,
          trial_campaigns ( id, title, product_id, products ( id, name, slug ) )`
       )
       .order("created_at", { ascending: false })
@@ -221,6 +222,7 @@ async function getHomeData(): Promise<{
       masterUserId: r.master_user_id,
       title: r.title,
       body: r.body,
+      rating: r.rating,
       images: r.images ?? [],
       externalLink: r.external_link,
       isHidden: false,
@@ -677,6 +679,9 @@ export default async function HomePage() {
                           {r.product.name}
                         </p>
                       )}
+                      <div style={{ marginBottom: "0.3rem" }}>
+                        <StarRatingDisplay rating={r.rating} size={13} />
+                      </div>
                       <h3 style={{ margin: "0 0 0.35rem", fontSize: "0.9375rem", fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: "var(--mb-gray-900)" }}>
                         {r.title}
                       </h3>

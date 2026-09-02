@@ -6,11 +6,13 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import type { Metadata } from "next";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { StarRatingDisplay } from "@/components/trials/StarRating";
 
 interface TrialReviewDetail {
   id: string;
   title: string;
   body: string;
+  rating: number;
   images: { url: string }[];
   externalLink: string | null;
   createdAt: string;
@@ -24,7 +26,7 @@ async function getReview(id: string): Promise<TrialReviewDetail | null> {
   const { data: r, error } = await supabase
     .from("trial_reviews")
     .select(
-      `id, title, body, images, external_link, created_at,
+      `id, title, body, rating, images, external_link, created_at,
        trial_campaigns ( id, title, product_id, products ( id, name, slug, images, base_price, sale_price ) )`
     )
     .eq("id", id)
@@ -41,6 +43,7 @@ async function getReview(id: string): Promise<TrialReviewDetail | null> {
     id: r.id,
     title: r.title,
     body: r.body,
+    rating: r.rating,
     images: (r.images as { url: string }[]) ?? [],
     externalLink: r.external_link,
     createdAt: r.created_at,
@@ -110,9 +113,12 @@ export default async function TrialReviewDetailPage({
       <h1 style={{ fontSize: "1.625rem", fontWeight: 800, margin: "0 0 0.5rem", lineHeight: 1.35, color: "var(--mb-gray-900)" }}>
         {review.title}
       </h1>
-      <p style={{ fontSize: "0.8125rem", color: "var(--mb-gray-400)", margin: "0 0 1.75rem" }}>
-        {new Date(review.createdAt).toLocaleDateString("ko-KR")}
-      </p>
+      <div style={{ display: "flex", alignItems: "center", gap: "0.6rem", margin: "0 0 1.75rem" }}>
+        <StarRatingDisplay rating={review.rating} size={17} />
+        <span style={{ fontSize: "0.8125rem", color: "var(--mb-gray-400)" }}>
+          {new Date(review.createdAt).toLocaleDateString("ko-KR")}
+        </span>
+      </div>
 
       {review.product && (
         <Link

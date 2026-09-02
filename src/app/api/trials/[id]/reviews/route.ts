@@ -24,7 +24,7 @@ export async function GET(
 
     const { data: rows, error } = await supabase
       .from("trial_reviews")
-      .select("id, campaign_id, trial_application_id, master_user_id, title, body, images, external_link, created_at")
+      .select("id, campaign_id, trial_application_id, master_user_id, title, body, rating, images, external_link, created_at")
       .eq("campaign_id", campaignId)
       .order("created_at", { ascending: false });
     if (error) throw error;
@@ -38,6 +38,7 @@ export async function GET(
         masterUserId: r.master_user_id,
         title: r.title,
         body: r.body,
+        rating: r.rating,
         images: r.images ?? [],
         externalLink: r.external_link,
         createdAt: r.created_at,
@@ -65,6 +66,7 @@ export async function POST(
     const body = await request.json();
     const title = String(body.title ?? "").trim();
     const reviewBody = String(body.body ?? "").trim();
+    const rating = Number(body.rating);
     const images = Array.isArray(body.images) ? body.images.slice(0, 10) : [];
     const externalLink = body.externalLink ? String(body.externalLink).trim() : null;
 
@@ -73,6 +75,10 @@ export async function POST(
     }
     if (!reviewBody || reviewBody.length > 4000) {
       return Response.json({ success: false, error: "본문을 1~4000자로 입력해주세요." }, { status: 400 });
+    }
+    const ALLOWED_RATINGS = [1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5];
+    if (!ALLOWED_RATINGS.includes(rating)) {
+      return Response.json({ success: false, error: "총점 별점을 0.5점 단위로 1~5점 사이에서 선택해주세요." }, { status: 400 });
     }
     if (!images.every((img: unknown) => typeof img === "string" && /^https?:\/\//.test(img))) {
       return Response.json({ success: false, error: "이미지 형식이 올바르지 않습니다." }, { status: 400 });
@@ -105,6 +111,7 @@ export async function POST(
         master_user_id: masterUserId,
         title,
         body: reviewBody,
+        rating,
         images: images.map((url: string) => ({ url })),
         external_link: externalLink,
       })

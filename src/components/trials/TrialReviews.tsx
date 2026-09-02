@@ -7,6 +7,7 @@
 import { useState, useRef } from "react";
 import Link from "next/link";
 import type { TrialReview } from "@/types";
+import { StarRatingDisplay, StarRatingInput } from "./StarRating";
 
 interface TrialReviewsProps {
   campaignId: string;
@@ -21,6 +22,7 @@ export default function TrialReviews({ campaignId, initialReviews, canWrite }: T
 
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
+  const [rating, setRating] = useState(0);
   const [images, setImages] = useState<string[]>([]);
   const [uploading, setUploading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -57,12 +59,16 @@ export default function TrialReviews({ campaignId, initialReviews, canWrite }: T
       alert("제목과 내용을 입력해주세요.");
       return;
     }
+    if (rating <= 0) {
+      alert("총점 별점을 선택해주세요.");
+      return;
+    }
     setSubmitting(true);
     try {
       const res = await fetch(`/api/trials/${campaignId}/reviews`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title: title.trim(), body: body.trim(), images }),
+        body: JSON.stringify({ title: title.trim(), body: body.trim(), rating, images }),
       });
       const result = await res.json();
       if (result.success) {
@@ -71,6 +77,7 @@ export default function TrialReviews({ campaignId, initialReviews, canWrite }: T
         setHasWritten(true);
         setTitle("");
         setBody("");
+        setRating(0);
         setImages([]);
         const listRes = await fetch(`/api/trials/${campaignId}/reviews`);
         const listResult = await listRes.json();
@@ -108,6 +115,16 @@ export default function TrialReviews({ campaignId, initialReviews, canWrite }: T
 
       {showForm && (
         <div style={{ border: "1px solid var(--mb-gray-200)", borderRadius: "16px", padding: "1.25rem", marginBottom: "1.5rem" }}>
+          <div style={{ marginBottom: "0.9rem" }}>
+            <div style={{ fontSize: "0.8125rem", fontWeight: 700, marginBottom: "0.4rem" }}>총점</div>
+            <div style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
+              <StarRatingInput value={rating} onChange={setRating} />
+              <span style={{ fontSize: "0.9375rem", fontWeight: 800, color: "var(--mb-pink-600)" }}>
+                {rating > 0 ? `${rating.toFixed(1)} / 5.0` : "별점을 선택해주세요"}
+              </span>
+            </div>
+          </div>
+
           <div style={{ marginBottom: "0.9rem" }}>
             <div style={{ fontSize: "0.8125rem", fontWeight: 700, marginBottom: "0.4rem" }}>제목</div>
             <input
@@ -196,6 +213,9 @@ export default function TrialReviews({ campaignId, initialReviews, canWrite }: T
                   )}
                 </div>
                 <div style={{ padding: "0.75rem" }}>
+                  <div style={{ marginBottom: "0.3rem" }}>
+                    <StarRatingDisplay rating={r.rating} size={13} />
+                  </div>
                   <h3 style={{ margin: "0 0 0.3rem", fontSize: "0.875rem", fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                     {r.title}
                   </h3>

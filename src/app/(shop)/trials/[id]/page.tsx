@@ -41,7 +41,7 @@ async function getCampaign(id: string): Promise<{
 
   const { data: reviewRows } = await supabase
     .from("trial_reviews")
-    .select("id, campaign_id, trial_application_id, master_user_id, title, body, images, external_link, created_at")
+    .select("id, campaign_id, trial_application_id, master_user_id, title, body, rating, images, external_link, created_at")
     .eq("campaign_id", id)
     .order("created_at", { ascending: false });
 
@@ -52,6 +52,7 @@ async function getCampaign(id: string): Promise<{
     masterUserId: r.master_user_id,
     title: r.title,
     body: r.body,
+    rating: r.rating,
     images: (r.images as { url: string }[]) ?? [],
     externalLink: r.external_link,
     isHidden: false,

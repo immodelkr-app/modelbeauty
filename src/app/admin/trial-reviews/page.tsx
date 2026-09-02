@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { StarRatingDisplay } from "@/components/trials/StarRating";
 
 interface TrialReviewRow {
   id: string;
@@ -8,6 +9,7 @@ interface TrialReviewRow {
   master_user_id: string;
   title: string;
   body: string;
+  rating: number;
   images: { url: string }[];
   external_link: string | null;
   is_hidden: boolean;
@@ -142,6 +144,7 @@ export default function AdminTrialReviewsPage() {
                   <th>체험단</th>
                   <th>상품</th>
                   <th>제목</th>
+                  <th>별점</th>
                   <th>사진</th>
                   <th>작성자</th>
                   <th>작성일</th>
@@ -160,6 +163,7 @@ export default function AdminTrialReviewsPage() {
                         {r.title}
                       </a>
                     </td>
+                    <td><StarRatingDisplay rating={r.rating} size={13} /></td>
                     <td>{r.images?.length ? `📷 ${r.images.length}` : "—"}</td>
                     <td className="admin-text-mono" style={{ fontSize: "0.72rem" }}>
                       {r.master_user_id.slice(0, 8)}…

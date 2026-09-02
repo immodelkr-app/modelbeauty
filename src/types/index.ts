@@ -318,6 +318,7 @@ export interface TrialReview {
   masterUserId: string;
   title: string;
   body: string;
+  rating: number;
   images: { url: string }[];
   externalLink: string | null;
   isHidden: boolean;

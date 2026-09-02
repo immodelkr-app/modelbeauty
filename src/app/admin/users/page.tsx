@@ -41,6 +41,7 @@ interface UserDetail extends UserSummary {
   };
   orders: any[];
   _coreAuthOffline?: boolean;
+  isAdmin?: boolean;
 }
 
 // 연동 앱 뱃지 렌더러
@@ -93,6 +94,7 @@ export default function AdminUsersPage() {
   const [selectedUser, setSelectedUser] = useState<UserDetail | null>(null);
   const [modalLoading, setModalLoading] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [togglingAdmin, setTogglingAdmin] = useState(false);
   const [showModal, setShowModal] = useState(false);
 
   // 멤버십 등급
@@ -422,6 +424,36 @@ export default function AdminUsersPage() {
       alert("네트워크 오류가 발생했습니다.");
     } finally {
       setDeleting(false);
+    }
+  };
+
+  const handleToggleAdmin = async (grant: boolean) => {
+    if (!selectedUser) return;
+    const displayName = selectedUser.name ? `"${selectedUser.name}"` : "이 사용자";
+    const message = grant
+      ? `${displayName}에게 관리자 권한을 부여하시겠습니까?\n관리자 페이지(/admin) 전체에 접근할 수 있게 됩니다.`
+      : `${displayName}의 관리자 권한을 해제하시겠습니까?`;
+    if (!confirm(message)) return;
+
+    setTogglingAdmin(true);
+    try {
+      const res = await fetch(`/api/admin/users/${selectedUser.id}/role`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ isAdmin: grant }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        alert(grant ? "✅ 관리자 권한을 부여했습니다." : "✅ 관리자 권한을 해제했습니다.");
+        setSelectedUser((prev) => (prev ? { ...prev, isAdmin: grant } : prev));
+      } else {
+        alert(data.error ?? "처리에 실패했습니다.");
+      }
+    } catch (e) {
+      console.error("관리자 권한 변경 요청 실패:", e);
+      alert("네트워크 오류가 발생했습니다.");
+    } finally {
+      setTogglingAdmin(false);
     }
   };
 
@@ -988,6 +1020,35 @@ export default function AdminUsersPage() {
                       ⚠️ 이 회원은 모델뷰티에 아직 직접 가입하지 않았습니다. (MOCA·IMFF 통합 회원) 비밀번호 찾기를 통해 모델뷰티 계정을 생성할 수 있습니다.
                     </div>
                   )}
+                  {/* 관리자 권한 부여/해제 */}
+                  <div style={{
+                    marginTop: "0.75rem", padding: "0.75rem 1rem",
+                    background: selectedUser.isAdmin ? "rgba(168,85,247,0.1)" : "rgba(15,23,42,0.6)",
+                    border: `1px solid ${selectedUser.isAdmin ? "rgba(168,85,247,0.35)" : "rgba(255,255,255,0.05)"}`,
+                    borderRadius: "8px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "0.75rem", flexWrap: "wrap",
+                  }}>
+                    <div style={{ fontSize: "0.8125rem", color: selectedUser.isAdmin ? "#e9d5ff" : "#94a3b8" }}>
+                      {selectedUser.isAdmin ? "🛡️ 이 계정은 관리자 권한이 있습니다. /admin 전체에 접근 가능합니다." : "이 계정은 관리자 권한이 없습니다."}
+                    </div>
+                    {(selectedUser as any).hasModelBeautyAccount ? (
+                      <button
+                        onClick={() => handleToggleAdmin(!selectedUser.isAdmin)}
+                        disabled={togglingAdmin}
+                        className={selectedUser.isAdmin ? "admin-btn-danger" : "admin-btn-primary"}
+                        style={{
+                          padding: "6px 14px", fontSize: "0.8125rem", borderRadius: "8px",
+                          cursor: togglingAdmin ? "not-allowed" : "pointer", fontWeight: 600,
+                          border: selectedUser.isAdmin ? "1px solid #ef4444" : "1px solid #a855f7",
+                          background: selectedUser.isAdmin ? "rgba(239,68,68,0.1)" : "rgba(168,85,247,0.15)",
+                          color: selectedUser.isAdmin ? "#f87171" : "#e9d5ff",
+                        }}
+                      >
+                        {togglingAdmin ? "⏳ 처리 중..." : selectedUser.isAdmin ? "🛡️ 관리자 권한 해제" : "🛡️ 관리자로 지정"}
+                      </button>
+                    ) : (
+                      <span style={{ fontSize: "0.75rem", color: "#64748b" }}>모델뷰티 로그인 계정이 있어야 지정할 수 있어요</span>
+                    )}
+                  </div>
                   {/* 강제 탈퇴 위험 버튼 */}
                   <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "0.75rem" }}>
                     <button

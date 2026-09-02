@@ -112,6 +112,7 @@ export async function GET(
         marketingAgreedAt: authUser?.user_metadata?.marketing_agreed_at ?? null,
         adminCreated:     authUser?.user_metadata?.admin_created ?? false,
         adminMemo:        authUser?.user_metadata?.admin_memo ?? null,
+        isAdmin:          authUser?.app_metadata?.role === "admin",
       },
     });
   } catch (error) {

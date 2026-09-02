@@ -549,7 +549,7 @@ export default function AdminTrialsPage() {
       {/* 신청자 목록 모달 */}
       {applicantsFor && (
         <div className="admin-modal-overlay" onClick={() => setApplicantsFor(null)}>
-          <div className="admin-modal-container" style={{ maxWidth: 640 }} onClick={(e) => e.stopPropagation()}>
+          <div className="admin-modal-container" style={{ maxWidth: 1240, width: "95vw" }} onClick={(e) => e.stopPropagation()}>
             <div className="admin-modal-header">
               <h2 className="admin-modal-title">{applicantsFor.title} — 신청자 목록</h2>
               <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
@@ -572,30 +572,30 @@ export default function AdminTrialsPage() {
                   <p className="admin-empty-title">아직 신청자가 없습니다</p>
                 </div>
               ) : (
-                <table className="admin-table">
+                <table className="admin-table" style={{ tableLayout: "fixed", width: "100%" }}>
                   <thead>
                     <tr>
-                      <th>이름</th>
-                      <th>연락처</th>
-                      <th>배송지</th>
-                      <th>SNS</th>
-                      <th>활동소개</th>
-                      <th>신청일</th>
-                      <th>상태</th>
-                      <th>관리</th>
+                      <th style={{ width: "8%" }}>이름</th>
+                      <th style={{ width: "11%" }}>연락처</th>
+                      <th style={{ width: "24%" }}>배송지</th>
+                      <th style={{ width: "16%" }}>SNS</th>
+                      <th style={{ width: "20%" }}>활동소개</th>
+                      <th style={{ width: "11%" }}>신청일</th>
+                      <th style={{ width: "6%" }}>상태</th>
+                      <th style={{ width: "10%" }}>관리</th>
                     </tr>
                   </thead>
                   <tbody>
                     {applicants.map((a) => (
                       <tr key={a.id}>
-                        <td style={{ fontSize: "0.82rem", fontWeight: 600 }}>{a.applicant_name ?? "—"}</td>
-                        <td style={{ fontSize: "0.82rem" }}>{a.applicant_phone ?? "—"}</td>
-                        <td style={{ fontSize: "0.78rem", maxWidth: 180, color: "#374151" }}>
+                        <td style={{ fontSize: "0.82rem", fontWeight: 600, whiteSpace: "nowrap" }}>{a.applicant_name ?? "—"}</td>
+                        <td style={{ fontSize: "0.82rem", whiteSpace: "nowrap" }}>{a.applicant_phone ?? "—"}</td>
+                        <td style={{ fontSize: "0.78rem", color: "#374151", wordBreak: "keep-all" }}>
                           {a.address_main
                             ? `[${a.address_zipcode ?? ""}] ${a.address_main}${a.address_detail ? ` ${a.address_detail}` : ""}`
                             : "—"}
                         </td>
-                        <td style={{ fontSize: "0.78rem", maxWidth: 180 }}>
+                        <td style={{ fontSize: "0.78rem", wordBreak: "break-all" }}>
                           {a.youtube_channel && <div>🎥 {a.youtube_channel}</div>}
                           {a.instagram_id && <div>📸 {a.instagram_id}</div>}
                           {a.channel_url && (
@@ -605,8 +605,8 @@ export default function AdminTrialsPage() {
                           )}
                           {!a.youtube_channel && !a.instagram_id && !a.channel_url && "—"}
                         </td>
-                        <td style={{ fontSize: "0.8rem", maxWidth: 200 }}>{a.message ?? "—"}</td>
-                        <td style={{ fontSize: "0.75rem", color: "#6b7280" }}>
+                        <td style={{ fontSize: "0.8rem", wordBreak: "keep-all" }}>{a.message ?? "—"}</td>
+                        <td style={{ fontSize: "0.75rem", color: "#6b7280", whiteSpace: "nowrap" }}>
                           {new Date(a.applied_at).toLocaleString("ko-KR")}
                         </td>
                         <td>

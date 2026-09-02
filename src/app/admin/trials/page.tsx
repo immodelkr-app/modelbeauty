@@ -30,7 +30,14 @@ interface ProductOption {
 interface Applicant {
   id: string;
   master_user_id: string;
-  channel_url: string;
+  applicant_name: string | null;
+  applicant_phone: string | null;
+  address_zipcode: string | null;
+  address_main: string | null;
+  address_detail: string | null;
+  youtube_channel: string | null;
+  instagram_id: string | null;
+  channel_url: string | null;
   message: string | null;
   status: "applied" | "selected" | "rejected";
   applied_at: string;
@@ -545,7 +552,17 @@ export default function AdminTrialsPage() {
           <div className="admin-modal-container" style={{ maxWidth: 640 }} onClick={(e) => e.stopPropagation()}>
             <div className="admin-modal-header">
               <h2 className="admin-modal-title">{applicantsFor.title} — 신청자 목록</h2>
-              <button onClick={() => setApplicantsFor(null)} className="admin-modal-close-btn">✕</button>
+              <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                {applicants.length > 0 && (
+                  <button
+                    onClick={() => { window.location.href = `/api/admin/trials/${applicantsFor.id}/applicants/excel-download`; }}
+                    className="admin-btn admin-btn-secondary admin-btn-sm"
+                  >
+                    📊 엑셀 다운로드
+                  </button>
+                )}
+                <button onClick={() => setApplicantsFor(null)} className="admin-modal-close-btn">✕</button>
+              </div>
             </div>
             <div className="admin-modal-body" style={{ overflowY: "auto" }}>
               {applicantsLoading ? (
@@ -558,7 +575,10 @@ export default function AdminTrialsPage() {
                 <table className="admin-table">
                   <thead>
                     <tr>
-                      <th>채널 링크</th>
+                      <th>이름</th>
+                      <th>연락처</th>
+                      <th>배송지</th>
+                      <th>SNS</th>
                       <th>지원 동기</th>
                       <th>신청일</th>
                       <th>상태</th>
@@ -568,12 +588,24 @@ export default function AdminTrialsPage() {
                   <tbody>
                     {applicants.map((a) => (
                       <tr key={a.id}>
-                        <td>
-                          <a href={a.channel_url} target="_blank" rel="noreferrer" style={{ color: "#2563eb", fontSize: "0.82rem" }}>
-                            {a.channel_url}
-                          </a>
+                        <td style={{ fontSize: "0.82rem", fontWeight: 600 }}>{a.applicant_name ?? "—"}</td>
+                        <td style={{ fontSize: "0.82rem" }}>{a.applicant_phone ?? "—"}</td>
+                        <td style={{ fontSize: "0.78rem", maxWidth: 180, color: "#374151" }}>
+                          {a.address_main
+                            ? `[${a.address_zipcode ?? ""}] ${a.address_main}${a.address_detail ? ` ${a.address_detail}` : ""}`
+                            : "—"}
                         </td>
-                        <td style={{ fontSize: "0.8rem", maxWidth: 240 }}>{a.message ?? "—"}</td>
+                        <td style={{ fontSize: "0.78rem", maxWidth: 180 }}>
+                          {a.youtube_channel && <div>🎥 {a.youtube_channel}</div>}
+                          {a.instagram_id && <div>📸 {a.instagram_id}</div>}
+                          {a.channel_url && (
+                            <a href={a.channel_url} target="_blank" rel="noreferrer" style={{ color: "#2563eb" }}>
+                              🔗 {a.channel_url}
+                            </a>
+                          )}
+                          {!a.youtube_channel && !a.instagram_id && !a.channel_url && "—"}
+                        </td>
+                        <td style={{ fontSize: "0.8rem", maxWidth: 200 }}>{a.message ?? "—"}</td>
                         <td style={{ fontSize: "0.75rem", color: "#6b7280" }}>
                           {new Date(a.applied_at).toLocaleString("ko-KR")}
                         </td>

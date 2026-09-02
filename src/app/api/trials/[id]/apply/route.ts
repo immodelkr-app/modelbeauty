@@ -1,6 +1,7 @@
 // ============================================================
 // POST /api/trials/[id]/apply — 체험단 신청 (로그인 회원)
-// body: { channelUrl: string, message?: string }
+// body: { applicantName, applicantPhone, addressZipcode, addressMain, addressDetail?,
+//         youtubeChannel?, instagramId?, channelUrl?, message? }
 // ============================================================
 
 import { createSupabaseServerClient, createSupabaseAdmin } from "@/lib/supabase/server";
@@ -19,11 +20,24 @@ export async function POST(
 
     const { id: campaignId } = await params;
     const body = await request.json();
-    const channelUrl = String(body.channelUrl ?? "").trim();
+    const applicantName = String(body.applicantName ?? "").trim();
+    const applicantPhone = String(body.applicantPhone ?? "").trim();
+    const addressZipcode = String(body.addressZipcode ?? "").trim();
+    const addressMain = String(body.addressMain ?? "").trim();
+    const addressDetail = body.addressDetail ? String(body.addressDetail).trim() : null;
+    const youtubeChannel = body.youtubeChannel ? String(body.youtubeChannel).trim() : null;
+    const instagramId = body.instagramId ? String(body.instagramId).trim() : null;
+    const channelUrl = body.channelUrl ? String(body.channelUrl).trim() : null;
     const message = body.message ? String(body.message).trim() : null;
 
-    if (!/^https?:\/\//.test(channelUrl)) {
-      return Response.json({ success: false, error: "블로그/유튜브/인스타 링크는 http(s):// 로 시작해야 합니다." }, { status: 400 });
+    if (!applicantName || !applicantPhone || !addressZipcode || !addressMain) {
+      return Response.json({ success: false, error: "이름, 연락처, 배송지 주소는 필수입니다." }, { status: 400 });
+    }
+    if (!youtubeChannel && !instagramId && !channelUrl) {
+      return Response.json({ success: false, error: "유튜브 채널, 인스타그램 아이디, 기타 링크 중 최소 하나는 입력해주세요." }, { status: 400 });
+    }
+    if (channelUrl && !/^https?:\/\//.test(channelUrl)) {
+      return Response.json({ success: false, error: "기타 링크는 http(s):// 로 시작해야 합니다." }, { status: 400 });
     }
 
     const admin = createSupabaseAdmin();
@@ -50,6 +64,13 @@ export async function POST(
       .insert({
         campaign_id: campaignId,
         master_user_id: masterUserId,
+        applicant_name: applicantName,
+        applicant_phone: applicantPhone,
+        address_zipcode: addressZipcode,
+        address_main: addressMain,
+        address_detail: addressDetail,
+        youtube_channel: youtubeChannel,
+        instagram_id: instagramId,
         channel_url: channelUrl,
         message,
       })

@@ -277,22 +277,27 @@ export default function AdminTrialsPage() {
     await loadApplicants(campaign.id);
   };
 
-  const handleSendFriendTalk = async (campaign: Campaign) => {
+  const handleSendNotify = async (campaign: Campaign) => {
     const already = campaign.friendtalk_sent_at
       ? `\n(이전 발송: ${new Date(campaign.friendtalk_sent_at).toLocaleString("ko-KR")})`
       : "";
     if (
       !confirm(
-        `"${campaign.title}" 체험단 모집 안내를 "아임모델" 카카오톡 채널 친구 전체에게 친구톡으로 발송하시겠습니까?${already}`
+        `"${campaign.title}" 체험단 모집 안내를 전체 회원에게 카카오 친구톡("아임모델" 채널) + 앱푸시로 발송하시겠습니까?${already}`
       )
     ) return;
 
     setSendingFriendTalkId(campaign.id);
     try {
-      const res = await fetch(`/api/admin/trials/${campaign.id}/notify-friendtalk`, { method: "POST" });
+      const res = await fetch(`/api/admin/trials/${campaign.id}/notify`, { method: "POST" });
       const result = await res.json();
       if (result.success) {
-        alert(`✅ 친구톡 발송 완료\n대상: ${result.attempted}명\n성공: ${result.succeeded}명\n실패(비친구 등): ${result.failed}명`);
+        const ft = result.friendtalk;
+        const push = result.push;
+        alert(
+          `✅ 발송 완료\n\n💬 친구톡: 대상 ${ft.attempted}명 · 성공 ${ft.succeeded}명 · 실패 ${ft.failed}명${ft.error ? `\n   ⚠️ ${ft.error}` : ""}` +
+          `\n\n📱 앱푸시: 대상 ${push.targetCount}명 · 성공 ${push.successCount}명 · 실패 ${push.failureCount}명${push.error ? `\n   ⚠️ ${push.error}` : ""}`
+        );
         fetchCampaigns();
       } else {
         alert(result.error ?? "발송에 실패했습니다.");
@@ -440,13 +445,13 @@ export default function AdminTrialsPage() {
                           신청자 보기
                         </button>
                         <button
-                          onClick={() => handleSendFriendTalk(c)}
+                          onClick={() => handleSendNotify(c)}
                           disabled={sendingFriendTalkId === c.id}
                           className="admin-btn admin-btn-sm"
                           style={{ borderColor: "#f2b100", color: "#8a5a00", backgroundColor: "#fff8e1", fontSize: "0.72rem" }}
-                          title={c.friendtalk_sent_at ? `이전 발송: ${new Date(c.friendtalk_sent_at).toLocaleString("ko-KR")}` : "카카오 친구톡으로 모집 안내 발송"}
+                          title={c.friendtalk_sent_at ? `이전 발송: ${new Date(c.friendtalk_sent_at).toLocaleString("ko-KR")}` : "카카오 친구톡 + 앱푸시로 모집 안내 발송"}
                         >
-                          {sendingFriendTalkId === c.id ? "발송 중..." : c.friendtalk_sent_at ? "💬 재발송" : "💬 친구톡 발송"}
+                          {sendingFriendTalkId === c.id ? "발송 중..." : c.friendtalk_sent_at ? "💬📱 재발송" : "💬📱 친구톡+푸시"}
                         </button>
                         <button
                           onClick={() => handleDelete(c)}

@@ -21,6 +21,7 @@ interface LiveStreamRow {
   createdAt: string;
   startedAt: string | null;
   scheduledAt: string | null;
+  notifySentAt: string | null;
   products: { id: string; name: string }[];
 }
 
@@ -47,6 +48,7 @@ export default function AdminLivePage() {
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [sendingNotifyId, setSendingNotifyId] = useState<string | null>(null);
 
   // 폼 상태
   const [title, setTitle] = useState("");
@@ -157,6 +159,39 @@ export default function AdminLivePage() {
       alert("삭제 요청 중 네트워크 오류가 발생했습니다.");
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleSendNotify = async (stream: LiveStreamRow) => {
+    const already = stream.notifySentAt
+      ? `\n(이전 발송: ${new Date(stream.notifySentAt).toLocaleString("ko-KR")})`
+      : "";
+    if (
+      !confirm(
+        `"${stream.title}" 라이브 방송 시작 안내를 전체 회원에게 카카오 친구톡("아임모델" 채널) + 앱푸시로 발송하시겠습니까?${already}`
+      )
+    ) return;
+
+    setSendingNotifyId(stream.id);
+    try {
+      const res = await fetch(`/api/live/${stream.id}/notify`, { method: "POST" });
+      const result = await res.json();
+      if (result.success) {
+        const ft = result.friendtalk;
+        const push = result.push;
+        alert(
+          `✅ 발송 완료\n\n💬 친구톡: 대상 ${ft.attempted}명 · 성공 ${ft.succeeded}명 · 실패 ${ft.failed}명${ft.error ? `\n   ⚠️ ${ft.error}` : ""}` +
+          `\n\n📱 앱푸시: 대상 ${push.targetCount}명 · 성공 ${push.successCount}명 · 실패 ${push.failureCount}명${push.error ? `\n   ⚠️ ${push.error}` : ""}`
+        );
+        fetchStreams();
+      } else {
+        alert(result.error ?? "발송에 실패했습니다.");
+      }
+    } catch (e) {
+      console.error(e);
+      alert("네트워크 오류가 발생했습니다.");
+    } finally {
+      setSendingNotifyId(null);
     }
   };
 
@@ -402,7 +437,7 @@ export default function AdminLivePage() {
                       {new Date(stream.createdAt).toLocaleDateString("ko-KR")}
                     </td>
                     <td>
-                      <div style={{ display: "flex", gap: "0.5rem" }}>
+                      <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
                         {stream.status !== "ended" ? (
                           <Link
                             href={`/admin/live/${stream.id}/control`}
@@ -424,6 +459,15 @@ export default function AdminLivePage() {
                             ⚙️ 편집본 등록
                           </Link>
                         )}
+                        <button
+                          onClick={() => handleSendNotify(stream)}
+                          disabled={sendingNotifyId === stream.id}
+                          className="admin-btn admin-btn-sm"
+                          style={{ borderColor: "#f2b100", color: "#8a5a00", backgroundColor: "#fff8e1", fontSize: "0.72rem" }}
+                          title={stream.notifySentAt ? `이전 발송: ${new Date(stream.notifySentAt).toLocaleString("ko-KR")}` : "카카오 친구톡 + 앱푸시로 방송 시작 안내 발송"}
+                        >
+                          {sendingNotifyId === stream.id ? "발송 중..." : stream.notifySentAt ? "💬📱 재발송" : "💬📱 친구톡+푸시"}
+                        </button>
                       </div>
                     </td>
                   </tr>

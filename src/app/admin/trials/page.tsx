@@ -42,6 +42,8 @@ interface Applicant {
   status: "applied" | "selected" | "rejected";
   applied_at: string;
   notified_at: string | null;
+  has_review: boolean;
+  review_reminded_at: string | null;
 }
 
 const APPLICANT_STATUS_LABEL: Record<Applicant["status"], string> = {
@@ -129,6 +131,7 @@ export default function AdminTrialsPage() {
   const [applicants, setApplicants] = useState<Applicant[]>([]);
   const [applicantsLoading, setApplicantsLoading] = useState(false);
   const [sendingFriendTalkId, setSendingFriendTalkId] = useState<string | null>(null);
+  const [sendingReminderId, setSendingReminderId] = useState<string | null>(null);
 
   const fetchCampaigns = useCallback(async () => {
     setLoading(true);
@@ -331,6 +334,34 @@ export default function AdminTrialsPage() {
       }
     } catch {
       alert("네트워크 오류가 발생했습니다.");
+    }
+  };
+
+  const handleRemindReview = async (applicant: Applicant) => {
+    if (!applicantsFor) return;
+    const already = applicant.review_reminded_at
+      ? `\n(이전 발송: ${new Date(applicant.review_reminded_at).toLocaleString("ko-KR")})`
+      : "";
+    if (!confirm(`"${applicant.applicant_name ?? "이 신청자"}"에게 후기 작성 리마인드(앱푸시+문자)를 보내시겠습니까?${already}`)) return;
+
+    setSendingReminderId(applicant.id);
+    try {
+      const res = await fetch(`/api/admin/trials/${applicantsFor.id}/applicants/${applicant.id}/remind-review`, {
+        method: "POST",
+      });
+      const result = await res.json();
+      if (result.success) {
+        const pushMsg = { sent: "발송됨", no_token: "앱 미설치/로그아웃", failed: "발송 실패", skipped: "-" }[result.pushResult as string] ?? result.pushResult;
+        const smsMsg = { sent: "발송됨", no_phone: "연락처 없음", failed: "발송 실패", skipped: "-" }[result.smsResult as string] ?? result.smsResult;
+        alert(`✅ 리마인드 발송 완료\n앱푸시: ${pushMsg}\n문자: ${smsMsg}`);
+        loadApplicants(applicantsFor.id);
+      } else {
+        alert(result.error ?? "발송에 실패했습니다.");
+      }
+    } catch {
+      alert("네트워크 오류가 발생했습니다.");
+    } finally {
+      setSendingReminderId(null);
     }
   };
 
@@ -577,14 +608,15 @@ export default function AdminTrialsPage() {
                 <table className="admin-table" style={{ tableLayout: "fixed", width: "100%" }}>
                   <thead>
                     <tr>
-                      <th style={{ width: "8%" }}>이름</th>
-                      <th style={{ width: "11%" }}>연락처</th>
-                      <th style={{ width: "24%" }}>배송지</th>
-                      <th style={{ width: "16%" }}>SNS</th>
-                      <th style={{ width: "20%" }}>활동소개</th>
-                      <th style={{ width: "11%" }}>신청일</th>
+                      <th style={{ width: "7%" }}>이름</th>
+                      <th style={{ width: "10%" }}>연락처</th>
+                      <th style={{ width: "20%" }}>배송지</th>
+                      <th style={{ width: "13%" }}>SNS</th>
+                      <th style={{ width: "16%" }}>활동소개</th>
+                      <th style={{ width: "10%" }}>신청일</th>
                       <th style={{ width: "6%" }}>상태</th>
-                      <th style={{ width: "10%" }}>관리</th>
+                      <th style={{ width: "10%" }}>후기</th>
+                      <th style={{ width: "8%" }}>관리</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -622,6 +654,30 @@ export default function AdminTrialsPage() {
                           {a.notified_at && (
                             <div style={{ fontSize: "0.68rem", color: "#9ca3af", marginTop: "2px" }}>
                               알림 {new Date(a.notified_at).toLocaleDateString("ko-KR")}
+                            </div>
+                          )}
+                        </td>
+                        <td>
+                          {a.status !== "selected" ? (
+                            <span style={{ fontSize: "0.72rem", color: "#9ca3af" }}>—</span>
+                          ) : a.has_review ? (
+                            <span style={{ fontSize: "0.75rem", fontWeight: 700, color: "#15803d" }}>✅ 작성완료</span>
+                          ) : (
+                            <div>
+                              <span style={{ fontSize: "0.72rem", fontWeight: 700, color: "#b91c1c" }}>❌ 미작성</span>
+                              <button
+                                onClick={() => handleRemindReview(a)}
+                                disabled={sendingReminderId === a.id}
+                                className="admin-btn admin-btn-sm"
+                                style={{ display: "block", marginTop: "3px", borderColor: "#f2b100", color: "#8a5a00", backgroundColor: "#fff8e1", fontSize: "0.68rem", padding: "2px 6px" }}
+                              >
+                                {sendingReminderId === a.id ? "발송 중..." : "🔔 리마인드"}
+                              </button>
+                              {a.review_reminded_at && (
+                                <div style={{ fontSize: "0.65rem", color: "#9ca3af", marginTop: "2px" }}>
+                                  {new Date(a.review_reminded_at).toLocaleDateString("ko-KR")} 발송
+                                </div>
+                              )}
                             </div>
                           )}
                         </td>

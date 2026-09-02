@@ -23,7 +23,15 @@ export async function GET(
 
     if (error) throw error;
 
-    return NextResponse.json({ success: true, data: data ?? [] });
+    const applicationIds = (data ?? []).map((a) => a.id);
+    const { data: reviewedRows } = applicationIds.length
+      ? await admin.from("trial_reviews").select("trial_application_id").in("trial_application_id", applicationIds)
+      : { data: [] as { trial_application_id: string }[] };
+    const reviewedSet = new Set((reviewedRows ?? []).map((r) => r.trial_application_id));
+
+    const result = (data ?? []).map((a) => ({ ...a, has_review: reviewedSet.has(a.id) }));
+
+    return NextResponse.json({ success: true, data: result });
   } catch (err) {
     console.error("[GET /api/admin/trials/[id]/applicants]", err);
     return NextResponse.json({ success: false, error: "서버 오류" }, { status: 500 });

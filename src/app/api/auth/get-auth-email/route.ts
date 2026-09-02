@@ -55,9 +55,15 @@ export async function POST(request: NextRequest) {
       | undefined) ?? null;
 
     if (localUser) {
-      const rawPhone = (localUser.phone || localUser.user_metadata?.phone || phoneDigits || "").replace(/\D/g, "");
-      const cleanPhone = rawPhone.length > 11 ? rawPhone.slice(-11) : rawPhone;
-      const expectedEmail = cleanPhone ? `${cleanPhone}@modelbeauty.kr` : localUser.email;
+      // 가상 이메일 계산은 email이 비어있을 때 자동 보정용으로만 쓴다.
+      // localUser.phone(Supabase 국제형식, 예: 821038601416)을 우선 쓰면 국가코드 자리수 때문에
+      // 뒤 11자리를 잘못 잘라내 실제 email과 다른 값이 나오는 버그가 있었으므로
+      // user_metadata.phone(국내형식) > im-core-auth 조회값 순으로 우선한다.
+      const rawPhone = (localUser.user_metadata?.phone || phoneDigits || localUser.phone || "").replace(/\D/g, "");
+      const cleanPhone = rawPhone.startsWith("82") && rawPhone.length === 12
+        ? `0${rawPhone.slice(2)}`
+        : rawPhone.length > 11 ? rawPhone.slice(-11) : rawPhone;
+      const expectedEmail = cleanPhone ? `${cleanPhone}@modelbeauty.kr` : null;
 
       // 만약 기존 전화번호 OTP 가입자 등 Supabase Auth의 email이 비어있다면 자동 업데이트
       if ((!localUser.email || localUser.email === "") && expectedEmail) {
@@ -72,8 +78,11 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      if (expectedEmail) {
-        return NextResponse.json({ found: true, authEmail: expectedEmail }, { status: 200 });
+      // 이미 등록된 email이 있으면 그대로 사용 (재계산한 값으로 덮어쓰지 않음 —
+      // 실제 로그인 계정 이메일과 어긋나면 비밀번호를 아무리 바꿔도 로그인이 실패한다)
+      const finalEmail = localUser.email || expectedEmail;
+      if (finalEmail) {
+        return NextResponse.json({ found: true, authEmail: finalEmail }, { status: 200 });
       }
     }
 

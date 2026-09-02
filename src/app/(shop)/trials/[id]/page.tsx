@@ -73,8 +73,14 @@ async function getCampaign(id: string): Promise<{
       .maybeSingle();
     alreadyApplied = !!mine;
     if (mine?.status === "selected") {
-      const alreadyReviewed = reviews.some((r) => r.trialApplicationId === mine.id);
-      canWriteReview = !alreadyReviewed;
+      // 공개 목록(reviews)은 RLS로 is_hidden 후기가 걸러지므로, 숨김 처리된 후기까지
+      // 포함해 이미 작성했는지 판단하려면 관리자 클라이언트로 별도 확인해야 한다.
+      const { data: existingReview } = await admin
+        .from("trial_reviews")
+        .select("id")
+        .eq("trial_application_id", mine.id)
+        .maybeSingle();
+      canWriteReview = !existingReview;
     }
   }
 

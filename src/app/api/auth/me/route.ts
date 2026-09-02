@@ -43,7 +43,13 @@ export async function GET() {
     }
 
     // 일반 전화번호 유저 판별 (phone 필드 또는 user_metadata 내 phone, 가상 이메일 매칭)
-    const userPhone = user.phone || user.user_metadata?.phone || (user.email?.endsWith("@modelbeauty.kr") ? user.email.split("@")[0] : null);
+    // user.phone(Supabase 국제형식, 예: 821038601416)을 우선 쓰면 im-core-auth sync에
+    // 국가코드가 섞인 번호가 전달되어 마이페이지 연락처 표시/배송지 저장이 깨지므로
+    // user_metadata.phone(국내형식) > 가상 이메일 파싱값 > user.phone 순으로 우선한다.
+    const userPhone =
+      user.user_metadata?.phone ||
+      (user.email?.endsWith("@modelbeauty.kr") ? user.email.split("@")[0] : null) ||
+      user.phone;
     
     // 관리자/이메일 전용 유저 판별 (가상 이메일이 아니고 전화번호 정보가 없을 때)
     const isEmailUser = user.email && !user.email.endsWith("@modelbeauty.kr") && !userPhone;

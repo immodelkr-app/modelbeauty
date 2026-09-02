@@ -340,6 +340,7 @@ export interface TrialCampaign {
   title: string;
   description: string | null;
   content: string | null;
+  thumbnail: string | null;
   campaignType: "free" | "paid";
   price: number;
   quota: number;

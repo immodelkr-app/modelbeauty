@@ -42,7 +42,7 @@ export default function TrialsGrid({ campaigns, initialMyApplications }: TrialsG
       }}
     >
       {campaigns.map((c) => {
-        const thumbnail = c.product.images?.[0]?.url ?? null;
+        const thumbnail = c.thumbnail ?? c.product.images?.[0]?.url ?? null;
         const applied = myApplications.has(c.id);
         const dday = formatDday(c.recruitEnd);
         const isClosed = c.status !== "recruiting" || dday === "마감";

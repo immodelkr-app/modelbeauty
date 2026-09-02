@@ -21,6 +21,7 @@ export async function PATCH(
     if (body.title !== undefined) update.title = String(body.title).trim();
     if (body.description !== undefined) update.description = body.description?.trim() || null;
     if (body.content !== undefined) update.content = body.content || null;
+    if (body.thumbnail !== undefined) update.thumbnail = body.thumbnail?.trim() || null;
     if (body.campaignType !== undefined) update.campaign_type = body.campaignType;
     if (body.price !== undefined) update.price = Number(body.price);
     if (body.quota !== undefined) update.quota = Number(body.quota);

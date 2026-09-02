@@ -18,7 +18,7 @@ async function getCampaigns(): Promise<{ campaigns: TrialCampaign[]; myApplicati
   const { data: campaigns, error } = await supabase
     .from("trial_campaigns")
     .select(
-      `id, product_id, vendor_id, title, description, campaign_type, price,
+      `id, product_id, vendor_id, title, description, thumbnail, campaign_type, price,
        quota, recruit_start, recruit_end, status, created_at, updated_at,
        products ( id, name, slug, images, base_price, sale_price )`
     )
@@ -65,6 +65,7 @@ async function getCampaigns(): Promise<{ campaigns: TrialCampaign[]; myApplicati
         vendorId: c.vendor_id,
         title: c.title,
         description: c.description,
+        thumbnail: c.thumbnail,
         campaignType: c.campaign_type as "free" | "paid",
         price: c.price,
         quota: c.quota,

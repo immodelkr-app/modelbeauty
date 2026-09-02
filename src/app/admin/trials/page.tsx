@@ -9,6 +9,7 @@ interface Campaign {
   title: string;
   description: string | null;
   content: string | null;
+  thumbnail: string | null;
   campaign_type: "free" | "paid";
   price: number;
   quota: number;
@@ -64,6 +65,7 @@ const EMPTY_FORM = {
   productId: "",
   title: "",
   description: "",
+  thumbnailImage: [] as UploadedImage[],
   contentText: "",
   contentImages: [] as UploadedImage[],
   campaignType: "free" as "free" | "paid",
@@ -160,6 +162,7 @@ export default function AdminTrialsPage() {
       productId: campaign.product_id,
       title: campaign.title,
       description: campaign.description ?? "",
+      thumbnailImage: campaign.thumbnail ? [{ url: campaign.thumbnail, alt: "" }] : [],
       contentText: text,
       contentImages: images,
       campaignType: campaign.campaign_type,
@@ -187,6 +190,7 @@ export default function AdminTrialsPage() {
         productId: form.productId,
         title: form.title,
         description: form.description,
+        thumbnail: form.thumbnailImage[0]?.url || null,
         content: buildCampaignContentHtml(form.contentText, form.contentImages),
         campaignType: form.campaignType,
         price: form.price,
@@ -452,6 +456,18 @@ export default function AdminTrialsPage() {
                 <div className="admin-field">
                   <label className="admin-label">한 줄 소개</label>
                   <textarea className="admin-textarea" value={form.description} onChange={(e) => setF("description", e.target.value)} rows={2} placeholder="목록 카드에 짧게 보여줄 소개 문구" />
+                </div>
+
+                <div className="admin-field">
+                  <label className="admin-label">썸네일(포스터) 이미지</label>
+                  <p style={{ fontSize: "0.75rem", color: "#6b7280", margin: "0.15rem 0 0.6rem" }}>
+                    목록 카드와 상세페이지 상단에 정사각형(1:1)으로 노출됩니다. 비워두면 연결된 상품 이미지가 대신 사용됩니다.
+                  </p>
+                  <MultiImageUploader
+                    images={form.thumbnailImage}
+                    onChange={(imgs) => setF("thumbnailImage", imgs.slice(-1))}
+                    hint="1장만 사용됩니다. jpg/png/webp/gif, 5MB 이하."
+                  />
                 </div>
 
                 <div className="admin-field" style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 8, padding: "0.75rem 1rem" }}>

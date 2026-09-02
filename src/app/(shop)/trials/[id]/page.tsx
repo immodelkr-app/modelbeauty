@@ -22,7 +22,7 @@ async function getCampaign(id: string): Promise<{
   const { data: campaign, error } = await supabase
     .from("trial_campaigns")
     .select(
-      `id, product_id, vendor_id, title, description, content, campaign_type, price,
+      `id, product_id, vendor_id, title, description, content, thumbnail, campaign_type, price,
        quota, recruit_start, recruit_end, status, created_at, updated_at,
        products ( id, name, slug, images, base_price, sale_price )`
     )
@@ -91,6 +91,7 @@ async function getCampaign(id: string): Promise<{
       title: campaign.title,
       description: campaign.description,
       content: campaign.content,
+      thumbnail: campaign.thumbnail,
       campaignType: campaign.campaign_type as "free" | "paid",
       price: campaign.price,
       quota: campaign.quota,
@@ -144,7 +145,7 @@ export default async function TrialDetailPage({
   if (!result) notFound();
 
   const { campaign, alreadyApplied, canWriteReview, reviews } = result;
-  const thumbnail = campaign.product.images?.[0]?.url ?? null;
+  const thumbnail = campaign.thumbnail ?? campaign.product.images?.[0]?.url ?? null;
   const dday = formatDday(campaign.recruitEnd);
   const isClosed = campaign.status !== "recruiting" || dday === "마감";
 

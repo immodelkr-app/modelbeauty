@@ -168,7 +168,9 @@ export async function POST(request: NextRequest) {
         phoneNumber: phoneDigits,
         appName: "MODEL_BEAUTY",
         localUserId,
-        name: cleanRealName,
+        // im-core-auth /api/auth/sync는 name 필드를 "닉네임"으로 저장한다(realName은 저장 안 함).
+        // 여기 실명을 넣으면 마스터유저(모카/IMFF와 공유)의 닉네임이 실명으로 덮어써진다.
+        name: cleanNickname,
         realName: cleanRealName,
         nickname: cleanNickname,
       });

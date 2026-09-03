@@ -103,7 +103,10 @@ export async function POST(request: NextRequest) {
           phoneNumber: phoneDigits,
           appName: "MODEL_BEAUTY",
           localUserId: newLocalUserId,
-          name: realName || nickname || undefined,
+          // im-core-auth /api/auth/sync는 name 필드를 "닉네임"으로 저장한다(realName은 저장 안 함).
+          // 여기 실명을 넣으면 마스터유저(모카/IMFF와 공유)의 닉네임이 실명으로 덮어써진다.
+          name: nickname || realName || undefined,
+          realName: realName || undefined,
           nickname: nickname || undefined,
         });
       } catch (syncErr) {
@@ -241,6 +244,12 @@ export async function POST(request: NextRequest) {
       (u) => u.user_metadata?.master_user_id === masterUserRef.masterUserId
     );
 
+    // 로그인 시 사용할 닉네임은 아임모델 공화국에 등록된 실제 닉네임을 우선한다.
+    // (닉네임 칸에 실명을 잘못 입력해도 전화번호 fallback으로 본인확인은 통과하는데,
+    //  이때 입력값을 그대로 돌려주면 2단계에서 계정의 로그인 닉네임이 실명으로 저장되어
+    //  이후 실제 닉네임으로는 로그인이 안 되는 버그가 있었음)
+    const verifiedNickname = masterUserDetail.name || nickname.trim();
+
     return NextResponse.json(
       {
         found: true,
@@ -248,7 +257,7 @@ export async function POST(request: NextRequest) {
         uid: localUser?.id ?? null,
         masterUserId: masterUserRef.masterUserId,
         phoneNumber: masterPhone,
-        nickname: nickname.trim(),
+        nickname: verifiedNickname,
         realName: masterRealName || realName.trim(),
       },
       { status: 200 }

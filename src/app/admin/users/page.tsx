@@ -574,121 +574,119 @@ export default function AdminUsersPage() {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
   };
 
+  // ── 통계 카드 팔레트 (라이트 배경 전용 — 선택 여부와 무관하게 항상 또렷하게 보이도록 고정 색) ──
+  type StatPalette = { bg: string; border: string; text: string; accent: string };
+  const STAT_PALETTES: Record<string, StatPalette> = {
+    total:   { bg: "#f8fafc", border: "#cbd5e1", text: "#1e293b", accent: "#475569" },
+    mb:      { bg: "#fdf2f8", border: "#f9a8d4", text: "#9d174d", accent: "#db2777" },
+    noMb:    { bg: "#fef2f2", border: "#fca5a5", text: "#991b1b", accent: "#dc2626" },
+  };
+  const TIER_PALETTES: StatPalette[] = [
+    { bg: "#fffbeb", border: "#fcd34d", text: "#92400e", accent: "#d97706" },
+    { bg: "#eff6ff", border: "#93c5fd", text: "#1e40af", accent: "#2563eb" },
+    { bg: "#f5f3ff", border: "#c4b5fd", text: "#5b21b6", accent: "#7c3aed" },
+    { bg: "#ecfdf5", border: "#6ee7b7", text: "#065f46", accent: "#059669" },
+  ];
+  const APP_PALETTES: Record<string, StatPalette> = {
+    MODEL_BEAUTY: { bg: "#fdf2f8", border: "#f9a8d4", text: "#9d174d", accent: "#db2777" },
+    MOCA:         { bg: "#fff7ed", border: "#fdba74", text: "#9a3412", accent: "#ea580c" },
+    IMFF:         { bg: "#eff6ff", border: "#93c5fd", text: "#1e40af", accent: "#2563eb" },
+  };
+  const statCardStyle = (selected: boolean, p: StatPalette): React.CSSProperties => ({
+    display: "flex", flexDirection: "column", alignItems: "flex-start",
+    padding: "0.9rem 1.25rem", borderRadius: "14px", cursor: "pointer",
+    background: p.bg,
+    border: selected ? `2px solid ${p.accent}` : `1.5px solid ${p.border}`,
+    boxShadow: selected ? `0 2px 10px ${p.accent}33` : "0 1px 2px rgba(15,23,42,0.05)",
+    transition: "all 0.15s", minWidth: "150px", textAlign: "left",
+  });
+
   return (
     <div className="admin-content-inner">
 
       {/* ── 회원 현황 통계 카드 ──────────────────────────── */}
-      <div style={{ marginBottom: "1.25rem" }}>
+      <div style={{ marginBottom: "1.5rem" }}>
         {loading && !stats ? (
           // 스켈레톤
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(130px, 1fr))", gap: "0.75rem" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))", gap: "0.75rem" }}>
             {[1,2,3,4,5,6].map((i) => (
-              <div key={i} className="skeleton" style={{ height: "80px", borderRadius: "12px" }} />
+              <div key={i} className="skeleton" style={{ height: "88px", borderRadius: "14px" }} />
             ))}
           </div>
         ) : stats ? (
-          <div style={{ display: "flex", flexDirection: "column", gap: "0.625rem" }}>
-            {/* 1행: 총원 + 등급별 */}
-            <div style={{ display: "flex", flexWrap: "wrap", gap: "0.625rem" }}>
-              {/* 총원 */}
-              <button
-                onClick={() => setAppFilter("all")}
-                style={{
-                  display: "flex", flexDirection: "column", alignItems: "flex-start",
-                  padding: "0.75rem 1.125rem", borderRadius: "12px", border: "none", cursor: "pointer",
-                  background: appFilter === "all"
-                    ? "rgba(236,72,153,0.25)" : "rgba(255,255,255,0.04)",
-                  outline: appFilter === "all" ? "1.5px solid rgba(236,72,153,0.6)" : "1px solid rgba(255,255,255,0.07)",
-                  transition: "all 0.18s", minWidth: "110px", textAlign: "left",
-                }}
-              >
-                <span style={{ fontSize: "0.7rem", color: "#94a3b8", fontWeight: 600, letterSpacing: "0.04em", textTransform: "uppercase" }}>👥 전체 회원</span>
-                <span style={{ fontSize: "1.5rem", fontWeight: 900, color: "#f1f5f9", lineHeight: 1.2, marginTop: "0.2rem" }}>{stats.total.toLocaleString()}<span style={{ fontSize: "0.875rem", fontWeight: 500, color: "#94a3b8", marginLeft: "3px" }}>명</span></span>
-              </button>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))", gap: "0.75rem" }}>
+            {/* 총원 */}
+            <button
+              onClick={() => setAppFilter("all")}
+              style={statCardStyle(appFilter === "all", STAT_PALETTES.total)}
+            >
+              <span style={{ fontSize: "0.8rem", color: STAT_PALETTES.total.text, fontWeight: 700 }}>👥 전체 회원</span>
+              <span style={{ fontSize: "1.75rem", fontWeight: 900, color: STAT_PALETTES.total.text, lineHeight: 1.25, marginTop: "0.25rem" }}>
+                {stats.total.toLocaleString()}<span style={{ fontSize: "0.9rem", fontWeight: 600, marginLeft: "3px" }}>명</span>
+              </span>
+            </button>
 
-              {/* 등급별 */}
-              {stats.byTier.map((t) => (
+            {/* 등급별 */}
+            {stats.byTier.map((t, i) => {
+              const p = TIER_PALETTES[i % TIER_PALETTES.length];
+              const selected = appFilter === `tier:${t.tierId}`;
+              return (
                 <button
                   key={t.tierId}
-                  onClick={() => setAppFilter(appFilter === `tier:${t.tierId}` ? "all" : `tier:${t.tierId}`)}
-                  style={{
-                    display: "flex", flexDirection: "column", alignItems: "flex-start",
-                    padding: "0.75rem 1.125rem", borderRadius: "12px", border: "none", cursor: "pointer",
-                    background: appFilter === `tier:${t.tierId}`
-                      ? "rgba(99,102,241,0.2)" : "rgba(255,255,255,0.04)",
-                    outline: appFilter === `tier:${t.tierId}` ? "1.5px solid rgba(99,102,241,0.55)" : "1px solid rgba(255,255,255,0.07)",
-                    transition: "all 0.18s", minWidth: "110px", textAlign: "left",
-                  }}
+                  onClick={() => setAppFilter(selected ? "all" : `tier:${t.tierId}`)}
+                  style={statCardStyle(selected, p)}
                 >
-                  <span style={{ fontSize: "0.7rem", color: "#94a3b8", fontWeight: 600, letterSpacing: "0.04em", textTransform: "uppercase" }}>{t.badgeEmoji} {t.tierName}</span>
-                  <span style={{ fontSize: "1.5rem", fontWeight: 900, color: "#e0e7ff", lineHeight: 1.2, marginTop: "0.2rem" }}>{t.count.toLocaleString()}<span style={{ fontSize: "0.875rem", fontWeight: 500, color: "#94a3b8", marginLeft: "3px" }}>명</span></span>
-                  <span style={{ fontSize: "0.68rem", color: "#6366f1", marginTop: "2px", fontWeight: 600 }}>
+                  <span style={{ fontSize: "0.8rem", color: p.text, fontWeight: 700 }}>{t.badgeEmoji} {t.tierName}</span>
+                  <span style={{ fontSize: "1.75rem", fontWeight: 900, color: p.text, lineHeight: 1.25, marginTop: "0.25rem" }}>
+                    {t.count.toLocaleString()}<span style={{ fontSize: "0.9rem", fontWeight: 600, marginLeft: "3px" }}>명</span>
+                  </span>
+                  <span style={{ fontSize: "0.78rem", color: p.accent, marginTop: "3px", fontWeight: 700 }}>
                     {stats.total > 0 ? Math.round((t.count / stats.total) * 100) : 0}%
                   </span>
                 </button>
-              ))}
-            </div>
+              );
+            })}
 
-            {/* 2행: 가입 구분 + 앱별 */}
-            <div style={{ display: "flex", flexWrap: "wrap", gap: "0.625rem" }}>
-              {/* 모델뷰티 직접 가입 */}
-              <button
-                onClick={() => setAppFilter(appFilter === "mb_only" ? "all" : "mb_only")}
-                style={{
-                  display: "flex", flexDirection: "column", alignItems: "flex-start",
-                  padding: "0.625rem 1rem", borderRadius: "12px", border: "none", cursor: "pointer",
-                  background: appFilter === "mb_only" ? "rgba(236,72,153,0.18)" : "rgba(255,255,255,0.03)",
-                  outline: appFilter === "mb_only" ? "1.5px solid rgba(236,72,153,0.5)" : "1px solid rgba(255,255,255,0.06)",
-                  transition: "all 0.18s", minWidth: "100px", textAlign: "left",
-                }}
-              >
-                <span style={{ fontSize: "0.68rem", color: "#94a3b8", fontWeight: 600 }}>🩷 모델뷰티 가입</span>
-                <span style={{ fontSize: "1.25rem", fontWeight: 800, color: "#ec4899", lineHeight: 1.2, marginTop: "0.15rem" }}>{stats.hasModelBeauty.toLocaleString()}<span style={{ fontSize: "0.8rem", color: "#94a3b8", marginLeft: "2px" }}>명</span></span>
-              </button>
+            {/* 모델뷰티 직접 가입 */}
+            <button
+              onClick={() => setAppFilter(appFilter === "mb_only" ? "all" : "mb_only")}
+              style={statCardStyle(appFilter === "mb_only", STAT_PALETTES.mb)}
+            >
+              <span style={{ fontSize: "0.8rem", color: STAT_PALETTES.mb.text, fontWeight: 700 }}>🩷 모델뷰티 가입</span>
+              <span style={{ fontSize: "1.75rem", fontWeight: 900, color: STAT_PALETTES.mb.text, lineHeight: 1.25, marginTop: "0.25rem" }}>
+                {stats.hasModelBeauty.toLocaleString()}<span style={{ fontSize: "0.9rem", fontWeight: 600, marginLeft: "3px" }}>명</span>
+              </span>
+            </button>
 
-              {/* 미가입 */}
-              <button
-                onClick={() => setAppFilter(appFilter === "no_mb" ? "all" : "no_mb")}
-                style={{
-                  display: "flex", flexDirection: "column", alignItems: "flex-start",
-                  padding: "0.625rem 1rem", borderRadius: "12px", border: "none", cursor: "pointer",
-                  background: appFilter === "no_mb" ? "rgba(239,68,68,0.15)" : "rgba(255,255,255,0.03)",
-                  outline: appFilter === "no_mb" ? "1.5px solid rgba(239,68,68,0.45)" : "1px solid rgba(255,255,255,0.06)",
-                  transition: "all 0.18s", minWidth: "100px", textAlign: "left",
-                }}
-              >
-                <span style={{ fontSize: "0.68rem", color: "#94a3b8", fontWeight: 600 }}>⚠️ 미가입 (연동만)</span>
-                <span style={{ fontSize: "1.25rem", fontWeight: 800, color: "#f87171", lineHeight: 1.2, marginTop: "0.15rem" }}>{stats.noModelBeauty.toLocaleString()}<span style={{ fontSize: "0.8rem", color: "#94a3b8", marginLeft: "2px" }}>명</span></span>
-              </button>
+            {/* 미가입 */}
+            <button
+              onClick={() => setAppFilter(appFilter === "no_mb" ? "all" : "no_mb")}
+              style={statCardStyle(appFilter === "no_mb", STAT_PALETTES.noMb)}
+            >
+              <span style={{ fontSize: "0.8rem", color: STAT_PALETTES.noMb.text, fontWeight: 700 }}>⚠️ 미가입 (연동만)</span>
+              <span style={{ fontSize: "1.75rem", fontWeight: 900, color: STAT_PALETTES.noMb.text, lineHeight: 1.25, marginTop: "0.25rem" }}>
+                {stats.noModelBeauty.toLocaleString()}<span style={{ fontSize: "0.9rem", fontWeight: 600, marginLeft: "3px" }}>명</span>
+              </span>
+            </button>
 
-              {/* 구분선 */}
-              <div style={{ width: "1px", background: "rgba(255,255,255,0.07)", margin: "0 0.25rem", alignSelf: "stretch" }} />
-
-              {/* 앱별 연동 수 */}
-              {Object.entries(stats.byApp).map(([app, cnt]) => {
-                const APP_META: Record<string, { emoji: string; label: string; color: string }> = {
-                  MODEL_BEAUTY: { emoji: "🩷", label: "모델뷰티",  color: "rgba(236,72,153,0.6)" },
-                  MOCA:         { emoji: "🟠", label: "MOCA",      color: "rgba(249,115,22,0.6)" },
-                  IMFF:         { emoji: "🔵", label: "IMFF",      color: "rgba(59,130,246,0.6)" },
-                };
-                const meta = APP_META[app] ?? { emoji: "📱", label: app, color: "rgba(255,255,255,0.4)" };
-                return (
-                  <div
-                    key={app}
-                    style={{
-                      display: "flex", flexDirection: "column", alignItems: "flex-start",
-                      padding: "0.625rem 1rem", borderRadius: "12px",
-                      background: "rgba(255,255,255,0.03)",
-                      border: `1px solid ${meta.color}30`,
-                      minWidth: "90px",
-                    }}
-                  >
-                    <span style={{ fontSize: "0.68rem", color: "#94a3b8", fontWeight: 600 }}>{meta.emoji} {meta.label} 연동</span>
-                    <span style={{ fontSize: "1.25rem", fontWeight: 800, color: "#e2e8f0", lineHeight: 1.2, marginTop: "0.15rem" }}>{(cnt as number).toLocaleString()}<span style={{ fontSize: "0.8rem", color: "#94a3b8", marginLeft: "2px" }}>명</span></span>
-                  </div>
-                );
-              })}
-            </div>
+            {/* 앱별 연동 수 */}
+            {Object.entries(stats.byApp).map(([app, cnt]) => {
+              const APP_LABEL: Record<string, { emoji: string; label: string }> = {
+                MODEL_BEAUTY: { emoji: "🩷", label: "모델뷰티" },
+                MOCA:         { emoji: "🟠", label: "MOCA" },
+                IMFF:         { emoji: "🔵", label: "IMFF" },
+              };
+              const meta = APP_LABEL[app] ?? { emoji: "📱", label: app };
+              const p = APP_PALETTES[app] ?? STAT_PALETTES.total;
+              return (
+                <div key={app} style={statCardStyle(false, p)}>
+                  <span style={{ fontSize: "0.8rem", color: p.text, fontWeight: 700 }}>{meta.emoji} {meta.label} 연동</span>
+                  <span style={{ fontSize: "1.75rem", fontWeight: 900, color: p.text, lineHeight: 1.25, marginTop: "0.25rem" }}>
+                    {(cnt as number).toLocaleString()}<span style={{ fontSize: "0.9rem", fontWeight: 600, marginLeft: "3px" }}>명</span>
+                  </span>
+                </div>
+              );
+            })}
           </div>
         ) : null}
       </div>

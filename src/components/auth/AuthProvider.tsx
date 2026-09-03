@@ -19,6 +19,7 @@ import {
   isIdleExpired,
 } from "@/lib/session-timeout";
 import { syncPushToken } from "@/lib/device/pushBridge";
+import { syncBiometricCredential } from "@/lib/device/biometricBridge";
 import type { MasterUser } from "@/types";
 
 // 세션 만료 여부를 확인할 주기 (라이브 방송 시청 등 조작 없는 상태에서도
@@ -112,13 +113,19 @@ export function AuthProvider({ children }: AuthProviderProps) {
     // 세션 변경 이벤트 구독 (로그인/로그아웃 시 자동 반영)
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (event) => {
+    } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (event === "SIGNED_IN") {
         markLoginAt();
         markActivity();
         await onSignedIn();
+        if (session?.refresh_token) syncBiometricCredential(session.refresh_token);
       } else if (event === "SIGNED_OUT") {
         onSignedOut();
+      } else if (event === "TOKEN_REFRESHED") {
+        // Supabase가 백그라운드에서 access token을 자동 갱신하면 refresh_token도 함께
+        // 로테이션된다. 지문 로그인이 등록돼 있다면 기기에 저장된 토큰도 함께 최신화해서
+        // 나중에 지문으로 로그인할 때 "로그인이 만료되었습니다" 오류가 뜨지 않게 한다.
+        if (session?.refresh_token) syncBiometricCredential(session.refresh_token);
       }
     });
 

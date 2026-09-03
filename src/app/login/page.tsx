@@ -655,15 +655,48 @@ function LoginForm() {
 
           {showBiometricButton && (
             <>
-              <button
-                type="button"
-                onClick={handleBiometricLogin}
-                className="login-btn"
-                disabled={isBiometricSubmitting}
-                style={{ marginBottom: "1rem" }}
-              >
-                {isBiometricSubmitting ? "인증 중..." : "👆 지문으로 로그인"}
-              </button>
+              <div style={{
+                display: "flex", flexDirection: "column", alignItems: "center",
+                marginBottom: "1.25rem",
+              }}>
+                <button
+                  type="button"
+                  onClick={handleBiometricLogin}
+                  disabled={isBiometricSubmitting}
+                  aria-label="지문으로 로그인"
+                  style={{
+                    width: "64px", height: "64px", borderRadius: "50%",
+                    background: "linear-gradient(135deg, #db2777, #9333ea)",
+                    border: "none",
+                    cursor: isBiometricSubmitting ? "not-allowed" : "pointer",
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    boxShadow: "0 8px 20px rgba(147,51,234,0.3)",
+                    opacity: isBiometricSubmitting ? 0.7 : 1,
+                  }}
+                >
+                  {isBiometricSubmitting ? (
+                    <span className="login-btn-spinner" style={{ borderTopColor: "#fff" }} />
+                  ) : (
+                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M12 10a2 2 0 0 0-2 2c0 1.02-.1 2.51-.26 4" />
+                      <path d="M14 13.12c0 2.38 0 6.38-1 8.88" />
+                      <path d="M17.29 21.02c.12-.6.43-2.3.5-3.02" />
+                      <path d="M2 12a10 10 0 0 1 18-6" />
+                      <path d="M2 16h.01" />
+                      <path d="M21.8 16c.2-2 .131-5.354 0-6" />
+                      <path d="M5 19.5C5.5 18 6 15 6 12a6 6 0 0 1 .34-2" />
+                      <path d="M8.65 22c.21-.66.45-1.32.57-2" />
+                      <path d="M9 6.8a6 6 0 0 1 9 5.2v2" />
+                    </svg>
+                  )}
+                </button>
+                <span style={{
+                  fontSize: "0.75rem", fontWeight: 600, color: "var(--mb-gray-500)",
+                  marginTop: "0.5rem",
+                }}>
+                  {isBiometricSubmitting ? "인증 중..." : "지문으로 로그인"}
+                </span>
+              </div>
               <div style={{
                 textAlign: "center", fontSize: "0.75rem", color: "var(--mb-gray-400)",
                 margin: "0 0 1rem",

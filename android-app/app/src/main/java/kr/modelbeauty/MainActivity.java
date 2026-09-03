@@ -32,12 +32,11 @@ import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 
 import java.nio.charset.StandardCharsets;
+import java.security.KeyPair;
+import java.security.KeyPairGenerator;
 import java.security.KeyStore;
 
 import javax.crypto.Cipher;
-import javax.crypto.KeyGenerator;
-import javax.crypto.SecretKey;
-import javax.crypto.spec.GCMParameterSpec;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -53,12 +52,13 @@ public class MainActivity extends AppCompatActivity {
     private static final String TARGET_URL = "https://www.modelbeauty.kr";
 
     // 지문 로그인용 Android Keystore 키 별칭 및 저장 정보
+    // RSA 키 쌍 방식: 개인키(복호화)만 지문 인증을 요구하고 공개키(암호화)는 인증 없이도
+    // 사용 가능하므로, Supabase 세션이 백그라운드에서 자동 갱신되어 refresh_token이 바뀌어도
+    // 지문 프롬프트 없이 저장값을 최신 상태로 계속 동기화할 수 있다(syncCredential 참고).
     private static final String BIOMETRIC_KEY_ALIAS = "modelbeauty_biometric_key";
     private static final String BIOMETRIC_PREFS_NAME = "biometric_prefs";
-    private static final String PREF_IV = "iv";
     private static final String PREF_CIPHERTEXT = "ciphertext";
-    private static final String AES_TRANSFORMATION =
-            KeyProperties.KEY_ALGORITHM_AES + "/" + KeyProperties.BLOCK_MODE_GCM + "/" + KeyProperties.ENCRYPTION_PADDING_NONE;
+    private static final String RSA_TRANSFORMATION = "RSA/ECB/OAEPWithSHA-256AndMGF1Padding";
 
     // 앱 푸시(FCM) 관련 요청 코드
     private static final int NOTIFICATION_PERMISSION_REQUEST_CODE = 2001;
@@ -405,36 +405,49 @@ public class MainActivity extends AppCompatActivity {
             return "{\"hardwareAvailable\":" + hardwareAvailable + ",\"credentialSaved\":" + credentialSaved + "}";
         }
 
-        // 회원가입 완료 화면 / 마이페이지에서 호출: 현재 세션의 refresh token을 지문으로 보호해 저장
+        // 회원가입 완료 화면 / 마이페이지에서 호출: 지문 인증(본인 확인) 후 현재 세션의
+        // refresh token을 RSA 공개키로 암호화해 저장. 암호화 자체는 인증이 필요 없지만,
+        // 등록 시점에는 기기 소유자 확인을 위해 지문 프롬프트를 그대로 띄운다.
         @JavascriptInterface
         public void saveCredential(String refreshToken) {
             runOnUiThread(() -> {
-                try {
-                    Cipher cipher = getEncryptCipher();
-                    BiometricPrompt.CryptoObject cryptoObject = new BiometricPrompt.CryptoObject(cipher);
-                    showBiometricPrompt(
-                            "지문 로그인 등록",
-                            "지문을 인증하면 다음부터 지문으로 로그인할 수 있어요",
-                            cryptoObject,
-                            result -> {
-                                try {
-                                    Cipher c = result.getCryptoObject().getCipher();
-                                    byte[] encrypted = c.doFinal(refreshToken.getBytes(StandardCharsets.UTF_8));
-                                    getSharedPreferences(BIOMETRIC_PREFS_NAME, MODE_PRIVATE).edit()
-                                            .putString(PREF_IV, Base64.encodeToString(c.getIV(), Base64.NO_WRAP))
-                                            .putString(PREF_CIPHERTEXT, Base64.encodeToString(encrypted, Base64.NO_WRAP))
-                                            .apply();
+                BiometricPrompt.PromptInfo promptInfo = new BiometricPrompt.PromptInfo.Builder()
+                        .setTitle("지문 로그인 등록")
+                        .setSubtitle("지문을 인증하면 다음부터 지문으로 로그인할 수 있어요")
+                        .setNegativeButtonText("취소")
+                        .setAllowedAuthenticators(BiometricManager.Authenticators.BIOMETRIC_STRONG)
+                        .build();
+                BiometricPrompt biometricPrompt = new BiometricPrompt(MainActivity.this,
+                        ContextCompat.getMainExecutor(MainActivity.this),
+                        new BiometricPrompt.AuthenticationCallback() {
+                            @Override
+                            public void onAuthenticationSucceeded(BiometricPrompt.AuthenticationResult result) {
+                                super.onAuthenticationSucceeded(result);
+                                if (encryptAndStoreCredential(refreshToken)) {
                                     notifyJs("window.__onBiometricEnrollResult && window.__onBiometricEnrollResult(true, '')");
-                                } catch (Exception e) {
-                                    notifyJs("window.__onBiometricEnrollResult && window.__onBiometricEnrollResult(false, " + jsString(e.getMessage()) + ")");
+                                } else {
+                                    notifyJs("window.__onBiometricEnrollResult && window.__onBiometricEnrollResult(false, '')");
                                 }
-                            },
-                            errorMessage -> notifyJs("window.__onBiometricEnrollResult && window.__onBiometricEnrollResult(false, " + jsString(errorMessage) + ")")
-                    );
-                } catch (Exception e) {
-                    notifyJs("window.__onBiometricEnrollResult && window.__onBiometricEnrollResult(false, " + jsString(e.getMessage()) + ")");
-                }
+                            }
+
+                            @Override
+                            public void onAuthenticationError(int errorCode, CharSequence errString) {
+                                super.onAuthenticationError(errorCode, errString);
+                                notifyJs("window.__onBiometricEnrollResult && window.__onBiometricEnrollResult(false, " + jsString(errString.toString()) + ")");
+                            }
+                        });
+                biometricPrompt.authenticate(promptInfo);
             });
+        }
+
+        // 세션이 백그라운드에서 자동 갱신되어 refresh_token이 바뀔 때마다 호출: 이미 등록된
+        // 기기에서만, 지문 프롬프트 없이 저장값을 최신 토큰으로 조용히 동기화한다.
+        // (RSA 공개키 암호화는 인증이 필요 없으므로 가능 — 복호화만 지문이 필요하다)
+        @JavascriptInterface
+        public void syncCredential(String refreshToken) {
+            SharedPreferences prefs = getSharedPreferences(BIOMETRIC_PREFS_NAME, MODE_PRIVATE);
+            if (!prefs.contains(PREF_CIPHERTEXT)) return;
+            encryptAndStoreCredential(refreshToken);
         }
 
         // 로그인 화면에서 호출: 지문 인증 성공 시 저장된 refresh token을 복호화해 웹으로 전달
@@ -518,42 +531,70 @@ public class MainActivity extends AppCompatActivity {
         biometricPrompt.authenticate(promptInfo, cryptoObject);
     }
 
-    private SecretKey getOrCreateSecretKey() throws Exception {
+    // 등록된 키가 있으면 반환하고, 없으면 새로 생성한다. 과거(AES 대칭키 방식) 버전에서
+    // 등록된 키가 남아있으면 새 방식과 호환되지 않으므로 삭제 후 재생성을 유도한다.
+    private KeyPair getOrCreateKeyPair() throws Exception {
         KeyStore keyStore = KeyStore.getInstance("AndroidKeyStore");
         keyStore.load(null);
 
         if (keyStore.containsAlias(BIOMETRIC_KEY_ALIAS)) {
-            return (SecretKey) keyStore.getKey(BIOMETRIC_KEY_ALIAS, null);
+            KeyStore.Entry entry = keyStore.getEntry(BIOMETRIC_KEY_ALIAS, null);
+            if (entry instanceof KeyStore.PrivateKeyEntry) {
+                KeyStore.PrivateKeyEntry privateEntry = (KeyStore.PrivateKeyEntry) entry;
+                return new KeyPair(privateEntry.getCertificate().getPublicKey(), privateEntry.getPrivateKey());
+            }
+            // 이전 버전에서 등록된 키(다른 알고리즘)는 재사용할 수 없으므로 정리하고
+            // 등록이 무효화된 것과 동일하게 처리해 재등록을 유도한다.
+            keyStore.deleteEntry(BIOMETRIC_KEY_ALIAS);
+            clearStoredCredential();
+            throw new KeyPermanentlyInvalidatedException();
         }
 
-        KeyGenerator keyGenerator = KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, "AndroidKeyStore");
+        KeyPairGenerator keyPairGenerator = KeyPairGenerator.getInstance(
+                KeyProperties.KEY_ALGORITHM_RSA, "AndroidKeyStore");
         KeyGenParameterSpec spec = new KeyGenParameterSpec.Builder(
                 BIOMETRIC_KEY_ALIAS, KeyProperties.PURPOSE_ENCRYPT | KeyProperties.PURPOSE_DECRYPT)
-                .setBlockModes(KeyProperties.BLOCK_MODE_GCM)
-                .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
+                .setDigests(KeyProperties.DIGEST_SHA256)
+                .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_RSA_OAEP)
                 .setUserAuthenticationRequired(true)
                 .setInvalidatedByBiometricEnrollment(true)
                 .build();
-        keyGenerator.init(spec);
-        return keyGenerator.generateKey();
+        keyPairGenerator.initialize(spec);
+        return keyPairGenerator.generateKeyPair();
     }
 
+    // 공개키 암호화 — Android Keystore는 개인키 사용에만 지문 인증을 요구하므로
+    // (공개키는 비밀이 아니라 안전하게 노출 가능) 이 연산은 프롬프트 없이 바로 수행된다.
     private Cipher getEncryptCipher() throws Exception {
-        Cipher cipher = Cipher.getInstance(AES_TRANSFORMATION);
-        cipher.init(Cipher.ENCRYPT_MODE, getOrCreateSecretKey());
+        Cipher cipher = Cipher.getInstance(RSA_TRANSFORMATION);
+        cipher.init(Cipher.ENCRYPT_MODE, getOrCreateKeyPair().getPublic());
         return cipher;
     }
 
+    // 개인키 복호화 — 반드시 지문 인증(BiometricPrompt.CryptoObject)을 통해서만 사용 가능하다.
     private Cipher getDecryptCipher() throws Exception {
         SharedPreferences prefs = getSharedPreferences(BIOMETRIC_PREFS_NAME, MODE_PRIVATE);
-        String ivB64 = prefs.getString(PREF_IV, null);
-        if (ivB64 == null) {
+        if (!prefs.contains(PREF_CIPHERTEXT)) {
             throw new IllegalStateException("no credential saved");
         }
-        byte[] iv = Base64.decode(ivB64, Base64.NO_WRAP);
-        Cipher cipher = Cipher.getInstance(AES_TRANSFORMATION);
-        cipher.init(Cipher.DECRYPT_MODE, getOrCreateSecretKey(), new GCMParameterSpec(128, iv));
+        Cipher cipher = Cipher.getInstance(RSA_TRANSFORMATION);
+        cipher.init(Cipher.DECRYPT_MODE, getOrCreateKeyPair().getPrivate());
         return cipher;
+    }
+
+    // 지문 인증 없이(공개키로) refresh token을 암호화해 저장. saveCredential(최초 등록)과
+    // syncCredential(자동 토큰 갱신 시 재동기화) 양쪽에서 공유하는 로직.
+    private boolean encryptAndStoreCredential(String refreshToken) {
+        try {
+            Cipher cipher = getEncryptCipher();
+            byte[] encrypted = cipher.doFinal(refreshToken.getBytes(StandardCharsets.UTF_8));
+            getSharedPreferences(BIOMETRIC_PREFS_NAME, MODE_PRIVATE).edit()
+                    .putString(PREF_CIPHERTEXT, Base64.encodeToString(encrypted, Base64.NO_WRAP))
+                    .apply();
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
     }
 
     private void notifyJs(String script) {

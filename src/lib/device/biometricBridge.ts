@@ -3,6 +3,7 @@ import { isAppWebView } from "./webview";
 interface AndroidBiometricNative {
   checkAvailability(): string;
   saveCredential(refreshToken: string): void;
+  syncCredential(refreshToken: string): void;
   login(): void;
   clearCredential(): void;
 }
@@ -70,6 +71,20 @@ export function loginWithBiometric(): Promise<{ success: boolean; token: string 
     };
     window.AndroidBiometric!.login();
   });
+}
+
+/**
+ * 이미 등록된 기기에서만, 지문 인증 없이 저장된 refresh token을 최신 값으로 조용히 동기화.
+ * Supabase 세션이 백그라운드에서 자동 갱신될 때마다 호출해 저장된 토큰이 만료되는 것을 막는다
+ * (등록 자체가 안 되어 있으면 네이티브 쪽에서 아무 것도 하지 않는다).
+ */
+export function syncBiometricCredential(refreshToken: string): void {
+  if (!isBiometricBridgeAvailable()) return;
+  try {
+    window.AndroidBiometric!.syncCredential(refreshToken);
+  } catch {
+    // 동기화 실패는 조용히 무시 — 다음 지문 로그인 시도에서 만료로 감지되어 재등록을 유도한다
+  }
 }
 
 /** 지문 로그인 자격증명 삭제 (마이페이지에서 끄거나, 만료된 토큰 감지 시) */

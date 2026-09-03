@@ -188,15 +188,38 @@ export default async function TrialDetailPage({
         </span>
       </div>
 
-      {campaign.product && (
-        <Link href={`/products/${campaign.product.slug}`} style={{ fontSize: "0.8125rem", color: "var(--mb-gray-500)", textDecoration: "underline" }}>
-          {campaign.product.name} 상품 보기 →
-        </Link>
-      )}
-
       <h1 style={{ fontSize: "1.5rem", fontWeight: 800, margin: "0.5rem 0 0.75rem", color: "var(--mb-gray-900)" }}>
         {campaign.title}
       </h1>
+
+      {campaign.product && (
+        <Link
+          href={`/products/${campaign.product.slug}`}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: "0.5rem",
+            fontSize: "0.875rem",
+            fontWeight: 700,
+            color: "#db2777",
+            background: "rgba(219,39,119,0.08)",
+            border: "1px solid rgba(219,39,119,0.3)",
+            borderRadius: "14px",
+            padding: "0.85rem 1.1rem",
+            margin: "0 0 1.25rem",
+            textDecoration: "none",
+          }}
+        >
+          <span style={{ display: "flex", alignItems: "center", gap: "0.5rem", minWidth: 0 }}>
+            <span style={{ fontSize: "1.1rem" }}>🛍️</span>
+            <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              {campaign.product.name} 상품 보러가기
+            </span>
+          </span>
+          <span style={{ flexShrink: 0 }}>→</span>
+        </Link>
+      )}
 
       {campaign.description && (
         <p style={{ fontSize: "0.9375rem", color: "var(--mb-gray-700, #374151)", lineHeight: 1.7, margin: "0 0 1.25rem" }}>

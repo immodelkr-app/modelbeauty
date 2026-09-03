@@ -473,7 +473,7 @@ export default function AdminTrialsPage() {
       {/* 개설 모달 */}
       {showModal && (
         <div className="admin-modal-overlay">
-          <div className="admin-modal-container" style={{ maxWidth: 860, width: "92vw" }}>
+          <div className="admin-modal-container" style={{ maxWidth: 860, width: "100%" }}>
             <div className="admin-modal-header">
               <h2 className="admin-modal-title">{editingCampaign ? "✏️ 체험단 수정" : "＋ 체험단 개설"}</h2>
               <button onClick={() => setShowModal(false)} className="admin-modal-close-btn">✕</button>
@@ -587,7 +587,7 @@ export default function AdminTrialsPage() {
       {/* 신청자 목록 모달 */}
       {applicantsFor && (
         <div className="admin-modal-overlay" onClick={() => setApplicantsFor(null)}>
-          <div className="admin-modal-container" style={{ maxWidth: 1240, width: "95vw" }} onClick={(e) => e.stopPropagation()}>
+          <div className="admin-modal-container" style={{ maxWidth: 1240, width: "100%" }} onClick={(e) => e.stopPropagation()}>
             <div className="admin-modal-header">
               <h2 className="admin-modal-title">{applicantsFor.title} — 신청자 목록</h2>
               <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
@@ -610,7 +610,8 @@ export default function AdminTrialsPage() {
                   <p className="admin-empty-title">아직 신청자가 없습니다</p>
                 </div>
               ) : (
-                <table className="admin-table" style={{ tableLayout: "fixed", width: "100%" }}>
+                <div className="admin-table-wrap">
+                <table className="admin-table" style={{ tableLayout: "fixed", width: "100%", minWidth: "980px" }}>
                   <thead>
                     <tr>
                       <th style={{ width: "7%" }}>이름</th>
@@ -712,6 +713,7 @@ export default function AdminTrialsPage() {
                     ))}
                   </tbody>
                 </table>
+                </div>
               )}
               {applicants.length > 0 && (
                 <p style={{ fontSize: "0.78rem", color: "#9ca3af", marginTop: "1rem" }}>

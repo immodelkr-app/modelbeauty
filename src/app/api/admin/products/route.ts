@@ -5,6 +5,7 @@
 
 import { requireAdmin } from "@/lib/auth-admin";
 import { createSupabaseAdmin } from "@/lib/supabase/server";
+import { sanitizeProductContent } from "@/lib/sanitize-product-content";
 
 export async function GET(request: Request) {
   const notAllowed = await requireAdmin();
@@ -104,6 +105,7 @@ export async function POST(request: Request) {
       categoryIds,
       description,
       content,
+      detailContentType,
       basePrice,
       salePrice,
       stockQuantity,
@@ -154,7 +156,8 @@ export async function POST(request: Request) {
         slug,
         category_id: categoryIdList[0] ?? null,
         description: description ?? null,
-        content: content ?? null,
+        content: sanitizeProductContent(content),
+        detail_content_type: detailContentType === "editor" ? "editor" : "images",
         base_price: basePrice,
         sale_price: salePrice ?? null,
         stock_quantity: stockQuantity ?? 0,

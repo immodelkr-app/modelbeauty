@@ -23,13 +23,17 @@ export default function EditProductPage({ params }: { params: Promise<{ id: stri
           if (!success || !data) { setNotFound(true); return; }
           const images = (data.images as { url: string; alt: string }[] ?? [])
             .map((img) => ({ url: img.url, alt: img.alt ?? "" }));
-          // 상세페이지 content는 ProductForm이 생성한 <img> 나열 HTML이므로 src/alt만 다시 추출
-          const detailImages = Array.from(
-            (data.content as string ?? "").matchAll(/<img[^>]*\ssrc="([^"]*)"[^>]*\salt="([^"]*)"[^>]*>/g)
-          ).map((m) => ({
-            url: m[1].replace(/&quot;/g, '"').replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&"),
-            alt: m[2].replace(/&quot;/g, '"').replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&"),
-          }));
+          const detailContentType: "images" | "editor" = data.detail_content_type === "editor" ? "editor" : "images";
+          // 이미지 나열형 content는 ProductForm이 생성한 <img> 나열 HTML이므로 src/alt만 다시 추출
+          const detailImages = detailContentType === "images"
+            ? Array.from(
+                (data.content as string ?? "").matchAll(/<img[^>]*\ssrc="([^"]*)"[^>]*\salt="([^"]*)"[^>]*>/g)
+              ).map((m) => ({
+                url: m[1].replace(/&quot;/g, '"').replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&"),
+                alt: m[2].replace(/&quot;/g, '"').replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&"),
+              }))
+            : [];
+          const detailEditorHtml = detailContentType === "editor" ? (data.content as string ?? "") : "";
           setInitialData({
             name: data.name ?? "",
             slug: data.slug ?? "",
@@ -40,7 +44,9 @@ export default function EditProductPage({ params }: { params: Promise<{ id: stri
             stockQuantity: String(data.stock_quantity ?? 0),
             sku: data.sku ?? "",
             images,
+            detailContentType,
             detailImages,
+            detailEditorHtml,
             tags: (data.tags ?? []).join(", "),
             isActive: data.is_active ?? true,
             isFeatured: data.is_featured ?? false,

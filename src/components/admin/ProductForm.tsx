@@ -7,6 +7,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import MultiImageUploader, { type UploadedImage } from "./MultiImageUploader";
+import BlogDetailEditor from "./BlogDetailEditor";
 
 interface Category { id: string; name: string; }
 interface Crew { id: string; name: string; nickname: string; }
@@ -23,7 +24,9 @@ export interface ProductFormData {
   stockQuantity: string;
   sku: string;
   images: UploadedImage[];       // 상품 이미지(첫 번째가 대표 썸네일)
-  detailImages: UploadedImage[]; // 상세페이지 이미지(순서대로 쌓아서 content로 저장)
+  detailContentType: "images" | "editor"; // 상세페이지 작성 방식
+  detailImages: UploadedImage[]; // 상세페이지 이미지(순서대로 쌓아서 content로 저장) — images 모드
+  detailEditorHtml: string;      // 블로그 에디터로 작성한 HTML — editor 모드
   tags: string;       // 쉼표 구분
   isActive: boolean;
   isFeatured: boolean;
@@ -39,7 +42,7 @@ export interface ProductFormData {
 const INITIAL: ProductFormData = {
   name: "", slug: "", categoryIds: [], description: "",
   basePrice: "", salePrice: "", stockQuantity: "0",
-  sku: "", images: [], detailImages: [], tags: "",
+  sku: "", images: [], detailContentType: "images", detailImages: [], detailEditorHtml: "", tags: "",
   isActive: true, isFeatured: false,
   recommenderCrewId: "", recommendationNote: "",
   relatedProducts: [],
@@ -154,7 +157,8 @@ export default function ProductForm({ productId, initialData, onSuccess }: Produ
       stockQuantity: parseInt(form.stockQuantity, 10) || 0,
       sku: form.sku || null,
       images: form.images.map((img, idx) => ({ url: img.url, alt: img.alt || form.name, sortOrder: idx })),
-      content: buildDetailContentHtml(form.detailImages),
+      detailContentType: form.detailContentType,
+      content: form.detailContentType === "editor" ? form.detailEditorHtml : buildDetailContentHtml(form.detailImages),
       tags: form.tags ? form.tags.split(",").map((t) => t.trim()).filter(Boolean) : [],
       isActive: form.isActive,
       isFeatured: form.isFeatured,
@@ -333,17 +337,66 @@ export default function ProductForm({ productId, initialData, onSuccess }: Produ
         />
       </div>
 
-      {/* 상세페이지 이미지 */}
+      {/* 상세페이지 내용 */}
       <div className="admin-card" style={{ padding: "1.5rem" }}>
-        <h2 className="admin-card-title" style={{ marginBottom: "1.25rem" }}>상세페이지 이미지</h2>
-        <p style={{ fontSize: "0.8125rem", color: "#6b7280", margin: "0 0 1rem" }}>
-          상품 상세페이지 하단에 순서대로 이어붙여 표시됩니다. 상세 설명 이미지를 원하는 순서대로 올려주세요.
-        </p>
-        <MultiImageUploader
-          images={form.detailImages}
-          onChange={(detailImages) => setForm((prev) => ({ ...prev, detailImages }))}
-          hint="jpg/png/webp/gif, 장당 5MB 이하. 여러 장을 올리면 위에서 아래로 이어붙여 보여집니다."
-        />
+        <h2 className="admin-card-title" style={{ marginBottom: "0.75rem" }}>상세페이지 내용</h2>
+        <div style={{ display: "flex", gap: "0.5rem", marginBottom: "1.25rem" }}>
+          <label
+            style={{
+              flex: 1, display: "flex", alignItems: "center", gap: "0.5rem", cursor: "pointer",
+              padding: "0.75rem 1rem", borderRadius: "10px",
+              border: form.detailContentType === "images" ? "1.5px solid #db2777" : "1px solid #e5e7eb",
+              background: form.detailContentType === "images" ? "#fdf2f8" : "#fff",
+              fontSize: "0.875rem", fontWeight: 600,
+            }}
+          >
+            <input
+              type="radio" name="detailContentType" value="images"
+              checked={form.detailContentType === "images"}
+              onChange={() => setForm((prev) => ({ ...prev, detailContentType: "images" }))}
+            />
+            🖼️ 이미지 나열형
+          </label>
+          <label
+            style={{
+              flex: 1, display: "flex", alignItems: "center", gap: "0.5rem", cursor: "pointer",
+              padding: "0.75rem 1rem", borderRadius: "10px",
+              border: form.detailContentType === "editor" ? "1.5px solid #db2777" : "1px solid #e5e7eb",
+              background: form.detailContentType === "editor" ? "#fdf2f8" : "#fff",
+              fontSize: "0.875rem", fontWeight: 600,
+            }}
+          >
+            <input
+              type="radio" name="detailContentType" value="editor"
+              checked={form.detailContentType === "editor"}
+              onChange={() => setForm((prev) => ({ ...prev, detailContentType: "editor" }))}
+            />
+            ✍️ 블로그 에디터형
+          </label>
+        </div>
+
+        {form.detailContentType === "images" ? (
+          <>
+            <p style={{ fontSize: "0.8125rem", color: "#6b7280", margin: "0 0 1rem" }}>
+              상품 상세페이지 하단에 순서대로 이어붙여 표시됩니다. 상세 설명 이미지를 원하는 순서대로 올려주세요.
+            </p>
+            <MultiImageUploader
+              images={form.detailImages}
+              onChange={(detailImages) => setForm((prev) => ({ ...prev, detailImages }))}
+              hint="jpg/png/webp/gif, 장당 5MB 이하. 여러 장을 올리면 위에서 아래로 이어붙여 보여집니다."
+            />
+          </>
+        ) : (
+          <>
+            <p style={{ fontSize: "0.8125rem", color: "#6b7280", margin: "0 0 1rem" }}>
+              블로그처럼 사진과 글을 자유롭게 섞어서 작성할 수 있습니다. 이미지는 붙여넣기/드래그하면 자동 업로드됩니다.
+            </p>
+            <BlogDetailEditor
+              initialHtml={form.detailEditorHtml}
+              onChange={(html) => setForm((prev) => ({ ...prev, detailEditorHtml: html }))}
+            />
+          </>
+        )}
       </div>
 
       {/* 추천 크루 */}

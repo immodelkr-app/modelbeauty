@@ -6,6 +6,7 @@
 
 import { requireAdmin } from "@/lib/auth-admin";
 import { createSupabaseAdmin } from "@/lib/supabase/server";
+import { sanitizeProductContent } from "@/lib/sanitize-product-content";
 
 export async function GET(
   _request: Request,
@@ -81,6 +82,7 @@ export async function PATCH(
       categoryIds,
       description,
       content,
+      detailContentType,
       basePrice,
       salePrice,
       stockQuantity,
@@ -120,7 +122,8 @@ export async function PATCH(
     if (slug !== undefined) updatePayload.slug = slug;
     if (categoryIdList !== undefined) updatePayload.category_id = categoryIdList[0] ?? null;
     if (description !== undefined) updatePayload.description = description;
-    if (content !== undefined) updatePayload.content = content;
+    if (content !== undefined) updatePayload.content = sanitizeProductContent(content);
+    if (detailContentType !== undefined) updatePayload.detail_content_type = detailContentType === "editor" ? "editor" : "images";
     if (basePrice !== undefined) updatePayload.base_price = basePrice;
     if (salePrice !== undefined) updatePayload.sale_price = salePrice;
     if (stockQuantity !== undefined) updatePayload.stock_quantity = stockQuantity;

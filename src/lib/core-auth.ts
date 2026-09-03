@@ -154,6 +154,10 @@ export async function getMasterUser(masterUserId: string): Promise<MasterUser> {
 
 /**
  * 전화번호로 마스터 유저 조회
+ * im-core-auth의 /api/auth/user/phone/:phone도 getMasterUser와 마찬가지로
+ * 스네이크케이스(phone_number, id 등)로 응답하므로 여기서 정규화한다.
+ * (정규화 누락 시 masterUserId가 undefined가 되어, 비밀번호 찾기에서 닉네임 조회가
+ *  실패해 전화번호로 폴백하는 경우 "회원 정보 조회에 실패했습니다" 오류로 이어지는 버그가 있었음)
  */
 export async function getMasterUserByPhone(
   phoneNumber: string
@@ -167,7 +171,14 @@ export async function getMasterUserByPhone(
     throw new Error(err.error || `유저 조회 실패: ${res.status}`);
   }
 
-  return res.json();
+  const data = await res.json();
+  return {
+    ...data,
+    masterUserId: data.masterUserId ?? data.id,
+    phoneNumber: data.phoneNumber ?? data.phone_number,
+    integratedPoints: data.integratedPoints ?? data.integrated_points ?? 0,
+    linkedApps: data.linkedApps ?? data.linked_apps ?? [],
+  } as MasterUser;
 }
 
 /**

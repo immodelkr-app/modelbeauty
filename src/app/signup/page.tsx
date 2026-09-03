@@ -683,14 +683,15 @@ export default function SignupPage() {
                 placeholder="우편번호"
                 value={form.zipcode}
                 className="login-input"
-                style={{ flex: "0 0 110px", cursor: "default", background: "var(--mb-gray-50, rgba(255,255,255,0.03))" }}
+                style={{ flex: "1 1 90px", minWidth: 0, cursor: "default", background: "var(--mb-gray-50, rgba(255,255,255,0.03))" }}
               />
               <button
                 type="button"
                 onClick={handleAddressSearch}
                 style={{
-                  flex: 1,
-                  padding: "0.625rem 1rem",
+                  flex: "0 0 auto",
+                  minWidth: 0,
+                  padding: "0.625rem 0.875rem",
                   background: "rgba(219,39,119,0.12)",
                   border: "1px solid rgba(219,39,119,0.35)",
                   borderRadius: "10px",

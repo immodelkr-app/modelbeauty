@@ -86,9 +86,13 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // im-core-auth에는 마스터 유저가 있지만(MOCA·IMFF 등) 모델뷰티 로컬 계정이 아직 없는 경우.
+    // 여기서 authEmail을 임의로 만들어 found:true를 주면, 존재하지도 않는 계정으로
+    // signInWithPassword를 시도하게 되어 "비밀번호가 틀렸다"는 오해를 준다.
+    // 실제로는 아직 모델뷰티 비밀번호를 설정한 적이 없는 것이므로, 비밀번호 찾기로
+    // 유도할 수 있도록 별도 플래그를 내려준다.
     if (phoneDigits) {
-      const authEmail = `${phoneDigits}@modelbeauty.kr`;
-      return NextResponse.json({ found: true, authEmail }, { status: 200 });
+      return NextResponse.json({ found: false, notActivated: true }, { status: 200 });
     }
 
     return NextResponse.json({ found: false }, { status: 200 });

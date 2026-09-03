@@ -8,9 +8,16 @@
 // 3. im-core-auth sync로 마스터 계정 생성/연결
 // 4. 기존 타 앱 계정이 있으면 통합 안내
 // 추가: 생년월일(년/월/일), 성별, 주소, 마케팅 동의 저장
+//
+// [MOCA/IMFF → 모델뷰티 유입 시 "이미 가입된 닉네임" 오탐 방지]
+// MOCA·IMFF 로그인 시 im-core-auth가 MODEL_BEAUTY 매핑을 자동으로 만들어두는데(로컬 계정은 없음),
+// 이 상태에서 그 닉네임 주인이 실제로 모델뷰티에 가입하려 하면 checkNicknameAvailable이
+// "이미 가입된 닉네임"으로 오탐한다. 닉네임 소유자의 전화번호가 지금 가입하려는 사람의
+// 전화번호와 같으면(=본인) 차단하지 않고 그대로 가입을 진행해 로컬 계정을 만들어준다.
+// (아래 syncMasterUser 호출이 해당 MODEL_BEAUTY 매핑의 local_user_id를 새 계정으로 갱신한다)
 
 import { NextRequest, NextResponse } from "next/server";
-import { checkNicknameAvailable, syncMasterUser } from "@/lib/core-auth";
+import { checkNicknameAvailable, getMasterUserByNickname, syncMasterUser } from "@/lib/core-auth";
 import { createSupabaseAdmin } from "@/lib/supabase/server";
 
 export async function POST(request: NextRequest) {
@@ -86,10 +93,24 @@ export async function POST(request: NextRequest) {
     // ── 닉네임 중복 확인 (im-core-auth 통합 체크) ────────────
     const isAvailable = await checkNicknameAvailable(cleanNickname);
     if (!isAvailable) {
-      return NextResponse.json(
-        { error: "이미 사용 중인 닉네임입니다. 다른 닉네임을 입력해주세요." },
-        { status: 409 }
-      );
+      // MOCA/IMFF에서 이미 쓰고 있는 "본인"의 닉네임일 수 있으므로
+      // 닉네임 소유자의 전화번호를 확인해 본인이면 예외적으로 통과시킨다.
+      let isOwnIdentity = false;
+      try {
+        const ownerRef = await getMasterUserByNickname(cleanNickname);
+        const ownerPhoneDigits = ownerRef?.phoneNumber?.replace(/\D/g, "");
+        isOwnIdentity = !!ownerPhoneDigits && ownerPhoneDigits === phoneDigits;
+      } catch (e) {
+        console.warn("[POST /api/auth/signup] 닉네임 소유자 확인 실패 (본인 여부 판단 불가):", e);
+      }
+
+      if (!isOwnIdentity) {
+        return NextResponse.json(
+          { error: "이미 사용 중인 닉네임입니다. 다른 닉네임을 입력해주세요." },
+          { status: 409 }
+        );
+      }
+      // 본인의 MOCA/IMFF 닉네임 → 모델뷰티 로컬 계정이 없는 상태이므로 가입을 계속 진행한다.
     }
 
     // ── Supabase Auth 가입 ────────────────────────────────────

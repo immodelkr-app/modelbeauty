@@ -528,6 +528,11 @@ function LoginForm() {
       });
       const emailData = await emailRes.json();
 
+      if (emailData.notActivated) {
+        setError("모카(MOCA)·IMFF에 가입된 닉네임이에요. 아래 '비밀번호 찾기'로 모델뷰티 비밀번호를 설정하면 바로 로그인할 수 있어요.");
+        return;
+      }
+
       if (!emailData.found || !emailData.authEmail) {
         setError("닉네임 또는 비밀번호가 올바르지 않습니다.");
         return;

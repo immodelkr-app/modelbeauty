@@ -9,7 +9,10 @@ import type { Metadata } from "next";
 import { createSupabaseServerClient, createSupabaseAdmin } from "@/lib/supabase/server";
 import TrialApplyPanel from "@/components/trials/TrialApplyPanel";
 import TrialReviews from "@/components/trials/TrialReviews";
+import ShareButtons from "@/components/products/ShareButtons";
 import type { TrialCampaign, TrialReview } from "@/types";
+
+const APP_URL = "https://www.modelbeauty.kr";
 
 async function getCampaign(id: string): Promise<{
   campaign: TrialCampaign;
@@ -226,6 +229,13 @@ export default async function TrialDetailPage({
           {campaign.description}
         </p>
       )}
+
+      <ShareButtons
+        productName={campaign.title}
+        productUrl={`${APP_URL}/trials/${campaign.id}`}
+        thumbnailUrl={thumbnail ?? undefined}
+        description={campaign.description}
+      />
 
       <div
         style={{

@@ -30,6 +30,10 @@ import androidx.biometric.BiometricManager;
 import androidx.biometric.BiometricPrompt;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
+import androidx.core.graphics.Insets;
+import androidx.core.view.ViewCompat;
+import androidx.core.view.WindowCompat;
+import androidx.core.view.WindowInsetsCompat;
 
 import java.nio.charset.StandardCharsets;
 import java.security.KeyPair;
@@ -71,8 +75,20 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         sCurrentInstance = this;
 
+        // Android 15(targetSdk 35+)부터는 앱이 기본적으로 엣지투엣지로 표시되어, 인셋을
+        // 직접 처리하지 않으면 상태바/내비게이션 바에 콘텐츠(웹뷰 상단 헤더, 하단 버튼 등)가
+        // 가려질 수 있다. 시스템 바 영역만큼 루트 뷰에 패딩을 주어 기존과 동일하게 보이도록 유지.
+        WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
+
         setContentView(R.layout.activity_main);
         mSplashOverlay = findViewById(R.id.splash_overlay);
+
+        View rootView = findViewById(R.id.main_root);
+        ViewCompat.setOnApplyWindowInsetsListener(rootView, (v, windowInsets) -> {
+            Insets systemBars = windowInsets.getInsets(WindowInsetsCompat.Type.systemBars());
+            v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom);
+            return WindowInsetsCompat.CONSUMED;
+        });
 
         // 자바 코드로 웹뷰 생성 후 컨테이너에 추가
         mWebView = new WebView(this);

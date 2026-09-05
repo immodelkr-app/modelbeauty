@@ -513,12 +513,26 @@ export default function CheckoutPage() {
 
             {/* 포인트 입력 */}
             <div>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.375rem" }}>
-                <label style={{ ...labelStyle, margin: 0 }}>포인트 사용 (상품 1만원 이상 구매 시, 최대 30% 한도)</label>
-                <span style={{ fontSize: "0.8125rem", color: "var(--mb-gray-500)" }}>
-                  보유: {maxAvailablePoints.toLocaleString()}P
+              <label style={{ ...labelStyle, margin: "0 0 0.5rem" }}>포인트 사용</label>
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  background: "var(--mb-pink-50)",
+                  borderRadius: "10px",
+                  padding: "0.75rem 1rem",
+                  marginBottom: "0.5rem",
+                }}
+              >
+                <span style={{ fontSize: "0.8125rem", fontWeight: 600, color: "var(--mb-gray-600)" }}>보유 포인트</span>
+                <span style={{ fontSize: "1.0625rem", fontWeight: 800, color: "var(--mb-pink-600)" }}>
+                  {maxAvailablePoints.toLocaleString()}P
                 </span>
               </div>
+              <p style={{ fontSize: "0.75rem", color: "var(--mb-gray-400)", margin: "0 0 0.5rem" }}>
+                상품 1만원 이상 구매 시, 최대 30% 한도로 사용할 수 있어요.
+              </p>
               <div style={{ display: "flex", gap: "0.5rem" }}>
                 <input
                   type="number"

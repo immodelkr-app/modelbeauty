@@ -1,11 +1,12 @@
 // ============================================================
-// GET   /api/mypage/profile — 내 프로필(생년월일/성별/마케팅 동의) 조회
+// GET   /api/mypage/profile — 내 프로필(생년월일/성별/마케팅 동의/SNS 활동) 조회
 // PATCH /api/mypage/profile — 내 프로필 수정
 // ============================================================
-// 생년월일/성별/마케팅 동의는 아임모델 공화국이 아니라 모델뷰티 로컬
-// Supabase Auth user_metadata에만 저장됨 (가입 시 선택 입력, 생일 쿠폰
-// 자동발급에 사용). user_metadata는 통째로 덮어써지므로 기존 값과
-// merge해서 저장 — master_user_id 등 다른 필드가 날아가지 않도록 주의.
+// 생년월일/성별/마케팅 동의/SNS 활동 정보는 아임모델 공화국이 아니라 모델뷰티
+// 로컬 Supabase Auth user_metadata에만 저장됨 (가입 시 선택 입력, 생일 쿠폰
+// 자동발급 및 체험단 신청서 자동 채움에 사용). user_metadata는 통째로
+// 덮어써지므로 기존 값과 merge해서 저장 — master_user_id 등 다른 필드가
+// 날아가지 않도록 주의.
 
 import { createSupabaseServerClient, createSupabaseAdmin } from "@/lib/supabase/server";
 
@@ -28,6 +29,9 @@ export async function GET() {
         gender: meta.gender ?? null,
         marketingEmail: meta.marketing_email ?? false,
         marketingSms: meta.marketing_sms ?? false,
+        snsYoutube: meta.sns_youtube ?? "",
+        snsInstagram: meta.sns_instagram ?? "",
+        snsBlogUrl: meta.sns_blog_url ?? "",
       },
     });
   } catch (err: any) {
@@ -39,11 +43,14 @@ export async function GET() {
 export async function PATCH(request: Request) {
   try {
     const body = await request.json();
-    const { birthDate, gender, marketingEmail, marketingSms } = body as {
+    const { birthDate, gender, marketingEmail, marketingSms, snsYoutube, snsInstagram, snsBlogUrl } = body as {
       birthDate?: string | null;
       gender?: "male" | "female" | "other" | null;
       marketingEmail?: boolean;
       marketingSms?: boolean;
+      snsYoutube?: string | null;
+      snsInstagram?: string | null;
+      snsBlogUrl?: string | null;
     };
 
     const supabase = await createSupabaseServerClient();
@@ -79,6 +86,9 @@ export async function PATCH(request: Request) {
       ...(gender !== undefined ? { gender: gender || null } : {}),
       ...(marketingEmail !== undefined ? { marketing_email: marketingEmail } : {}),
       ...(marketingSms !== undefined ? { marketing_sms: marketingSms } : {}),
+      ...(snsYoutube !== undefined ? { sns_youtube: snsYoutube || null } : {}),
+      ...(snsInstagram !== undefined ? { sns_instagram: snsInstagram || null } : {}),
+      ...(snsBlogUrl !== undefined ? { sns_blog_url: snsBlogUrl || null } : {}),
     };
 
     const { error } = await admin.auth.admin.updateUserById(user.id, {

@@ -150,6 +150,7 @@ export default function MypagePage() {
     birthYear: "", birthMonth: "", birthDay: "",
     gender: "" as "" | "male" | "female" | "other",
     marketingEmail: false, marketingSms: false,
+    snsYoutube: "", snsInstagram: "", snsBlogUrl: "",
   });
 
   // 등급 안내 팝업 상태
@@ -205,6 +206,9 @@ export default function MypagePage() {
           gender: res.data.gender ?? "",
           marketingEmail: !!res.data.marketingEmail,
           marketingSms: !!res.data.marketingSms,
+          snsYoutube: res.data.snsYoutube ?? "",
+          snsInstagram: res.data.snsInstagram ?? "",
+          snsBlogUrl: res.data.snsBlogUrl ?? "",
         });
       })
       .catch(() => {});
@@ -311,7 +315,7 @@ export default function MypagePage() {
   };
 
   const handleSaveProfile = async () => {
-    const { birthYear, birthMonth, birthDay, gender, marketingEmail, marketingSms } = profileState;
+    const { birthYear, birthMonth, birthDay, gender, marketingEmail, marketingSms, snsYoutube, snsInstagram, snsBlogUrl } = profileState;
 
     if ((birthYear || birthMonth || birthDay) && !(birthYear && birthMonth && birthDay)) {
       setProfileError("생년월일은 년/월/일을 모두 선택해 주세요.");
@@ -328,7 +332,10 @@ export default function MypagePage() {
       const res = await fetch("/api/mypage/profile", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ birthDate, gender: gender || null, marketingEmail, marketingSms }),
+        body: JSON.stringify({
+          birthDate, gender: gender || null, marketingEmail, marketingSms,
+          snsYoutube: snsYoutube.trim(), snsInstagram: snsInstagram.trim(), snsBlogUrl: snsBlogUrl.trim(),
+        }),
       });
       const data = await res.json();
       if (data.success) {
@@ -937,6 +944,32 @@ export default function MypagePage() {
               </label>
             </div>
 
+            <div>
+              <p style={{ fontSize: "0.8125rem", color: "var(--mb-gray-500)", margin: "0 0 0.5rem 0" }}>
+                📢 SNS 활동 정보를 등록하시면 체험단 신청 시 자동으로 채워드려요. (선택)
+              </p>
+              <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+                <input
+                  value={profileState.snsYoutube}
+                  onChange={(e) => setProfileState((prev) => ({ ...prev, snsYoutube: e.target.value }))}
+                  placeholder="유튜브 채널 URL 또는 @핸들"
+                  style={{ width: "100%", border: "1px solid var(--mb-gray-300)", borderRadius: "8px", padding: "0.5rem", fontSize: "0.875rem", outline: "none" }}
+                />
+                <input
+                  value={profileState.snsInstagram}
+                  onChange={(e) => setProfileState((prev) => ({ ...prev, snsInstagram: e.target.value }))}
+                  placeholder="인스타그램 @아이디"
+                  style={{ width: "100%", border: "1px solid var(--mb-gray-300)", borderRadius: "8px", padding: "0.5rem", fontSize: "0.875rem", outline: "none" }}
+                />
+                <input
+                  value={profileState.snsBlogUrl}
+                  onChange={(e) => setProfileState((prev) => ({ ...prev, snsBlogUrl: e.target.value }))}
+                  placeholder="블로그 등 기타 링크 (https://...)"
+                  style={{ width: "100%", border: "1px solid var(--mb-gray-300)", borderRadius: "8px", padding: "0.5rem", fontSize: "0.875rem", outline: "none" }}
+                />
+              </div>
+            </div>
+
             {profileError && <p style={{ color: "#ef4444", fontSize: "0.8125rem", margin: 0 }}>{profileError}</p>}
 
             <div style={{ display: "flex", gap: "0.5rem", marginTop: "0.5rem" }}>
@@ -976,6 +1009,12 @@ export default function MypagePage() {
             <p style={{ margin: 0 }}>
               <span style={{ fontWeight: 600, color: "var(--mb-gray-500)" }}>[마케팅 수신]</span>{" "}
               이메일 {profileState.marketingEmail ? "동의" : "미동의"} · SMS {profileState.marketingSms ? "동의" : "미동의"}
+            </p>
+            <p style={{ margin: 0 }}>
+              <span style={{ fontWeight: 600, color: "var(--mb-gray-500)" }}>[SNS 활동]</span>{" "}
+              {profileState.snsYoutube || profileState.snsInstagram || profileState.snsBlogUrl
+                ? [profileState.snsYoutube && "유튜브", profileState.snsInstagram && "인스타그램", profileState.snsBlogUrl && "블로그"].filter(Boolean).join(" · ") + " 등록됨"
+                : <span style={{ color: "var(--mb-pink-500)" }}>미등록 — 등록하시면 체험단 신청서에 자동으로 채워드려요 📢</span>}
             </p>
           </div>
         )}

@@ -88,6 +88,20 @@ export default function TrialApplyPanel({ campaignId, isClosed, initialApplied }
       addressDetail: masterUser?.shipping_detail || "",
     });
     setOpen(true);
+
+    // 마이페이지에 등록해둔 SNS 활동 정보를 기본값으로 채워준다 (신청 시 여전히 수정 가능).
+    fetch("/api/mypage/profile")
+      .then((r) => r.json())
+      .then((res) => {
+        if (!res.success) return;
+        setForm((prev) => ({
+          ...prev,
+          youtubeChannel: prev.youtubeChannel || res.data.snsYoutube || "",
+          instagramId: prev.instagramId || res.data.snsInstagram || "",
+          channelUrl: prev.channelUrl || res.data.snsBlogUrl || "",
+        }));
+      })
+      .catch(() => {});
   };
 
   const handleSubmit = async () => {

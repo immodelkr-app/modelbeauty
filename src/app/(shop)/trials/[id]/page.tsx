@@ -235,6 +235,7 @@ export default async function TrialDetailPage({
         productUrl={`${APP_URL}/trials/${campaign.id}`}
         thumbnailUrl={thumbnail ?? undefined}
         description={campaign.description}
+        buttonLabel="체험단 신청하기"
       />
 
       <div

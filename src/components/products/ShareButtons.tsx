@@ -26,6 +26,7 @@ interface ShareButtonsProps {
   description?: string | null;
   crewNickname?: string | null;
   recommendationNote?: string | null;
+  buttonLabel?: string; // 카카오톡 공유 카드의 CTA 버튼 문구 (기본값: "지금 구매하기")
 }
 
 export default function ShareButtons({
@@ -35,6 +36,7 @@ export default function ShareButtons({
   description,
   crewNickname,
   recommendationNote,
+  buttonLabel = "지금 구매하기",
 }: ShareButtonsProps) {
   const [copied, setCopied] = useState(false);
   const [kakaoReady, setKakaoReady] = useState(false);
@@ -117,7 +119,7 @@ export default function ShareButtons({
       },
       buttons: [
         {
-          title: "지금 구매하기",
+          title: buttonLabel,
           link: {
             mobileWebUrl: productUrl,
             webUrl: productUrl,
@@ -125,7 +127,7 @@ export default function ShareButtons({
         },
       ],
     });
-  }, [productName, productUrl, thumbnailUrl, description, crewNickname, recommendationNote]);
+  }, [productName, productUrl, thumbnailUrl, description, crewNickname, recommendationNote, buttonLabel]);
 
   // Web Share API (모바일 OS 공유 시트)
   const handleWebShare = useCallback(async () => {

@@ -29,6 +29,7 @@ export default function TrialApplyPanel({ campaignId, isClosed, initialApplied }
   const [applied, setApplied] = useState(initialApplied);
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState(EMPTY_FORM);
+  const [consentImageUsage, setConsentImageUsage] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
   const setF = (key: keyof typeof EMPTY_FORM, value: string) =>
@@ -87,6 +88,7 @@ export default function TrialApplyPanel({ campaignId, isClosed, initialApplied }
       addressMain: masterUser?.shipping_address || "",
       addressDetail: masterUser?.shipping_detail || "",
     });
+    setConsentImageUsage(false);
     setOpen(true);
 
     // 마이페이지에 등록해둔 SNS 활동 정보를 기본값으로 채워준다 (신청 시 여전히 수정 가능).
@@ -113,6 +115,10 @@ export default function TrialApplyPanel({ campaignId, isClosed, initialApplied }
       alert("유튜브 채널, 인스타그램 아이디, 기타 링크 중 최소 하나는 입력해주세요.");
       return;
     }
+    if (!consentImageUsage) {
+      alert("초상권 및 콘텐츠(사진·영상) 사용 동의가 필요합니다.");
+      return;
+    }
     setSubmitting(true);
     try {
       const res = await fetch(`/api/trials/${campaignId}/apply`, {
@@ -128,6 +134,7 @@ export default function TrialApplyPanel({ campaignId, isClosed, initialApplied }
           instagramId: form.instagramId.trim() || undefined,
           channelUrl: form.channelUrl.trim() || undefined,
           message: form.message.trim() || undefined,
+          consentImageUsage,
         }),
       });
       const result = await res.json();
@@ -255,6 +262,31 @@ export default function TrialApplyPanel({ campaignId, isClosed, initialApplied }
               />
             </div>
 
+            <label
+              style={{
+                display: "flex",
+                alignItems: "flex-start",
+                gap: "0.5rem",
+                cursor: "pointer",
+                marginBottom: "1.25rem",
+                padding: "0.75rem",
+                background: "var(--mb-gray-50)",
+                borderRadius: "10px",
+              }}
+            >
+              <input
+                type="checkbox"
+                checked={consentImageUsage}
+                onChange={(e) => setConsentImageUsage(e.target.checked)}
+                style={{ width: "17px", height: "17px", marginTop: "1px", flexShrink: 0, accentColor: "var(--mb-pink-600)", cursor: "pointer" }}
+              />
+              <span style={{ fontSize: "0.78125rem", color: "var(--mb-gray-600)", lineHeight: 1.5 }}>
+                <span style={{ color: "var(--mb-pink-600)", fontWeight: 700, marginRight: "4px" }}>[필수]</span>
+                체험단 활동 중 촬영된 사진·영상 등 콘텐츠를 브랜드/모델뷰티의 홍보 및 마케팅 목적으로 사용하는 것에 동의하며,
+                이에 대한 초상권 및 저작권 사용을 허락합니다.
+              </span>
+            </label>
+
             <div style={{ display: "flex", gap: "0.5rem" }}>
               <button
                 onClick={() => setOpen(false)}
@@ -264,8 +296,8 @@ export default function TrialApplyPanel({ campaignId, isClosed, initialApplied }
               </button>
               <button
                 onClick={handleSubmit}
-                disabled={submitting}
-                style={{ flex: 2, padding: "0.75rem", border: "none", background: "var(--mb-pink-600)", color: "#fff", borderRadius: "10px", fontSize: "0.875rem", fontWeight: 700, cursor: submitting ? "default" : "pointer", opacity: submitting ? 0.6 : 1 }}
+                disabled={submitting || !consentImageUsage}
+                style={{ flex: 2, padding: "0.75rem", border: "none", background: "var(--mb-pink-600)", color: "#fff", borderRadius: "10px", fontSize: "0.875rem", fontWeight: 700, cursor: submitting || !consentImageUsage ? "default" : "pointer", opacity: submitting || !consentImageUsage ? 0.6 : 1 }}
               >
                 {submitting ? "신청 중..." : "신청하기"}
               </button>

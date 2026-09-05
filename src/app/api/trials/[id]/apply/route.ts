@@ -1,7 +1,7 @@
 // ============================================================
 // POST /api/trials/[id]/apply — 체험단 신청 (로그인 회원)
 // body: { applicantName, applicantPhone, addressZipcode, addressMain, addressDetail?,
-//         youtubeChannel?, instagramId?, channelUrl?, message? }
+//         youtubeChannel?, instagramId?, channelUrl?, message?, consentImageUsage }
 // ============================================================
 
 import { createSupabaseServerClient, createSupabaseAdmin } from "@/lib/supabase/server";
@@ -29,6 +29,7 @@ export async function POST(
     const instagramId = body.instagramId ? String(body.instagramId).trim() : null;
     const channelUrl = body.channelUrl ? String(body.channelUrl).trim() : null;
     const message = body.message ? String(body.message).trim() : null;
+    const consentImageUsage = body.consentImageUsage === true;
 
     if (!applicantName || !applicantPhone || !addressZipcode || !addressMain) {
       return Response.json({ success: false, error: "이름, 연락처, 배송지 주소는 필수입니다." }, { status: 400 });
@@ -38,6 +39,9 @@ export async function POST(
     }
     if (channelUrl && !/^https?:\/\//.test(channelUrl)) {
       return Response.json({ success: false, error: "기타 링크는 http(s):// 로 시작해야 합니다." }, { status: 400 });
+    }
+    if (!consentImageUsage) {
+      return Response.json({ success: false, error: "초상권 및 콘텐츠(사진·영상) 사용 동의가 필요합니다." }, { status: 400 });
     }
 
     const admin = createSupabaseAdmin();
@@ -73,6 +77,8 @@ export async function POST(
         instagram_id: instagramId,
         channel_url: channelUrl,
         message,
+        consent_image_usage: consentImageUsage,
+        consent_agreed_at: new Date().toISOString(),
       })
       .select()
       .single();

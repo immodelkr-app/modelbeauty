@@ -39,6 +39,7 @@ interface Applicant {
   instagram_id: string | null;
   channel_url: string | null;
   message: string | null;
+  consent_image_usage: boolean | null;
   status: "applied" | "selected" | "rejected";
   applied_at: string;
   notified_at: string | null;
@@ -628,7 +629,15 @@ export default function AdminTrialsPage() {
                   <tbody>
                     {applicants.map((a) => (
                       <tr key={a.id}>
-                        <td style={{ fontSize: "0.82rem", fontWeight: 600, whiteSpace: "nowrap" }}>{a.applicant_name ?? "—"}</td>
+                        <td style={{ fontSize: "0.82rem", fontWeight: 600, whiteSpace: "nowrap" }}>
+                          {a.applicant_name ?? "—"}
+                          <span
+                            title={a.consent_image_usage ? "초상권·콘텐츠 사용 동의함" : "초상권·콘텐츠 사용 동의 미확인"}
+                            style={{ marginLeft: "4px" }}
+                          >
+                            {a.consent_image_usage ? "✅" : "⚠️"}
+                          </span>
+                        </td>
                         <td style={{ fontSize: "0.82rem", whiteSpace: "nowrap" }}>{a.applicant_phone ?? "—"}</td>
                         <td style={{ fontSize: "0.78rem", color: "#374151", wordBreak: "keep-all" }}>
                           {a.address_main

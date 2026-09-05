@@ -265,14 +265,7 @@ public class MainActivity extends AppCompatActivity {
                 if (url.startsWith("http:") || url.startsWith("https:")) {
                     return false; // 웹뷰 내에서 일반 링크 이동 허용
                 } else {
-                    try {
-                        Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
-                        startActivity(intent);
-                        return true;
-                    } catch (Exception e) {
-                        // 스마트폰에 해당 결제/외부 앱이 설치되어 있지 않은 경우 처리
-                        return true;
-                    }
+                    return handleExternalUrl(url);
                 }
             }
 
@@ -317,20 +310,36 @@ public class MainActivity extends AppCompatActivity {
 
             // window.open()으로 열리는 새 창(카카오톡 공유 팝업 등)을 가로채서
             // 시스템 인텐트로 넘긴다 (카카오톡 앱 딥링크는 앱 실행, 일반 URL은 외부 브라우저로 이동)
+            // 카카오 하이브리드 앱 가이드 권장사항: 팝업 웹뷰는 실제 뷰 계층에 추가하고,
+            // window.close() 호출 시(onCloseWindow) 반드시 제거해야 리다이렉트 스크립트가
+            // 정상 동작한다(뷰 계층에 붙지 않은 웹뷰는 일부 기기에서 내부 리다이렉트가 멈출 수 있음).
             @Override
             public boolean onCreateWindow(WebView view, boolean isDialog, boolean isUserGesture, Message resultMsg) {
                 WebView transportWebView = new WebView(MainActivity.this);
+                transportWebView.getSettings().setJavaScriptEnabled(true);
                 transportWebView.setWebViewClient(new WebViewClient() {
                     @Override
                     public boolean shouldOverrideUrlLoading(WebView childView, String url) {
-                        try {
-                            startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(url)));
-                        } catch (Exception e) {
-                            // 해당 URL을 처리할 앱이 없는 경우 등은 무시
-                        }
-                        return true;
+                        return handleExternalUrl(url);
                     }
                 });
+                transportWebView.setWebChromeClient(new WebChromeClient() {
+                    @Override
+                    public void onCloseWindow(WebView window) {
+                        FrameLayout webViewContainer = findViewById(R.id.webview_container);
+                        if (webViewContainer != null) {
+                            webViewContainer.removeView(window);
+                        }
+                        window.destroy();
+                    }
+                });
+
+                // 화면에 보이지 않아야 하므로 크기는 0으로 두되, 리다이렉트가 끊기지 않도록
+                // 뷰 계층에는 반드시 추가한다.
+                FrameLayout webViewContainer = findViewById(R.id.webview_container);
+                if (webViewContainer != null) {
+                    webViewContainer.addView(transportWebView, new FrameLayout.LayoutParams(0, 0));
+                }
 
                 WebView.WebViewTransport transport = (WebView.WebViewTransport) resultMsg.obj;
                 transport.setWebView(transportWebView);
@@ -344,6 +353,32 @@ public class MainActivity extends AppCompatActivity {
 
         // 앱 푸시(FCM)용 JS 브릿지 등록 (웹에서 window.AndroidPush으로 접근)
         mWebView.addJavascriptInterface(new PushBridge(), "AndroidPush");
+    }
+
+    // 웹뷰에서 http(s)가 아닌 외부 스킴 URL을 처리한다. 카카오톡 공유 등 일부 SDK는
+    // "intent://...#Intent;scheme=...;package=...;S.browser_fallback_url=...;end" 형식의
+    // Android 전용 intent URI를 반환하는데, 이 형식은 Uri.parse() + ACTION_VIEW로는 제대로
+    // 해석되지 않고(scheme이 "intent"인 일반 URI로 오인되어 해당 앱을 못 찾음) 예외 없이
+    // 조용히 실패한다. Intent.parseUri(URI_INTENT_SCHEME)로 별도 파싱해야 한다.
+    private boolean handleExternalUrl(String url) {
+        try {
+            if (url.startsWith("intent://") || url.startsWith("intent:")) {
+                Intent intent = Intent.parseUri(url, Intent.URI_INTENT_SCHEME);
+                if (intent.resolveActivity(getPackageManager()) != null) {
+                    startActivity(intent);
+                } else {
+                    String fallbackUrl = intent.getStringExtra("browser_fallback_url");
+                    if (fallbackUrl != null) {
+                        startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(fallbackUrl)));
+                    }
+                }
+            } else {
+                startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(url)));
+            }
+        } catch (Exception e) {
+            // 해당 URL을 처리할 앱이 없는 경우 등은 무시
+        }
+        return true;
     }
 
     // 웹(JS)에서 window.AndroidPush.getToken()으로 호출하는 브릿지.

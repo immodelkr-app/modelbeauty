@@ -17,6 +17,14 @@
     <!-- 앱 푸시 알림 표시 권한 (Android 13+에서는 런타임 동의도 필요) -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
+    <!-- Android 11(API 30)부터는 패키지 가시성 제한으로 인해 이 선언이 없으면
+         카카오톡이 실제로 설치되어 있어도 PackageManager가 이를 찾지 못해
+         intent.resolveActivity()가 null을 반환한다 → 카카오톡 공유 버튼을 눌러도
+         아무 반응이 없는 문제(카카오톡 앱이 실행되지 않음)의 원인이었음. -->
+    <queries>
+        <package android:name="com.kakao.talk" />
+    </queries>
+
     <application
         android:allowBackup="true"
         android:icon="@mipmap/ic_launcher"

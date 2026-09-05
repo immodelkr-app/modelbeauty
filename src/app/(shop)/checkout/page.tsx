@@ -622,16 +622,22 @@ export default function CheckoutPage() {
               결제 수단 선택
             </h2>
             <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-              <label style={{ display: "flex", alignItems: "center", gap: "0.625rem", fontSize: "0.9375rem", cursor: "pointer", fontWeight: 500, color: "var(--mb-gray-800)" }}>
+              <label style={{ display: "flex", alignItems: "flex-start", gap: "0.625rem", fontSize: "0.9375rem", cursor: "pointer", fontWeight: 500, color: "var(--mb-gray-800)" }}>
                 <input
                   type="radio"
                   name="paymentMethod"
                   value="CARD"
                   checked={paymentMethod === "CARD"}
                   onChange={() => setPaymentMethod("CARD")}
-                  style={{ width: "18px", height: "18px", accentColor: "var(--mb-pink-500)" }}
+                  style={{ width: "18px", height: "18px", marginTop: "2px", flexShrink: 0, accentColor: "var(--mb-pink-500)" }}
                 />
-                💳 신용카드 / 간편결제 (Toss, Naver, Kakao 등)
+                <span>
+                  💳 신용카드 / 간편결제
+                  <br />
+                  <span style={{ fontSize: "0.8125rem", fontWeight: 400, color: "var(--mb-gray-500)" }}>
+                    (Toss, Naver, Kakao 등)
+                  </span>
+                </span>
               </label>
               
               <label style={{ display: "flex", alignItems: "center", gap: "0.625rem", fontSize: "0.9375rem", cursor: "pointer", fontWeight: 500, color: "var(--mb-gray-800)" }}>

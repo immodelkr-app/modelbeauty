@@ -4,7 +4,7 @@
 // ============================================================
 
 import { isAdmin, requireAdmin } from "@/lib/auth-admin";
-import { createSupabaseServerClient, createSupabaseAdmin } from "@/lib/supabase/server";
+import { createSupabaseAdmin } from "@/lib/supabase/server";
 import type { NextRequest } from "next/server";
 import { IvsClient, CreateChannelCommand } from "@aws-sdk/client-ivs";
 
@@ -13,9 +13,11 @@ export async function GET(request: NextRequest) {
     const { searchParams } = request.nextUrl;
     const status = searchParams.get("status"); // upcoming | live | ended | all
 
-    const supabase = await createSupabaseServerClient();
     // RTMP 스트림 키/수신 엔드포인트는 관리자(방송 제어실)만 필요 — 일반 시청자에게는 노출 금지
     const isRequesterAdmin = await isAdmin();
+    // stream_key 등 비공개 컬럼은 anon/authenticated 롤에서 SELECT 권한이 REVOKE되어 있으므로
+    // (응답 필드는 아래에서 관리자 여부로 걸러내더라도) select('*') 자체가 실패하지 않도록 서비스 롤 사용.
+    const supabase = createSupabaseAdmin();
 
     let query = supabase
       .from("live_streams")

@@ -4,7 +4,7 @@
 
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createSupabaseAdmin, createSupabaseServerClient } from "@/lib/supabase/server";
 import LiveRoomClient from "@/components/live/LiveRoomClient";
 
 interface Props {
@@ -29,8 +29,11 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 async function getStreamData(id: string) {
   const supabase = await createSupabaseServerClient();
+  // stream_key 등 비공개 컬럼은 anon/authenticated 롤에서 SELECT 권한이 REVOKE되어 있으므로
+  // (아래에서 필드를 화이트리스트로만 골라 반환하더라도) select('*')가 실패하지 않도록 서비스 롤 사용.
+  const admin = createSupabaseAdmin();
 
-  const { data: stream, error } = await supabase
+  const { data: stream, error } = await admin
     .from("live_streams")
     .select(`
       *,

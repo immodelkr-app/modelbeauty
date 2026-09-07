@@ -5,12 +5,16 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import Image from "next/image";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createSupabaseAdmin } from "@/lib/supabase/server";
 
 export const metadata: Metadata = {
   title: "라이브 쇼핑 | 모델뷰티",
   description: "실시간으로 소통하며 쇼핑하는 모델뷰티 라이브 쇼핑!",
 };
+
+// 방송 상태(live/upcoming/ended)가 실시간으로 바뀌므로 매 요청마다 새로 조회한다.
+// (서비스 롤 클라이언트로 바뀌면서 쿠키 의존성이 사라져 정적 생성으로 전환되는 것을 방지)
+export const dynamic = "force-dynamic";
 
 interface MappedProduct {
   id: string;
@@ -35,7 +39,9 @@ interface StreamItem {
 }
 
 async function getLiveStreams(): Promise<StreamItem[]> {
-  const supabase = await createSupabaseServerClient();
+  // stream_key 등 비공개 컬럼은 anon/authenticated 롤에서 SELECT 권한이 REVOKE되어 있으므로
+  // (누구나 볼 수 있는 공개 목록이라도) 서비스 롤로 조회해야 select('*')가 실패하지 않는다.
+  const supabase = createSupabaseAdmin();
 
   const { data, error } = await supabase
     .from("live_streams")

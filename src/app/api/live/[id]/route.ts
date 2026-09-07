@@ -166,6 +166,17 @@ export async function PATCH(
 
     // 2. 상품 매핑 정보 업데이트
     if (productIds !== undefined) {
+      // 라이브특가(is_live_deal/deal_ends_at)는 상품 매핑과 별개로 관리되는 값이라
+      // 삭제 후 재생성 시 사라지지 않도록, 기존 값을 미리 조회해서 남아있는 상품에는 그대로 유지한다.
+      const { data: existingMappings } = await admin
+        .from("live_stream_products")
+        .select("product_id, is_live_deal, deal_ends_at")
+        .eq("stream_id", id);
+
+      const dealFlagsByProduct = new Map(
+        (existingMappings ?? []).map((m) => [m.product_id, { isLiveDeal: m.is_live_deal, dealEndsAt: m.deal_ends_at }])
+      );
+
       // 기존 매핑 삭제
       const { error: deleteError } = await admin
         .from("live_stream_products")
@@ -174,13 +185,18 @@ export async function PATCH(
 
       if (deleteError) throw deleteError;
 
-      // 새 매핑 추가
+      // 새 매핑 추가 (기존에 매핑돼 있던 상품의 라이브특가 플래그는 유지, 새로 추가된 상품은 기본값)
       if (productIds.length > 0) {
-        const mappings = productIds.map((productId: string, index: number) => ({
-          stream_id: id,
-          product_id: productId,
-          sort_order: index,
-        }));
+        const mappings = productIds.map((productId: string, index: number) => {
+          const existing = dealFlagsByProduct.get(productId);
+          return {
+            stream_id: id,
+            product_id: productId,
+            sort_order: index,
+            is_live_deal: existing?.isLiveDeal ?? false,
+            deal_ends_at: existing?.dealEndsAt ?? null,
+          };
+        });
 
         const { error: insertError } = await admin
           .from("live_stream_products")

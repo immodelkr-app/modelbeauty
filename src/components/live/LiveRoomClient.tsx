@@ -7,6 +7,7 @@
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import type Hls from "hls.js";
 import { useAuthStore } from "@/store/auth.store";
 
 interface Product {
@@ -107,6 +108,11 @@ export default function LiveRoomClient({ initialStream, initialChats }: LiveRoom
   // 음소거 관련 상태 (브라우저 자동재생 음소거 정책 우회용)
   const [isMuted, setIsMuted] = useState(true);
 
+  // ── HLS(.m3u8) 재생 관련 (Safari 외 브라우저는 hls.js 필요) ──────
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const hlsRef = useRef<Hls | null>(null);
+  const [videoError, setVideoError] = useState(false);
+
   // ── 슬라이드업 상품 패널 상태 ────────────────────────────────
   const [showProductPanel, setShowProductPanel] = useState(false);
   const [panelProduct, setPanelProduct] = useState<Product | null>(null);
@@ -161,6 +167,60 @@ export default function LiveRoomClient({ initialStream, initialChats }: LiveRoom
     const timer = setInterval(tick, 1000);
     return () => clearInterval(timer);
   }, [stream.status, stream.scheduledAt]);
+
+  // ── 라이브/리플레이 영상 재생 (IVS HLS(.m3u8)는 hls.js 없이 Safari 외 브라우저에서 재생 불가) ──
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    const url =
+      stream.status === "live"
+        ? stream.streamUrl || MOCK_BEAUTY_VIDEO_URL
+        : stream.replayUrl || MOCK_BEAUTY_VIDEO_URL;
+
+    // youtube/vimeo 등 임베드 URL은 iframe으로 렌더링되어 video 엘리먼트가 없으므로 여기서 걸러짐
+    if (getEmbedUrl(url).type !== "direct") return;
+
+    setVideoError(false);
+    let cancelled = false;
+    const isHlsSource = url.includes(".m3u8");
+
+    if (isHlsSource) {
+      import("hls.js")
+        .then(({ default: HlsCtor }) => {
+          if (cancelled) return;
+          if (HlsCtor.isSupported()) {
+            const hls = new HlsCtor({ autoStartLoad: true });
+            hls.loadSource(url);
+            hls.attachMedia(video);
+            hls.on(HlsCtor.Events.MANIFEST_PARSED, () => {
+              video.play().catch(() => {});
+            });
+            hls.on(HlsCtor.Events.ERROR, (_event, data) => {
+              if (data.fatal) setVideoError(true);
+            });
+            hlsRef.current = hls;
+          } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
+            // Safari 네이티브 HLS 지원
+            video.src = url;
+            video.play().catch(() => {});
+          } else {
+            setVideoError(true);
+          }
+        })
+        .catch(() => setVideoError(true));
+    } else {
+      // MP4 등 일반 영상 (리플레이/목업)
+      video.src = url;
+      video.play().catch(() => {});
+    }
+
+    return () => {
+      cancelled = true;
+      hlsRef.current?.destroy();
+      hlsRef.current = null;
+    };
+  }, [stream.status, stream.streamUrl, stream.replayUrl]);
 
   // ── 진행 중인 전시 상품 찾기 ──────────────────────────────
   useEffect(() => {
@@ -804,20 +864,34 @@ export default function LiveRoomClient({ initialStream, initialChats }: LiveRoom
                 className="live-video-element"
                 style={{ width: "100%", height: "100%", border: "none" }}
               />
+            ) : videoError ? (
+              <div className="live-video-fallback">
+                {stream.coverImageUrl && (
+                  <Image
+                    src={stream.coverImageUrl}
+                    alt={stream.title}
+                    fill
+                    sizes="800px"
+                    style={{ objectFit: "cover", opacity: 0.5 }}
+                  />
+                )}
+                <span className="live-video-fallback-msg">영상을 불러올 수 없습니다</span>
+              </div>
             ) : (
               <video
-                src={videoUrl}
+                ref={videoRef}
                 autoPlay
                 muted={isMuted}
                 loop
                 playsInline
                 controls
                 className="live-video-element"
+                onError={() => setVideoError(true)}
               />
             )}
 
             {/* 음소거 해제 플로팅 버튼 */}
-            {isMuted && embed.type === "direct" && (
+            {isMuted && embed.type === "direct" && !videoError && (
               <button
                 onClick={() => setIsMuted(false)}
                 className="unmute-overlay-btn"
@@ -1316,6 +1390,23 @@ export default function LiveRoomClient({ initialStream, initialChats }: LiveRoom
           width: 100%;
           height: 100%;
           object-fit: contain;
+        }
+
+        .live-video-fallback {
+          position: relative;
+          width: 100%;
+          height: 100%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          background: #000;
+        }
+        .live-video-fallback-msg {
+          position: relative;
+          z-index: 1;
+          color: rgba(255, 255, 255, 0.75);
+          font-size: 0.875rem;
+          font-weight: 600;
         }
 
         .video-overlay-top {

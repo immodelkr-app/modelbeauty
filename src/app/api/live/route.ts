@@ -3,7 +3,7 @@
 // POST /api/live — 라이브 방송 신규 등록 (Admin Only)
 // ============================================================
 
-import { requireAdmin } from "@/lib/auth-admin";
+import { isAdmin, requireAdmin } from "@/lib/auth-admin";
 import { createSupabaseServerClient, createSupabaseAdmin } from "@/lib/supabase/server";
 import type { NextRequest } from "next/server";
 import { IvsClient, CreateChannelCommand } from "@aws-sdk/client-ivs";
@@ -14,6 +14,8 @@ export async function GET(request: NextRequest) {
     const status = searchParams.get("status"); // upcoming | live | ended | all
 
     const supabase = await createSupabaseServerClient();
+    // RTMP 스트림 키/수신 엔드포인트는 관리자(방송 제어실)만 필요 — 일반 시청자에게는 노출 금지
+    const isRequesterAdmin = await isAdmin();
 
     let query = supabase
       .from("live_streams")
@@ -77,9 +79,9 @@ export async function GET(request: NextRequest) {
         scheduledAt: stream.scheduled_at || null,
         notifySentAt: stream.notify_sent_at || null,
         products,
-        ingestEndpoint: stream.ingest_endpoint || null,
-        streamKey: stream.stream_key || null,
-        channelArn: stream.channel_arn || null,
+        ingestEndpoint: isRequesterAdmin ? stream.ingest_endpoint || null : null,
+        streamKey: isRequesterAdmin ? stream.stream_key || null : null,
+        channelArn: isRequesterAdmin ? stream.channel_arn || null : null,
       };
     });
 

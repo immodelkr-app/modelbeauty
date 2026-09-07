@@ -164,6 +164,34 @@ export async function POST(request: Request) {
       );
     }
 
+    // 품절 확인 (옵션이 있으면 옵션 재고, 없으면 상품 재고 기준)
+    if (variantId) {
+      const { data: variant } = await admin
+        .from("product_variants")
+        .select("id, stock_quantity")
+        .eq("id", variantId)
+        .eq("product_id", productId)
+        .single();
+
+      if (!variant) {
+        return Response.json(
+          { success: false, error: "존재하지 않는 옵션입니다." },
+          { status: 404 }
+        );
+      }
+      if (variant.stock_quantity <= 0) {
+        return Response.json(
+          { success: false, error: "품절된 옵션입니다." },
+          { status: 400 }
+        );
+      }
+    } else if (product.stock_quantity <= 0) {
+      return Response.json(
+        { success: false, error: "품절된 상품입니다." },
+        { status: 400 }
+      );
+    }
+
     // 동일 상품+변형이 이미 장바구니에 있으면 수량 합산 (upsert)
     const { data: existing } = await admin
       .from("cart_items")

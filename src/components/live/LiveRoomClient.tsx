@@ -1246,9 +1246,9 @@ export default function LiveRoomClient({ initialStream, initialChats }: LiveRoom
                     <button
                       className="panel-cart-btn"
                       onClick={handleAddToCart}
-                      disabled={addingToCart}
+                      disabled={addingToCart || isSoldOut(panelProduct)}
                     >
-                      {addingToCart ? "담는 중..." : "❤️ 장바구니 담기"}
+                      {isSoldOut(panelProduct) ? "품절" : addingToCart ? "담는 중..." : "❤️ 장바구니 담기"}
                     </button>
                     <a
                       href={`/products/${panelProduct.slug}?stream_id=${stream.id}`}

@@ -14,7 +14,7 @@ const INFO_LINKS = [
   { href: "/about", label: "브랜드 소개" },
   { href: "/notices", label: "공지사항" },
   { href: "/faq", label: "자주 묻는 질문" },
-  { href: "/contact", label: "고객센터" },
+  { href: "/mypage/inquiries", label: "1:1 문의" },
 ];
 
 const POLICY_LINKS = [

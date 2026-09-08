@@ -6,6 +6,7 @@
 
 import { useState } from "react";
 import Image from "next/image";
+import Link from "next/link";
 import ProductReviews from "./ProductReviews";
 import type { ProductReview, ProductReviewSummary } from "@/types";
 
@@ -27,6 +28,8 @@ interface ProductDetailTabsProps {
   content: string | null;
   videos: ProductVideo[];
   productSlug: string;
+  productId: string;
+  productName: string;
   reviews: ProductReview[];
   reviewSummary: ProductReviewSummary;
   reviewNextCursor: string | null;
@@ -54,6 +57,8 @@ export default function ProductDetailTabs({
   content,
   videos,
   productSlug,
+  productId,
+  productName,
   reviews,
   reviewSummary,
   reviewNextCursor,
@@ -72,7 +77,16 @@ export default function ProductDetailTabs({
   return (
     <div className="product-content-section" style={{ marginTop: "3rem" }}>
       {/* 탭 헤더 */}
-      <div className="product-content-tabs" style={{ display: "flex", borderBottom: "1px solid var(--mb-gray-200)", marginBottom: "2rem" }}>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          borderBottom: "1px solid var(--mb-gray-200)",
+          marginBottom: "2rem",
+        }}
+      >
+      <div className="product-content-tabs" style={{ display: "flex" }}>
         <button
           onClick={() => setActiveTab("detail")}
           className={`product-content-tab${activeTab === "detail" ? " active" : ""}`}
@@ -155,6 +169,25 @@ export default function ProductDetailTabs({
             {reviewSummary.count}
           </span>
         </button>
+      </div>
+
+        <Link
+          href={`/mypage/inquiries/new?category=product&productId=${productId}&productName=${encodeURIComponent(productName)}`}
+          style={{
+            flexShrink: 0,
+            padding: "0.5rem 0.9rem",
+            marginLeft: "0.5rem",
+            fontSize: "0.8125rem",
+            fontWeight: 700,
+            color: "var(--mb-gray-600)",
+            border: "1px solid var(--mb-gray-200)",
+            borderRadius: "100px",
+            textDecoration: "none",
+            whiteSpace: "nowrap",
+          }}
+        >
+          ❓ 상품 문의하기
+        </Link>
       </div>
 
       {/* 탭 바디 */}

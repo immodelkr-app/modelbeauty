@@ -612,6 +612,8 @@ export default async function ProductDetailPage({
         content={product.content}
         videos={videos}
         productSlug={product.slug}
+        productId={product.id}
+        productName={product.name}
         reviews={reviewData.reviews}
         reviewSummary={reviewData.summary}
         reviewNextCursor={reviewData.nextCursor}

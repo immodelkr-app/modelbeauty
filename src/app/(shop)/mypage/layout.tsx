@@ -17,6 +17,7 @@ const NAV_ITEMS = [
   { href: "/mypage/orders",    label: "주문 내역",  icon: "📦" },
   { href: "/mypage/wishlist",  label: "위시리스트", icon: "❤️" },
   { href: "/mypage/points",    label: "포인트",     icon: "✨" },
+  { href: "/mypage/inquiries", label: "1:1 문의",   icon: "💬" },
 ];
 
 export default function MypageLayout({

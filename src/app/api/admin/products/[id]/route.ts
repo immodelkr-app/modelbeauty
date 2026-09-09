@@ -94,6 +94,7 @@ export async function PATCH(
       recommenderCrewId,
       recommendationNote,
       relatedProductIds,
+      pointRatio,
     } = body;
 
     if (slug && !/^[a-z0-9-]+$/.test(slug)) {
@@ -105,6 +106,12 @@ export async function PATCH(
     if (basePrice !== undefined && basePrice < 0) {
       return Response.json(
         { success: false, error: "basePrice는 0 이상이어야 합니다." },
+        { status: 400 }
+      );
+    }
+    if (pointRatio !== undefined && pointRatio !== null && pointRatio !== 50 && pointRatio !== 100) {
+      return Response.json(
+        { success: false, error: "pointRatio는 50 또는 100이어야 합니다." },
         { status: 400 }
       );
     }
@@ -135,6 +142,7 @@ export async function PATCH(
     // recommenderCrewId: null 전달 시 크루 연결 해제 지원
     if (recommenderCrewId !== undefined) updatePayload.recommender_crew_id = recommenderCrewId || null;
     if (recommendationNote !== undefined) updatePayload.recommendation_note = recommendationNote || null;
+    if (pointRatio !== undefined) updatePayload.point_ratio = pointRatio;
 
     if (Object.keys(updatePayload).length === 0) {
       return Response.json(

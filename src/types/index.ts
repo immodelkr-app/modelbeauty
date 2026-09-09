@@ -52,6 +52,9 @@ export interface Category {
   imageUrl: string | null;
   isActive: boolean;
   createdAt: string;
+  isPointMall?: boolean;
+  pointPeriodStartsAt?: string | null;
+  pointPeriodEndsAt?: string | null;
 }
 
 export interface Product {
@@ -71,6 +74,7 @@ export interface Product {
   isFeatured: boolean;
   createdAt: string;
   updatedAt: string;
+  pointRatio?: number | null;
   // 조인
   category?: Category;
   options?: ProductOption[];

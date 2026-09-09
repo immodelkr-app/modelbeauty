@@ -29,6 +29,29 @@ interface ProductsPageProps {
 
 // ── 데이터 패칭 ────────────────────────────────────────────
 
+interface PointMallGate {
+  isPointMall: boolean;
+  isActivePeriod: boolean;
+}
+
+async function getPointMallGate(categorySlug: string): Promise<PointMallGate | null> {
+  const supabase = await createSupabaseServerClient();
+  const { data: cat } = await supabase
+    .from("categories")
+    .select("is_point_mall, point_period_starts_at, point_period_ends_at")
+    .eq("slug", categorySlug)
+    .eq("is_active", true)
+    .single();
+
+  if (!cat || !cat.is_point_mall) return null;
+
+  const now = Date.now();
+  const startsOk = !cat.point_period_starts_at || now >= new Date(cat.point_period_starts_at).getTime();
+  const endsOk = !cat.point_period_ends_at || now <= new Date(cat.point_period_ends_at).getTime();
+
+  return { isPointMall: true, isActivePeriod: startsOk && endsOk };
+}
+
 async function getCategories(): Promise<Category[]> {
   const supabase = await createSupabaseServerClient();
   const { data } = await supabase
@@ -160,8 +183,9 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
   const sp = await searchParams;
   const page = Math.max(1, parseInt(sp.page ?? "1", 10));
 
-  const [categories, { items: products, total }] = await Promise.all([
+  const [categories, pointMallGate, { items: products, total }] = await Promise.all([
     getCategories(),
+    sp.category ? getPointMallGate(sp.category) : Promise.resolve(null),
     getProducts({
       category: sp.category,
       search: sp.search,
@@ -172,16 +196,23 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
   ]);
 
   const totalPages = Math.ceil(total / PAGE_LIMIT);
+  const showPointMallGate = !!pointMallGate?.isPointMall && !pointMallGate.isActivePeriod;
 
   return (
     <div className="products-page">
       {/* 필터 (클라이언트 컴포넌트 — Suspense 필요) */}
       <Suspense fallback={<div style={{ height: "140px" }} />}>
-        <ProductFilters categories={categories} totalCount={total} />
+        <ProductFilters categories={categories} totalCount={showPointMallGate ? 0 : total} />
       </Suspense>
 
-      {/* 상품 그리드 */}
-      {products.length === 0 ? (
+      {/* 포인트몰 활동기간이 아닐 때 */}
+      {showPointMallGate ? (
+        <div className="products-empty">
+          <div className="products-empty-icon">⏳</div>
+          <h3>포인트 사용기간이 아닙니다</h3>
+          <p>이 카테고리는 지정된 기간에만 이용할 수 있어요. 다음 활동기간을 기다려주세요.</p>
+        </div>
+      ) : products.length === 0 ? (
         <div className="products-empty">
           <div className="products-empty-icon">🔍</div>
           <h3>상품을 찾을 수 없습니다</h3>
@@ -200,7 +231,7 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
       )}
 
       {/* 페이지네이션 */}
-      {totalPages > 1 && (
+      {!showPointMallGate && totalPages > 1 && (
         <Suspense>
           <Pagination currentPage={page} totalPages={totalPages} searchParams={sp} />
         </Suspense>

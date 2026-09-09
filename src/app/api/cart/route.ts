@@ -39,7 +39,7 @@ export async function GET() {
         `id, quantity, created_at, updated_at,
          products (
            id, name, slug, base_price, sale_price,
-           stock_quantity, images,
+           stock_quantity, images, point_ratio,
            categories!products_category_id_fkey ( id, name, slug )
          ),
          product_variants (
@@ -92,6 +92,7 @@ export async function GET() {
               stockQuantity: product.stock_quantity,
               images: product.images ?? [],
               category: category ?? null,
+              pointRatio: product.point_ratio ?? null,
             }
           : null,
         variant: variant
@@ -152,7 +153,7 @@ export async function POST(request: Request) {
     // 상품 재고 확인
     const { data: product } = await admin
       .from("products")
-      .select("id, stock_quantity, is_active")
+      .select("id, stock_quantity, is_active, point_ratio")
       .eq("id", productId)
       .eq("is_active", true)
       .single();
@@ -161,6 +162,60 @@ export async function POST(request: Request) {
       return Response.json(
         { success: false, error: "존재하지 않는 상품입니다." },
         { status: 404 }
+      );
+    }
+
+    // 포인트몰 상품(point_ratio 설정됨)은 소속 카테고리의 활동기간 안에서만 담을 수 있음
+    // (카테고리 목록 페이지 접근이 아니라 상품 상세 직접 링크로 우회 담기하는 것을 방지)
+    const isPointMallItem = product.point_ratio !== null;
+    if (isPointMallItem) {
+      const { data: mappedCategories } = await admin
+        .from("product_categories")
+        .select("categories ( is_point_mall, point_period_starts_at, point_period_ends_at )")
+        .eq("product_id", productId);
+
+      const pointMallCategories = (mappedCategories ?? [])
+        .map((row) => (Array.isArray(row.categories) ? row.categories[0] : row.categories))
+        .filter((c): c is { is_point_mall: boolean; point_period_starts_at: string | null; point_period_ends_at: string | null } => !!c?.is_point_mall);
+
+      const now = Date.now();
+      const isWithinActivePeriod = pointMallCategories.some((c) => {
+        const startsOk = !c.point_period_starts_at || now >= new Date(c.point_period_starts_at).getTime();
+        const endsOk = !c.point_period_ends_at || now <= new Date(c.point_period_ends_at).getTime();
+        return startsOk && endsOk;
+      });
+
+      if (pointMallCategories.length > 0 && !isWithinActivePeriod) {
+        return Response.json(
+          { success: false, error: "포인트 사용기간이 아닙니다." },
+          { status: 400 }
+        );
+      }
+    }
+    const { data: existingCartItems } = await admin
+      .from("cart_items")
+      .select("products ( point_ratio )")
+      .eq("master_user_id", masterUserId);
+
+    const cartHasPointMallItem = (existingCartItems ?? []).some((row) => {
+      const p = Array.isArray(row.products) ? row.products[0] : row.products;
+      return p?.point_ratio !== null && p?.point_ratio !== undefined;
+    });
+    const cartHasRegularItem = (existingCartItems ?? []).some((row) => {
+      const p = Array.isArray(row.products) ? row.products[0] : row.products;
+      return p && (p.point_ratio === null || p.point_ratio === undefined);
+    });
+
+    if (isPointMallItem && cartHasRegularItem) {
+      return Response.json(
+        { success: false, error: "포인트몰 상품은 일반 상품과 함께 담을 수 없습니다. 장바구니의 일반 상품을 먼저 결제해주세요." },
+        { status: 400 }
+      );
+    }
+    if (!isPointMallItem && cartHasPointMallItem) {
+      return Response.json(
+        { success: false, error: "포인트몰 상품과 일반 상품은 함께 담을 수 없습니다. 포인트몰 상품을 먼저 결제해주세요." },
+        { status: 400 }
       );
     }
 

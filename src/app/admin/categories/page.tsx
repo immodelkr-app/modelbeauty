@@ -1,7 +1,7 @@
 "use client";
 // /admin/categories — 카테고리 관리
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, Fragment } from "react";
 
 interface CategoryRow {
   id: string;
@@ -10,6 +10,17 @@ interface CategoryRow {
   sort_order: number;
   is_active: boolean;
   parent_id: string | null;
+  is_point_mall: boolean;
+  point_period_starts_at: string | null;
+  point_period_ends_at: string | null;
+}
+
+// datetime-local input value(로컬 타임존, 초 없음) ↔ ISO 문자열 변환
+function toDatetimeLocal(iso: string | null): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
 function toSlug(name: string) {
@@ -25,6 +36,10 @@ export default function AdminCategoriesPage() {
   const [adding, setAdding] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
+  const [pmEditId, setPmEditId] = useState<string | null>(null);
+  const [pmEnabled, setPmEnabled] = useState(false);
+  const [pmStart, setPmStart] = useState("");
+  const [pmEnd, setPmEnd] = useState("");
 
   const fetchCategories = useCallback(async () => {
     setLoading(true);
@@ -66,6 +81,31 @@ export default function AdminCategoriesPage() {
       body: JSON.stringify({ name: editName }),
     });
     setEditId(null);
+    fetchCategories();
+  };
+
+  const openPointMallEdit = (cat: CategoryRow) => {
+    setPmEditId(cat.id);
+    setPmEnabled(cat.is_point_mall);
+    setPmStart(toDatetimeLocal(cat.point_period_starts_at));
+    setPmEnd(toDatetimeLocal(cat.point_period_ends_at));
+  };
+
+  const handlePointMallSave = async (id: string) => {
+    if (pmEnabled && pmStart && pmEnd && new Date(pmStart) >= new Date(pmEnd)) {
+      alert("종료 일시는 시작 일시보다 이후여야 합니다.");
+      return;
+    }
+    await fetch(`/api/admin/categories/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        isPointMall: pmEnabled,
+        pointPeriodStartsAt: pmStart ? new Date(pmStart).toISOString() : null,
+        pointPeriodEndsAt: pmEnd ? new Date(pmEnd).toISOString() : null,
+      }),
+    });
+    setPmEditId(null);
     fetchCategories();
   };
 
@@ -148,12 +188,14 @@ export default function AdminCategoriesPage() {
                   <th>Slug</th>
                   <th>순서</th>
                   <th>상태</th>
+                  <th>포인트몰</th>
                   <th>관리</th>
                 </tr>
               </thead>
               <tbody>
                 {categories.map((cat, index) => (
-                  <tr key={cat.id}>
+                  <Fragment key={cat.id}>
+                  <tr>
                     <td>
                       {editId === cat.id ? (
                         <input className="admin-input" value={editName} onChange={(e) => setEditName(e.target.value)} autoFocus style={{ maxWidth: "200px" }} />
@@ -170,6 +212,17 @@ export default function AdminCategoriesPage() {
                         style={{ cursor: "pointer", border: "none", fontFamily: "inherit" }}
                       >
                         {cat.is_active ? "활성" : "비활성"}
+                      </button>
+                    </td>
+                    <td>
+                      <button
+                        type="button"
+                        className={`admin-badge ${cat.is_point_mall ? "admin-badge-green" : "admin-badge-gray"}`}
+                        onClick={() => openPointMallEdit(cat)}
+                        style={{ cursor: "pointer", border: "none", fontFamily: "inherit" }}
+                        title="포인트몰 여부/활동기간 설정"
+                      >
+                        {cat.is_point_mall ? "포인트몰" : "일반"}
                       </button>
                     </td>
                     <td>
@@ -206,6 +259,32 @@ export default function AdminCategoriesPage() {
                       </div>
                     </td>
                   </tr>
+                  {pmEditId === cat.id && (
+                    <tr>
+                      <td colSpan={6} style={{ background: "#fdf2f8", padding: "1rem 1.25rem" }}>
+                        <div style={{ display: "flex", gap: "1rem", flexWrap: "wrap", alignItems: "flex-end" }}>
+                          <label style={{ display: "flex", alignItems: "center", gap: "0.4rem", fontSize: "0.875rem", fontWeight: 600 }}>
+                            <input type="checkbox" checked={pmEnabled} onChange={(e) => setPmEnabled(e.target.checked)} />
+                            포인트몰 카테고리로 운영
+                          </label>
+                          <div className="admin-field" style={{ minWidth: "200px" }}>
+                            <label className="admin-label">활동 시작</label>
+                            <input type="datetime-local" className="admin-input" value={pmStart} onChange={(e) => setPmStart(e.target.value)} disabled={!pmEnabled} />
+                          </div>
+                          <div className="admin-field" style={{ minWidth: "200px" }}>
+                            <label className="admin-label">활동 종료</label>
+                            <input type="datetime-local" className="admin-input" value={pmEnd} onChange={(e) => setPmEnd(e.target.value)} disabled={!pmEnabled} />
+                          </div>
+                          <button className="admin-btn admin-btn-primary admin-btn-sm" onClick={() => handlePointMallSave(cat.id)}>저장</button>
+                          <button className="admin-btn admin-btn-secondary admin-btn-sm" onClick={() => setPmEditId(null)}>취소</button>
+                        </div>
+                        <p className="admin-input-hint" style={{ margin: "0.5rem 0 0" }}>
+                          카테고리 메뉴는 항상 노출되며, 활동기간 밖에는 이 카테고리에 들어오면 &quot;포인트 사용기간이 아닙니다&quot; 안내가 표시됩니다. 기간을 비워두면 언제나 활성 상태입니다.
+                        </p>
+                      </td>
+                    </tr>
+                  )}
+                  </Fragment>
                 ))}
               </tbody>
             </table>

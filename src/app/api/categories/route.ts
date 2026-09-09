@@ -34,6 +34,9 @@ export async function GET(_request: NextRequest) {
       imageUrl: c.image_url,
       isActive: c.is_active,
       createdAt: c.created_at,
+      isPointMall: c.is_point_mall,
+      pointPeriodStartsAt: c.point_period_starts_at,
+      pointPeriodEndsAt: c.point_period_ends_at,
     }));
 
     return Response.json({ success: true, data: categories });

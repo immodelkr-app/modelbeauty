@@ -53,6 +53,7 @@ export default function EditProductPage({ params }: { params: Promise<{ id: stri
             recommenderCrewId: data.recommender_crew_id ?? "",
             recommendationNote: data.recommendation_note ?? "",
             relatedProducts: data.relatedProducts ?? [],
+            pointRatio: data.point_ratio != null ? String(data.point_ratio) : "",
           });
         })
         .finally(() => setLoading(false));

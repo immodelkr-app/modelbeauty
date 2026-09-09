@@ -63,7 +63,7 @@ export async function POST(request: NextRequest) {
 
     const { data: products } = await admin
       .from("products")
-      .select("id, base_price, sale_price, is_active")
+      .select("id, base_price, sale_price, is_active, point_ratio")
       .in("id", productIds);
     const { data: variants } = variantIds.length
       ? await admin.from("product_variants").select("id, price_adjustment").in("id", variantIds)
@@ -72,7 +72,7 @@ export async function POST(request: NextRequest) {
     const productMap = new Map((products ?? []).map((p) => [p.id, p]));
     const variantMap = new Map((variants ?? []).map((v) => [v.id, v]));
 
-    const verifiedItems: { productId: string; variantId?: string; productName: string; variantInfo?: Record<string, string>; unitPrice: number; quantity: number }[] = [];
+    const verifiedItems: { productId: string; variantId?: string; productName: string; variantInfo?: Record<string, string>; unitPrice: number; quantity: number; pointRatio: number | null }[] = [];
     for (const item of items as { productId: string; variantId?: string; productName: string; variantInfo?: Record<string, string>; quantity: number }[]) {
       const product = productMap.get(item.productId);
       if (!product || !product.is_active) {
@@ -83,8 +83,12 @@ export async function POST(request: NextRequest) {
       }
       const priceAdjustment = item.variantId ? (variantMap.get(item.variantId)?.price_adjustment ?? 0) : 0;
       const unitPrice = (product.sale_price ?? product.base_price) + priceAdjustment;
-      verifiedItems.push({ ...item, unitPrice });
+      verifiedItems.push({ ...item, unitPrice, pointRatio: product.point_ratio ?? null });
     }
+
+    // 포인트몰 상품(point_ratio 설정됨)과 일반 상품은 장바구니 단계에서 이미 혼합이 막혀있으므로
+    // 하나라도 포인트몰 상품이면 주문 전체를 포인트몰 주문으로 취급
+    const isPointMallOrder = verifiedItems.length > 0 && verifiedItems.every((i) => i.pointRatio != null);
 
     // 금액 계산 (서버 검증된 unitPrice 기준)
     const subtotal = verifiedItems.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0);
@@ -103,9 +107,16 @@ export async function POST(request: NextRequest) {
       // 등급 조회 실패 시 할인 없이 진행
     }
 
-    // 포인트 할인 검증 (조건 A: 10,000원 이상 구매 시, 최대 30%까지만 포인트 결제 허용, 최소 1,000P)
+    // 포인트 할인 검증
+    // - 일반 주문(조건 A): 10,000원 이상 구매 시, 최대 30%까지만 포인트 결제 허용, 최소 1,000P
+    // - 포인트몰 주문: 최소금액 제한 없이 상품별 지정 비율(50%/100%)까지 허용
     let pointDiscount = 0;
-    if (subtotal >= 10000 && usedPointAmount >= 1000) {
+    if (isPointMallOrder && usedPointAmount >= 1000) {
+      const maxPointsAllowed = Math.floor(
+        verifiedItems.reduce((sum, item) => sum + item.unitPrice * item.quantity * ((item.pointRatio ?? 0) / 100), 0)
+      );
+      pointDiscount = Math.min(usedPointAmount, maxPointsAllowed);
+    } else if (!isPointMallOrder && subtotal >= 10000 && usedPointAmount >= 1000) {
       const maxPointsAllowed = Math.floor(subtotal * 0.3);
       pointDiscount = Math.min(usedPointAmount, maxPointsAllowed);
     }

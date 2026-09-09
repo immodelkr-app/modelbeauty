@@ -123,7 +123,15 @@ export async function POST(request: Request) {
       vendorCostType = "rate",
       vendorCostRate = 0,
       vendorSupplyPrice = 0,
+      pointRatio = null,
     } = body;
+
+    if (pointRatio !== null && pointRatio !== 50 && pointRatio !== 100) {
+      return Response.json(
+        { success: false, error: "pointRatio는 50 또는 100이어야 합니다." },
+        { status: 400 }
+      );
+    }
 
     // 필수 필드 검증
     if (!name || !slug) {
@@ -172,6 +180,7 @@ export async function POST(request: Request) {
         vendor_cost_type: vendorCostType,
         vendor_cost_rate: Number(vendorCostRate),
         vendor_supply_price: Number(vendorSupplyPrice),
+        point_ratio: pointRatio,
       })
       .select()
       .single();

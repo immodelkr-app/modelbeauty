@@ -13,6 +13,7 @@ export interface CartProduct {
   stockQuantity: number;
   images: { url: string; alt: string; sortOrder: number }[];
   category: { id: string; name: string; slug: string } | null;
+  pointRatio: number | null;
 }
 
 export interface CartVariant {

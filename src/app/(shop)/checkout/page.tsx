@@ -101,9 +101,17 @@ export default function CheckoutPage() {
     }
   }
 
-  // 포인트 할인 계산 (조건 A: 1만원 이상 구매 시, 상품 금액의 최대 30%까지 사용 가능)
+  // 포인트몰 상품(point_ratio 설정됨)만 담긴 주문인지 여부 — 장바구니 단계에서 일반 상품과 혼합이 막혀있어
+  // 있다면 전체가 포인트몰 상품, 없다면 전체가 일반 상품이다.
+  const isPointMallOrder = checkoutItems.length > 0 && checkoutItems.every((i) => i.product?.pointRatio != null);
+
+  // 포인트 할인 계산
+  // - 일반 주문: 1만원 이상 구매 시, 상품 금액의 최대 30%까지 사용 가능
+  // - 포인트몰 주문: 최소금액 제한 없이 상품별로 지정된 비율(50%/100%)까지 사용 가능
   const maxAvailablePoints = masterUser?.integratedPoints ?? 0;
-  const maxPointsAllowed = subtotal >= 10000 ? Math.floor(subtotal * 0.3) : 0;
+  const maxPointsAllowed = isPointMallOrder
+    ? Math.floor(checkoutItems.reduce((s, i) => s + i.subtotal * ((i.product?.pointRatio ?? 0) / 100), 0))
+    : subtotal >= 10000 ? Math.floor(subtotal * 0.3) : 0;
   const maxPointsToUse = Math.min(maxPointsAllowed, Math.max(0, subtotal - membershipDiscount - couponDiscount));
   const actualPointDiscount = Math.min(appliedPoints, maxPointsToUse);
 
@@ -544,7 +552,7 @@ export default function CheckoutPage() {
                 <button
                   type="button"
                   onClick={() => {
-                    if (subtotal < 10000) {
+                    if (!isPointMallOrder && subtotal < 10000) {
                       alert("포인트는 상품 합계 금액이 10,000원 이상일 때만 사용 가능합니다.");
                       return;
                     }
@@ -558,7 +566,8 @@ export default function CheckoutPage() {
                       return;
                     }
                     if (pts > maxPointsToUse) {
-                      alert(`해당 주문에서 적용 가능한 최대 포인트는 상품 총액의 30%인 ${maxPointsToUse.toLocaleString()}P 입니다.`);
+                      const capLabel = isPointMallOrder ? "이 주문의 포인트 사용 한도" : "상품 총액의 30%";
+                      alert(`해당 주문에서 적용 가능한 최대 포인트는 ${capLabel}인 ${maxPointsToUse.toLocaleString()}P 입니다.`);
                       return;
                     }
                     setAppliedPoints(pts);
@@ -578,7 +587,7 @@ export default function CheckoutPage() {
                 <button
                   type="button"
                   onClick={() => {
-                    if (subtotal < 10000) {
+                    if (!isPointMallOrder && subtotal < 10000) {
                       alert("포인트는 상품 합계 금액이 10,000원 이상일 때만 사용 가능합니다.");
                       return;
                     }
@@ -587,7 +596,8 @@ export default function CheckoutPage() {
                       return;
                     }
                     if (maxPointsToUse < 1000) {
-                      alert("본 주문에서 사용 가능한 최대 포인트(상품 총액의 30%)가 1,000P 미만입니다.");
+                      const capLabel = isPointMallOrder ? "이 주문의 포인트 사용 한도" : "상품 총액의 30%";
+                      alert(`본 주문에서 사용 가능한 최대 포인트(${capLabel})가 1,000P 미만입니다.`);
                       return;
                     }
                     const allPoints = Math.min(maxAvailablePoints, maxPointsToUse);

@@ -37,6 +37,7 @@ export interface ProductFormData {
   vendorCostType: string;
   vendorCostRate: string;
   vendorSupplyPrice: string;
+  pointRatio: string; // "" | "50" | "100" — 포인트몰 상품의 포인트 사용 한도
 }
 
 const INITIAL: ProductFormData = {
@@ -47,6 +48,7 @@ const INITIAL: ProductFormData = {
   recommenderCrewId: "", recommendationNote: "",
   relatedProducts: [],
   vendorId: "", vendorCostType: "rate", vendorCostRate: "0", vendorSupplyPrice: "0",
+  pointRatio: "",
 };
 
 // 상세페이지 이미지 목록을 안전한 <img> 태그 나열 HTML로 변환
@@ -169,6 +171,7 @@ export default function ProductForm({ productId, initialData, onSuccess }: Produ
       vendorCostType: form.vendorCostType,
       vendorCostRate: parseFloat(form.vendorCostRate) || 0,
       vendorSupplyPrice: parseInt(form.vendorSupplyPrice, 10) || 0,
+      pointRatio: form.pointRatio ? parseInt(form.pointRatio, 10) : null,
     };
 
     try {
@@ -536,6 +539,15 @@ export default function ProductForm({ productId, initialData, onSuccess }: Produ
               <input type="checkbox" checked={form.isFeatured} onChange={(e) => set("isFeatured", e.target.checked)} />
               <span className="admin-toggle-label">베스트 상품으로 표시</span>
             </label>
+          </div>
+          <div className="admin-field">
+            <label className="admin-label">💰 포인트몰 사용 비율</label>
+            <select className="admin-select" value={form.pointRatio} onChange={(e) => set("pointRatio", e.target.value)}>
+              <option value="">일반 상품 (포인트몰 아님)</option>
+              <option value="50">50% — 결제금액의 최대 50%까지 포인트 사용 가능</option>
+              <option value="100">100% — 결제금액 전액 포인트 사용 가능</option>
+            </select>
+            <p className="admin-input-hint">포인트몰 카테고리에 담을 상품만 50%/100%로 설정하세요. 일반 상품과 장바구니에서 혼합될 수 없습니다.</p>
           </div>
         </div>
       </div>

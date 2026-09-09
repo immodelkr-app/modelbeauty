@@ -16,7 +16,7 @@ export async function PATCH(
   try {
     const { id } = await params;
     const body = await request.json();
-    const { name, slug, parentId, sortOrder, imageUrl, isActive } = body;
+    const { name, slug, parentId, sortOrder, imageUrl, isActive, isPointMall, pointPeriodStartsAt, pointPeriodEndsAt } = body;
 
     if (slug && !/^[a-z0-9-]+$/.test(slug)) {
       return Response.json(
@@ -33,6 +33,9 @@ export async function PATCH(
     if (sortOrder !== undefined) updatePayload.sort_order = sortOrder;
     if (imageUrl !== undefined) updatePayload.image_url = imageUrl;
     if (isActive !== undefined) updatePayload.is_active = isActive;
+    if (isPointMall !== undefined) updatePayload.is_point_mall = isPointMall;
+    if (pointPeriodStartsAt !== undefined) updatePayload.point_period_starts_at = pointPeriodStartsAt || null;
+    if (pointPeriodEndsAt !== undefined) updatePayload.point_period_ends_at = pointPeriodEndsAt || null;
 
     if (Object.keys(updatePayload).length === 0) {
       return Response.json(
@@ -81,6 +84,9 @@ export async function PATCH(
         imageUrl: data.image_url,
         isActive: data.is_active,
         createdAt: data.created_at,
+        isPointMall: data.is_point_mall,
+        pointPeriodStartsAt: data.point_period_starts_at,
+        pointPeriodEndsAt: data.point_period_ends_at,
       },
     });
   } catch (err) {

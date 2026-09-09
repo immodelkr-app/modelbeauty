@@ -302,6 +302,9 @@ export default function AdminProductsPage() {
                         <Link href={`/admin/products/${p.id}`} className="admin-btn admin-btn-secondary admin-btn-sm">
                           수정
                         </Link>
+                        <Link href={`/admin/products/new?copyFrom=${p.id}`} className="admin-btn admin-btn-secondary admin-btn-sm" title="이 상품 정보를 복사해서 새 상품(예: 포인트몰용)으로 등록">
+                          복사 등록
+                        </Link>
                         <button onClick={() => handleDelete(p.id, p.name)} className="admin-btn admin-btn-danger admin-btn-sm">
                           삭제
                         </button>

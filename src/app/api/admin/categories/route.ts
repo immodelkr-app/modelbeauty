@@ -30,7 +30,7 @@ export async function POST(request: Request) {
 
   try {
     const body = await request.json();
-    const { name, slug, parentId, sortOrder, imageUrl, isActive } = body;
+    const { name, slug, parentId, sortOrder, imageUrl, isActive, isPointMall, pointPeriodStartsAt, pointPeriodEndsAt } = body;
 
     if (!name || !slug) {
       return Response.json(
@@ -58,6 +58,9 @@ export async function POST(request: Request) {
         sort_order: sortOrder ?? 0,
         image_url: imageUrl ?? null,
         is_active: isActive ?? true,
+        is_point_mall: isPointMall ?? false,
+        point_period_starts_at: pointPeriodStartsAt ?? null,
+        point_period_ends_at: pointPeriodEndsAt ?? null,
       })
       .select()
       .single();
@@ -88,6 +91,9 @@ export async function POST(request: Request) {
           imageUrl: data.image_url,
           isActive: data.is_active,
           createdAt: data.created_at,
+          isPointMall: data.is_point_mall,
+          pointPeriodStartsAt: data.point_period_starts_at,
+          pointPeriodEndsAt: data.point_period_ends_at,
         },
       },
       { status: 201 }

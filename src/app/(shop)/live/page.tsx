@@ -6,6 +6,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import Image from "next/image";
 import { createSupabaseAdmin } from "@/lib/supabase/server";
+import LiveCountdownBadge from "@/components/live/LiveCountdownBadge";
 
 export const metadata: Metadata = {
   title: "라이브 쇼핑 | 모델뷰티",
@@ -246,6 +247,25 @@ export default async function LiveShoppingPage() {
                     : `D-${diffDays}`;
                   return (
                     <div key={stream.id} className="upcoming-item">
+                      <div className="upcoming-thumb">
+                        {stream.coverImageUrl ? (
+                          <Image
+                            src={stream.coverImageUrl}
+                            alt={stream.title}
+                            fill
+                            sizes="120px"
+                            style={{ objectFit: "cover" }}
+                          />
+                        ) : (
+                          <div className="upcoming-thumb-fallback">💄</div>
+                        )}
+                        {schedDate && (
+                          <LiveCountdownBadge
+                            scheduledAt={stream.scheduledAt!}
+                            className="upcoming-thumb-countdown"
+                          />
+                        )}
+                      </div>
                       <div className="upcoming-time-box">
                         {schedDate ? (
                           <>

@@ -45,3 +45,14 @@ next-env.d.ts
 
 # Firebase (FCM 앱 푸시) — 기기별로 발급되는 프로젝트 설정 파일, 커밋하지 않음
 android-app/app/google-services.json
+
+# 로컬 전용 (비밀값 포함 가능한 임시 스크립트, 로컬 Claude 설정)
+scratch/
+.claude/
+
+# Android 빌드 산출물 / IDE 캐시
+android-app/.gradle/
+android-app/.idea/
+android-app/build/
+android-app/app/build/
+android-app/**/*.class

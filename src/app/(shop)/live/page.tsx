@@ -187,7 +187,7 @@ export default async function LiveShoppingPage() {
                               <div key={p.id} className="onair-prod-item">
                                 <div className="onair-prod-thumb">
                                   {p.thumbnail ? (
-                                    <Image src={p.thumbnail} alt={p.name} fill sizes="36px" style={{ objectFit: "cover" }} />
+                                    <Image unoptimized src={p.thumbnail} alt={p.name} fill sizes="36px" style={{ objectFit: "cover" }} />
                                   ) : (
                                     "✨"
                                   )}
@@ -249,7 +249,7 @@ export default async function LiveShoppingPage() {
                     <div key={stream.id} className="upcoming-item">
                       <div className="upcoming-thumb">
                         {stream.coverImageUrl ? (
-                          <Image
+                          <Image unoptimized
                             src={stream.coverImageUrl}
                             alt={stream.title}
                             fill
@@ -323,7 +323,7 @@ export default async function LiveShoppingPage() {
                           <div className="replay-visual-fallback">
                             {stream.products[0]?.thumbnail && (
                               <div className="replay-fallback-product">
-                                <Image src={stream.products[0].thumbnail} alt={stream.products[0].name} fill sizes="88px" style={{ objectFit: "cover" }} />
+                                <Image unoptimized src={stream.products[0].thumbnail} alt={stream.products[0].name} fill sizes="88px" style={{ objectFit: "cover" }} />
                               </div>
                             )}
                             {pickReplayComments(stream.id).map((comment, i) => (

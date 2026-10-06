@@ -723,7 +723,7 @@ export default async function HomePage() {
                   className="youtube-card"
                 >
                   <div className="youtube-card-thumb">
-                    <Image
+                    <Image unoptimized
                       src={video.thumbnailUrl}
                       alt={video.title}
                       fill
@@ -765,7 +765,7 @@ export default async function HomePage() {
                   rel="noopener noreferrer"
                   className="instagram-card"
                 >
-                  <Image
+                  <Image unoptimized
                     src={post.imageUrl}
                     alt={post.caption.slice(0, 60) || "모델뷰티 인스타그램 게시물"}
                     fill

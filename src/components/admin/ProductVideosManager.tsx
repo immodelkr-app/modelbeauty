@@ -246,7 +246,7 @@ export default function ProductVideosManager({ productId }: ProductVideosManager
                     }}
                   >
                     {video.thumbnailUrl ? (
-                      <Image
+                      <Image unoptimized
                         src={video.thumbnailUrl}
                         alt={video.title}
                         fill

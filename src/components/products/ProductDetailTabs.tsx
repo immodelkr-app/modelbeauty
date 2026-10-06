@@ -274,7 +274,7 @@ export default function ProductDetailTabs({
                   {/* 썸네일 */}
                   <div style={{ position: "relative", aspectRatio: "16/9", background: "var(--mb-gray-900)" }}>
                     {video.thumbnailUrl ? (
-                      <Image
+                      <Image unoptimized
                         src={video.thumbnailUrl}
                         alt={video.title}
                         fill

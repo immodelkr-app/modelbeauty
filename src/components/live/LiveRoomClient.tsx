@@ -936,7 +936,7 @@ export default function LiveRoomClient({ initialStream, initialChats }: LiveRoom
                   <div style={{ display: "flex", gap: "0.75rem", alignItems: "center", flex: 1, minWidth: 0 }}>
                     <div className="overlay-prod-image">
                       {pimg(activeProduct) ? (
-                        <Image
+                        <Image unoptimized
                           src={pimg(activeProduct)!}
                           alt={activeProduct.name}
                           fill
@@ -1189,7 +1189,7 @@ export default function LiveRoomClient({ initialStream, initialChats }: LiveRoom
                 <div className="panel-product-top">
                   <div className="panel-product-image">
                     {pimg(panelProduct) ? (
-                      <Image
+                      <Image unoptimized
                         src={pimg(panelProduct)!}
                         alt={panelProduct.name}
                         fill
@@ -1303,7 +1303,7 @@ export default function LiveRoomClient({ initialStream, initialChats }: LiveRoom
                   >
                     <div className="product-list-row-image">
                       {pimg(p) ? (
-                        <Image src={pimg(p)!} alt={p.name} fill sizes="48px" style={{ objectFit: "cover" }} />
+                        <Image unoptimized src={pimg(p)!} alt={p.name} fill sizes="48px" style={{ objectFit: "cover" }} />
                       ) : (
                         "💄"
                       )}

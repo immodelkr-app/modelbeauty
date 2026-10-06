@@ -253,7 +253,7 @@ export default function AdminProductsPage() {
                       <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
                         <div className="admin-table-thumb" style={{ position: "relative" }}>
                           {p.thumbnail ? (
-                            <Image
+                            <Image unoptimized
                               src={p.thumbnail}
                               alt={p.name}
                               width={44}

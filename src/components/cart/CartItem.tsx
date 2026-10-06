@@ -58,7 +58,7 @@ export default function CartItem({ item, checked, onCheckChange }: CartItemProps
       {/* 이미지 */}
       <div className="cart-item-image">
         {firstImage ? (
-          <Image
+          <Image unoptimized
             src={firstImage.url}
             alt={firstImage.alt || product?.name || "상품"}
             fill

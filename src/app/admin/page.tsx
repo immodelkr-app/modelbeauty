@@ -124,7 +124,7 @@ function DashboardProductCard({ product }: { product: DashboardProduct }) {
         }}
       >
         {product.thumbnail ? (
-          <Image src={product.thumbnail} alt={product.name} fill sizes="104px" style={{ objectFit: "cover" }} />
+          <Image unoptimized src={product.thumbnail} alt={product.name} fill sizes="104px" style={{ objectFit: "cover" }} />
         ) : (
           <span style={{ fontSize: "1.75rem" }} aria-hidden="true">💄</span>
         )}
@@ -644,7 +644,7 @@ export default function AdminDashboard() {
                           </div>
                           <div className="admin-top-product-thumb">
                             {product.productImage ? (
-                              <Image
+                              <Image unoptimized
                                 src={product.productImage}
                                 alt={product.productName}
                                 fill

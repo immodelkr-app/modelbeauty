@@ -153,7 +153,7 @@ export default function MyOrderDetailPage({ params }: { params: Promise<{ id: st
               return (
                 <div key={item.id} style={{ padding: "1rem 1.25rem", borderBottom: idx < order.order_items.length - 1 ? "1px solid var(--mb-gray-50)" : "none", display: "flex", gap: "1rem", alignItems: "center" }}>
                   <div style={{ width: 56, height: 56, borderRadius: "12px", background: "linear-gradient(135deg, #fdf2f8, #fce7f3)", overflow: "hidden", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "1.5rem" }}>
-                    {thumb ? <Image src={thumb} alt={item.product_name} width={56} height={56} style={{ objectFit: "cover" }} /> : "💄"}
+                    {thumb ? <Image unoptimized src={thumb} alt={item.product_name} width={56} height={56} style={{ objectFit: "cover" }} /> : "💄"}
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontWeight: 600, color: "var(--mb-gray-900)", fontSize: "0.9rem" }}>{item.product_name}</div>

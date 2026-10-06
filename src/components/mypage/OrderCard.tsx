@@ -94,7 +94,7 @@ export default function OrderCard({ order, onCancelled }: OrderCardProps) {
         <div className="order-card-body">
           <div className="order-card-thumb">
             {firstItem.imageUrl ? (
-              <Image
+              <Image unoptimized
                 src={firstItem.imageUrl}
                 alt={firstItem.productName}
                 fill

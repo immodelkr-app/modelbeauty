@@ -197,7 +197,7 @@ export default function AdminOrderDetailPage({ params }: { params: Promise<{ id:
                       <td>
                         <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
                           <div className="admin-table-thumb">
-                            {thumb ? <Image src={thumb} alt={item.product_name as string} fill sizes="44px" style={{ objectFit: "cover" }} /> : "💄"}
+                            {thumb ? <Image unoptimized src={thumb} alt={item.product_name as string} fill sizes="44px" style={{ objectFit: "cover" }} /> : "💄"}
                           </div>
                           <span style={{ fontWeight: 600 }}>{item.product_name as string}</span>
                         </div>

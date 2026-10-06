@@ -49,7 +49,7 @@ export default function ProductGallery({ images, productName }: ProductGalleryPr
               className={`product-gallery-thumb ${idx === activeIndex ? "active" : ""}`}
               onClick={() => setActiveIndex(idx)}
             >
-              <Image
+              <Image unoptimized
                 src={img.url}
                 alt={img.alt || `${productName} ${idx + 1}`}
                 width={72}

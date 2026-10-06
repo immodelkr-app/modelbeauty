@@ -382,7 +382,7 @@ export default function AdminLivePage() {
                     <td>
                       <div className="admin-table-thumb" style={{ width: "80px", height: "45px", position: "relative" }}>
                         {stream.coverImageUrl ? (
-                          <Image
+                          <Image unoptimized
                             src={stream.coverImageUrl}
                             alt={stream.title}
                             fill

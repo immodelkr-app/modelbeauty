@@ -65,7 +65,17 @@ function SuccessContent() {
             removeItem(directItemId);
             sessionStorage.removeItem("direct_checkout_item_id");
           } else {
-            clearCart(); // 장바구니 비우기
+            // 체크해서 결제한 상품만 삭제 (선택 정보가 없으면 전체 비우기)
+            let selectedIds: string[] | null = null;
+            try {
+              selectedIds = JSON.parse(sessionStorage.getItem("checkout_selected_ids") || "null");
+            } catch { /* 무시 */ }
+            sessionStorage.removeItem("checkout_selected_ids");
+            if (selectedIds && selectedIds.length > 0) {
+              selectedIds.forEach((id) => removeItem(id));
+            } else {
+              clearCart();
+            }
           }
 
           // 기본 주소로 저장 처리

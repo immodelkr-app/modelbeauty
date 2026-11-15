@@ -74,6 +74,8 @@ export default function CartPage() {
   };
 
   const handleCheckout = () => {
+    // 체크한 상품만 결제 화면으로 넘기기 위해 선택 id를 저장 (비로그인 → 로그인 후에도 유지)
+    sessionStorage.setItem("checkout_selected_ids", JSON.stringify([...checkedIds]));
     if (!isLoggedIn) {
       router.push("/login?redirect=/checkout");
       return;

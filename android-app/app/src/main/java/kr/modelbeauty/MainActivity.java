@@ -380,12 +380,18 @@ public class MainActivity extends AppCompatActivity {
         try {
             if (url.startsWith("intent://") || url.startsWith("intent:")) {
                 Intent intent = Intent.parseUri(url, Intent.URI_INTENT_SCHEME);
-                if (intent.resolveActivity(getPackageManager()) != null) {
+                // Android 11+ 패키지 가시성 때문에 resolveActivity()는 카드사 앱이 설치돼 있어도
+                // null을 반환한다(앱카드 실행이 무반응이던 원인). 확인 없이 바로 실행하고,
+                // 앱이 없을 때만 fallback URL → 마켓 설치 페이지 순으로 넘긴다.
+                try {
                     startActivity(intent);
-                } else {
+                } catch (android.content.ActivityNotFoundException notFound) {
                     String fallbackUrl = intent.getStringExtra("browser_fallback_url");
                     if (fallbackUrl != null) {
                         startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(fallbackUrl)));
+                    } else if (intent.getPackage() != null) {
+                        startActivity(new Intent(Intent.ACTION_VIEW,
+                                Uri.parse("market://details?id=" + intent.getPackage())));
                     }
                 }
             } else {

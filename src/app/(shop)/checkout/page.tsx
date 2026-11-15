@@ -29,19 +29,27 @@ export default function CheckoutPage() {
   const [isDirect, setIsDirect] = useState(false);
   const [directItemId, setDirectItemId] = useState<string | null>(null);
   const [isLoaded, setIsLoaded] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<string[] | null>(null);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.get("direct") === "true") {
       setIsDirect(true);
       setDirectItemId(sessionStorage.getItem("direct_checkout_item_id"));
+    } else {
+      try {
+        const raw = sessionStorage.getItem("checkout_selected_ids");
+        if (raw) setSelectedIds(JSON.parse(raw));
+      } catch { /* 저장값이 깨졌으면 전체 상품으로 진행 */ }
     }
     setIsLoaded(true);
   }, []);
 
+  // 장바구니에서 체크한 상품만 주문 (선택 정보가 없거나 일치하는 상품이 없으면 전체)
+  const selectedItems = selectedIds ? items.filter((item) => selectedIds.includes(item.id)) : items;
   const checkoutItems = (isDirect && directItemId)
     ? items.filter((item) => item.id === directItemId)
-    : items;
+    : selectedItems.length > 0 ? selectedItems : items;
 
   // 배송지 폼
   const [form, setForm] = useState({

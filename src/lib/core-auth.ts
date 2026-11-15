@@ -267,6 +267,7 @@ export async function rewardPoints(params: {
       masterUserId: params.masterUserId,
       amount: params.amount,
       appName: "MODEL_BEAUTY",
+      appSource: "MODEL_BEAUTY", // 아임모델 공화국이 appSource를 필수로 요구
       description: params.description,
     }),
   });
@@ -293,6 +294,7 @@ export async function deductPoints(params: {
       masterUserId: params.masterUserId,
       amount: params.amount,
       appName: "MODEL_BEAUTY",
+      appSource: "MODEL_BEAUTY", // 아임모델 공화국이 appSource를 필수로 요구
       description: params.description,
     }),
   });

@@ -5,8 +5,8 @@
 // 프론트엔드에서 결제 성공 리다이렉트 후 서버에서 최종 승인 처리
 
 import { NextRequest, NextResponse } from "next/server";
-import { confirmPayment } from "@/lib/tosspayments";
-import { deductPoints, useCoupon } from "@/lib/core-auth";
+import { confirmPayment, cancelPayment } from "@/lib/tosspayments";
+import { deductPoints, rewardPoints, useCoupon } from "@/lib/core-auth";
 import { createSupabaseAdmin } from "@/lib/supabase/server";
 
 export async function POST(request: NextRequest) {
@@ -55,17 +55,45 @@ export async function POST(request: NextRequest) {
     const paymentResult = await confirmPayment({ paymentKey, orderId, amount });
 
     // 3. 포인트 차감 (사용한 경우)
-    if (order.used_point_amount > 0) {
-      await deductPoints({
-        masterUserId: order.master_user_id,
-        amount: order.used_point_amount,
-        description: `주문 결제 포인트 사용 (${order.order_number})`,
-      });
-    }
+    // 포인트/쿠폰 처리가 실패하면 이미 승인된 카드 결제를 자동 취소해
+    // "결제는 됐는데 주문은 대기" 상태가 남지 않게 한다.
+    let pointsDeducted = false;
+    try {
+      if (order.used_point_amount > 0) {
+        await deductPoints({
+          masterUserId: order.master_user_id,
+          amount: order.used_point_amount,
+          description: `주문 결제 포인트 사용 (${order.order_number})`,
+        });
+        pointsDeducted = true;
+      }
 
-    // 4. 쿠폰 사용 처리 (사용한 경우)
-    if (order.used_coupon_id) {
-      await useCoupon(order.used_coupon_id);
+      // 4. 쿠폰 사용 처리 (사용한 경우)
+      if (order.used_coupon_id) {
+        await useCoupon(order.used_coupon_id);
+      }
+    } catch (postErr) {
+      console.error("[payments/confirm] 포인트/쿠폰 처리 실패 → 자동 환불 시도:", postErr);
+      try {
+        await cancelPayment(paymentResult.paymentKey, {
+          cancelReason: "포인트/쿠폰 처리 실패로 인한 자동 취소",
+        });
+      } catch (cancelErr) {
+        // 환불까지 실패하면 수동 처리 필요 — 로그에 paymentKey 남김
+        console.error("[payments/confirm] 자동 환불 실패! 수동 취소 필요:", paymentResult.paymentKey, cancelErr);
+      }
+      if (pointsDeducted) {
+        try {
+          await rewardPoints({
+            masterUserId: order.master_user_id,
+            amount: order.used_point_amount,
+            description: `결제 실패 포인트 반환 (${order.order_number})`,
+          });
+        } catch (e) {
+          console.error("[payments/confirm] 포인트 반환 실패:", e);
+        }
+      }
+      throw postErr;
     }
 
     // 5. 주문 상태 업데이트

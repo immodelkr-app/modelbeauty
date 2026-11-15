@@ -341,7 +341,8 @@ export default function CheckoutPage() {
       if (err && typeof err === "object" && "code" in err && (err as { code: string }).code === "USER_CANCEL") {
         return;
       }
-      setError("결제 요청 중 오류가 발생했습니다. 다시 시도해 주세요.");
+      const e = err as { code?: string; message?: string };
+      setError(`결제 요청 중 오류가 발생했습니다. 다시 시도해 주세요.${e?.code || e?.message ? ` (${e.code ?? ""} ${e.message ?? ""})` : ""}`);
     } finally {
       setIsSubmitting(false);
     }
@@ -370,7 +371,7 @@ export default function CheckoutPage() {
         </h1>
       </div>
 
-      <div style={{ display: "grid", gap: "1.5rem", gridTemplateColumns: "1fr" }}>
+      <div style={{ display: "grid", gap: "1.5rem", gridTemplateColumns: "minmax(0, 1fr)" }}>
         <form onSubmit={handleAddressSubmit} style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
 
           {/* 주문 상품 요약 */}

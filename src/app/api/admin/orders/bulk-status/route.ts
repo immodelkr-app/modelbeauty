@@ -1,6 +1,7 @@
 import { requireAdmin } from "@/lib/auth-admin";
 import { createSupabaseAdmin } from "@/lib/supabase/server";
 import { rewardPoints, restoreCoupon } from "@/lib/core-auth";
+import { rewardConfirmPoints } from "@/lib/order-confirm";
 
 const VALID_STATUSES = [
   "pending", "paid", "preparing", "shipping",
@@ -69,19 +70,10 @@ export async function PATCH(request: Request) {
         
         // 1. 구매 확정 (confirmed) -> 포인트 적립 (1%)
         if (status === "confirmed" && current.status !== "confirmed") {
-          if (current.total_amount > 0) {
-            const rewardAmount = Math.floor(current.total_amount * 0.01);
-            if (rewardAmount > 0) {
-              try {
-                await rewardPoints({
-                  masterUserId: current.master_user_id,
-                  amount: rewardAmount,
-                  description: `구매 확정 포인트 적립 (${current.order_number})`,
-                });
-              } catch (err) {
-                console.error(`[bulk-status] 주문 ${current.order_number} 포인트 적립 실패:`, err);
-              }
-            }
+          try {
+            await rewardConfirmPoints(current);
+          } catch (err) {
+            console.error(`[bulk-status] 주문 ${current.order_number} 포인트 적립 실패:`, err);
           }
         }
 

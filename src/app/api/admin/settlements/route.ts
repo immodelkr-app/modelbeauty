@@ -141,7 +141,7 @@ export async function POST(request: NextRequest) {
     // 1. 해당 월에 생성되고 'confirmed' (구매확정) 된 라이브 연계 주문들 조회
     const { data: orders, error: ordersErr } = await admin
       .from("orders")
-      .select("id, total_amount, live_stream_id")
+      .select("id, total_amount, shipping_fee, live_stream_id")
       .eq("status", "confirmed")
       .not("live_stream_id", "is", null)
       .gte("created_at", startDateStr)
@@ -195,7 +195,8 @@ export async function POST(request: NextRequest) {
 
     (orders ?? []).forEach((order: any) => {
       const streamId = order.live_stream_id;
-      const salesAmount = order.total_amount ?? 0;
+      // 정산 기준: 상품 결제액 = 최종 결제금액 - 배송비 (쿠폰·포인트·멤버십 할인 반영 후)
+      const salesAmount = Math.max(0, (order.total_amount ?? 0) - (order.shipping_fee ?? 0));
       const mappedCrews = streamCrewMap[streamId] ?? [];
 
       mappedCrews.forEach((mc) => {

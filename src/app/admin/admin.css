@@ -25,14 +25,22 @@
   display: flex;
   flex-direction: column;
   padding: 0;
-  position: sticky;
+  /* fixed: globals.css의 html,body overflow-x:hidden 때문에 sticky가 동작하지 않음 */
+  position: fixed;
   top: 0;
+  left: 0;
+  width: 240px;
   height: 100vh;
   overflow-y: auto;
-  scrollbar-width: none;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255,255,255,0.25) transparent;
 }
 
-.admin-sidebar::-webkit-scrollbar { display: none; }
+/* 사이드바가 fixed라 그리드 1열이 비므로 메인을 2열에 배치 */
+@media (min-width: 1024px) {
+  .admin-main { grid-column: 2; }
+}
 
 @media (max-width: 1023px) {
   .admin-sidebar {

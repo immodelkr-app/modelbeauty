@@ -45,10 +45,10 @@ interface UserDetail extends UserSummary {
 }
 
 // 연동 앱 뱃지 렌더러
-const APP_BADGE: Record<string, { emoji: string; label: string; color: string }> = {
-  MODEL_BEAUTY: { emoji: "🩷", label: "모델뷰티", color: "rgba(236,72,153,0.2)" },
-  MOCA:         { emoji: "🟠", label: "MOCA",    color: "rgba(249,115,22,0.2)" },
-  IMFF:         { emoji: "🔵", label: "IMFF",    color: "rgba(59,130,246,0.2)" },
+const APP_BADGE: Record<string, { emoji: string; label: string; color: string; text: string }> = {
+  MODEL_BEAUTY: { emoji: "🩷", label: "모델뷰티", color: "rgba(236,72,153,0.12)", text: "#9d174d" },
+  MOCA:         { emoji: "🟠", label: "MOCA",    color: "rgba(249,115,22,0.12)", text: "#9a3412" },
+  IMFF:         { emoji: "🔵", label: "IMFF",    color: "rgba(59,130,246,0.12)", text: "#1e40af" },
 };
 
 function LinkedAppBadges({ apps }: { apps: string[] }) {
@@ -61,7 +61,7 @@ function LinkedAppBadges({ apps }: { apps: string[] }) {
         return (
           <span key={app} style={{
             fontSize: "0.6875rem", fontWeight: 700, padding: "2px 7px",
-            background: b.color, borderRadius: "5px", color: "#e2e8f0",
+            background: b.color, borderRadius: "5px", color: b.text,
             whiteSpace: "nowrap",
           }}>
             {b.emoji} {b.label}
@@ -772,20 +772,20 @@ export default function AdminUsersPage() {
             padding: "0.625rem 1.125rem", fontSize: "0.875rem", fontWeight: 700,
             background: migrating ? "rgba(234,179,8,0.1)" : "rgba(234,179,8,0.15)",
             border: "1px solid rgba(234,179,8,0.4)",
-            color: migrating ? "#fde047" : "#facc15",
+            color: "#92400e",
             borderRadius: "8px", cursor: migrating ? "not-allowed" : "pointer",
             transition: "all 0.2s",
           }}
           onMouseEnter={(e) => {
             if (!migrating) {
               e.currentTarget.style.background = "rgba(234,179,8,0.3)";
-              e.currentTarget.style.color = "#fef08a";
+              e.currentTarget.style.color = "#78350f";
             }
           }}
           onMouseLeave={(e) => {
             if (!migrating) {
               e.currentTarget.style.background = "rgba(234,179,8,0.15)";
-              e.currentTarget.style.color = "#facc15";
+              e.currentTarget.style.color = "#92400e";
             }
           }}
         >
@@ -805,13 +805,13 @@ export default function AdminUsersPage() {
         <div style={{
           marginBottom: "1rem", padding: "0.875rem 1.25rem",
           background: "rgba(34, 197, 94, 0.08)", border: "1px solid rgba(34, 197, 94, 0.3)",
-          borderRadius: "10px", fontSize: "0.875rem", color: "#86efac",
+          borderRadius: "10px", fontSize: "0.875rem", color: "#166534",
           display: "flex", gap: "1.5rem", flexWrap: "wrap", alignItems: "center",
         }}>
-          <span style={{ fontWeight: 700, color: "#4ade80", fontSize: "0.9375rem" }}>✅ 동기화 완료</span>
-          <span>전체 <strong style={{ color: "#f1f5f9" }}>{syncResult.total}명</strong></span>
-          <span>🆕 신규 등록 <strong style={{ color: "#86efac" }}>{syncResult.created}명</strong></span>
-          <span>🔄 정보 업데이트 <strong style={{ color: "#7dd3fc" }}>{syncResult.updated}명</strong></span>
+          <span style={{ fontWeight: 700, color: "#15803d", fontSize: "0.9375rem" }}>✅ 동기화 완료</span>
+          <span>전체 <strong style={{ color: "#0f172a" }}>{syncResult.total}명</strong></span>
+          <span>🆕 신규 등록 <strong style={{ color: "#15803d" }}>{syncResult.created}명</strong></span>
+          <span>🔄 정보 업데이트 <strong style={{ color: "#0369a1" }}>{syncResult.updated}명</strong></span>
           <span>⏭️ 변경없음 <strong style={{ color: "#94a3b8" }}>{syncResult.skipped}명</strong></span>
           {syncResult.failed > 0 && (
             <span>❌ 실패 <strong style={{ color: "#f87171" }}>{syncResult.failed}명</strong></span>
@@ -844,13 +844,13 @@ export default function AdminUsersPage() {
         <div style={{
           marginBottom: "1rem", padding: "0.875rem 1.25rem",
           background: "rgba(234, 179, 8, 0.08)", border: "1px solid rgba(234, 179, 8, 0.3)",
-          borderRadius: "10px", fontSize: "0.875rem", color: "#fde047",
+          borderRadius: "10px", fontSize: "0.875rem", color: "#92400e",
           display: "flex", gap: "1.5rem", flexWrap: "wrap", alignItems: "center",
         }}>
-          <span style={{ fontWeight: 700, color: "#facc15", fontSize: "0.9375rem" }}>📧 이메일 마이그레이션 완료</span>
-          <span>전체 <strong style={{ color: "#f1f5f9" }}>{migrateResult.total}명</strong></span>
-          <span>대상 <strong style={{ color: "#fde047" }}>{migrateResult.targets}명</strong></span>
-          <span>✅ 처리 완료 <strong style={{ color: "#86efac" }}>{migrateResult.migrated}명</strong></span>
+          <span style={{ fontWeight: 700, color: "#78350f", fontSize: "0.9375rem" }}>📧 이메일 마이그레이션 완료</span>
+          <span>전체 <strong style={{ color: "#0f172a" }}>{migrateResult.total}명</strong></span>
+          <span>대상 <strong style={{ color: "#b45309" }}>{migrateResult.targets}명</strong></span>
+          <span>✅ 처리 완료 <strong style={{ color: "#15803d" }}>{migrateResult.migrated}명</strong></span>
           {migrateResult.skipped > 0 && (
             <span>⏭️ 스킵 <strong style={{ color: "#94a3b8" }}>{migrateResult.skipped}명</strong></span>
           )}

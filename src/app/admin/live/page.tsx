@@ -23,6 +23,7 @@ interface LiveStreamRow {
   scheduledAt: string | null;
   notifySentAt: string | null;
   products: { id: string; name: string }[];
+  crew: { id: string; nickname: string; commissionRate: number } | null;
 }
 
 interface ProductOption {
@@ -64,6 +65,12 @@ export default function AdminLivePage() {
   const [allCrews, setAllCrews] = useState<CrewOption[]>([]);
   const [selectedCrewId, setSelectedCrewId] = useState<string>("");
   const [crewCommissionRate, setCrewCommissionRate] = useState<number>(0);
+
+  // 기존 방송 크루 지정/변경 (행 단위 인라인 편집)
+  const [crewEditStreamId, setCrewEditStreamId] = useState<string | null>(null);
+  const [crewEditId, setCrewEditId] = useState("");
+  const [crewEditRate, setCrewEditRate] = useState(0);
+  const [crewSaving, setCrewSaving] = useState(false);
 
   // 전체 상품 옵션 리스트
   const [allProducts, setAllProducts] = useState<ProductOption[]>([]);
@@ -192,6 +199,34 @@ export default function AdminLivePage() {
       alert("네트워크 오류가 발생했습니다.");
     } finally {
       setSendingNotifyId(null);
+    }
+  };
+
+  const openCrewEdit = (stream: LiveStreamRow) => {
+    setCrewEditStreamId(stream.id);
+    setCrewEditId(stream.crew?.id ?? "");
+    setCrewEditRate(stream.crew?.commissionRate ?? 0);
+  };
+
+  const handleCrewSave = async (streamId: string) => {
+    setCrewSaving(true);
+    try {
+      const res = await fetch(`/api/admin/live/${streamId}/crew`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ crewId: crewEditId || null, commissionRate: crewEditRate }),
+      });
+      const result = await res.json();
+      if (result.success) {
+        setCrewEditStreamId(null);
+        fetchStreams();
+      } else {
+        alert(result.error ?? "크루 저장에 실패했습니다.");
+      }
+    } catch {
+      alert("네트워크 오류가 발생했습니다.");
+    } finally {
+      setCrewSaving(false);
     }
   };
 
@@ -422,6 +457,58 @@ export default function AdminLivePage() {
                     </td>
                     <td>
                       <div style={{ fontWeight: 500 }}>{stream.streamerName}</div>
+                      {crewEditStreamId === stream.id ? (
+                        <div style={{ display: "flex", flexDirection: "column", gap: "4px", marginTop: "6px", minWidth: "150px" }}>
+                          <select
+                            value={crewEditId}
+                            onChange={(e) => {
+                              setCrewEditId(e.target.value);
+                              const c = allCrews.find((x) => x.id === e.target.value);
+                              if (c) setCrewEditRate(c.default_commission_rate);
+                            }}
+                            aria-label="담당 크루"
+                            style={{ fontSize: "0.75rem", padding: "4px", borderRadius: "4px", border: "1px solid #d1d5db" }}
+                          >
+                            <option value="">크루 없음</option>
+                            {allCrews.map((c) => (
+                              <option key={c.id} value={c.id}>{c.nickname}</option>
+                            ))}
+                          </select>
+                          {crewEditId && (
+                            <label style={{ fontSize: "0.75rem", color: "#4b5563", display: "flex", alignItems: "center", gap: "4px" }}>
+                              수수료
+                              <input
+                                type="number" min={0} max={100} step={0.1}
+                                value={crewEditRate}
+                                onChange={(e) => setCrewEditRate(Number(e.target.value))}
+                                style={{ width: "60px", fontSize: "0.75rem", padding: "3px", borderRadius: "4px", border: "1px solid #d1d5db" }}
+                              />%
+                            </label>
+                          )}
+                          <div style={{ display: "flex", gap: "4px" }}>
+                            <button type="button" className="admin-btn admin-btn-primary admin-btn-sm" disabled={crewSaving} onClick={() => handleCrewSave(stream.id)}>
+                              {crewSaving ? "저장 중..." : "저장"}
+                            </button>
+                            <button type="button" className="admin-btn admin-btn-secondary admin-btn-sm" onClick={() => setCrewEditStreamId(null)}>
+                              취소
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => openCrewEdit(stream)}
+                          title="정산 대상 크루와 수수료율 지정/변경"
+                          style={{
+                            marginTop: "4px", fontSize: "0.72rem", padding: "2px 8px", borderRadius: "999px", cursor: "pointer",
+                            border: stream.crew ? "1px solid #c4b5fd" : "1px dashed #9ca3af",
+                            background: stream.crew ? "#f5f3ff" : "#fff",
+                            color: stream.crew ? "#5b21b6" : "#6b7280",
+                          }}
+                        >
+                          {stream.crew ? `🎙️ ${stream.crew.nickname} · ${stream.crew.commissionRate}% ✏️` : "＋ 정산 크루 지정"}
+                        </button>
+                      )}
                     </td>
                     <td>{formatStatus(stream.status)}</td>
                     <td>

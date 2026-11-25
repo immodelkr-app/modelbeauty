@@ -213,8 +213,22 @@ export async function POST(request: NextRequest) {
     });
 
     // 5. vendor_settlement_history upsert
-    const upsertRows = Object.entries(vendorMap)
-      .filter(([, v]) => v.totalSales > 0)
+    // 이미 지급완료된 정산은 재계산으로 덮어쓰지 않음 (상태가 대기로 돌아가 이중 지급되는 것 방지)
+    const { data: existingRows, error: existingErr } = await admin
+      .from("vendor_settlement_history")
+      .select("vendor_id, payout_status")
+      .eq("year_month", yearMonth);
+    if (existingErr) throw existingErr;
+    const paidVendorIds = new Set(
+      (existingRows ?? []).filter((r: any) => r.payout_status === "paid").map((r: any) => r.vendor_id)
+    );
+    const existingVendorIds = new Set((existingRows ?? []).map((r: any) => r.vendor_id as string));
+    // 주문 취소로 이번 계산에서 빠진 업체의 기존 내역은 0으로 갱신
+    const calc: Record<string, { totalSales: number; totalPayout: number }> = { ...vendorMap };
+    existingVendorIds.forEach((id) => { if (!calc[id]) calc[id] = { totalSales: 0, totalPayout: 0 }; });
+
+    const upsertRows = Object.entries(calc)
+      .filter(([vendorId, v]) => (v.totalSales > 0 || existingVendorIds.has(vendorId)) && !paidVendorIds.has(vendorId))
       .map(([vendorId, v]) => ({
         year_month: yearMonth,
         vendor_id: vendorId,

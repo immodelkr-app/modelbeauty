@@ -29,7 +29,8 @@ export async function GET(request: NextRequest) {
           products (
             id, name, slug, base_price, sale_price, images, is_active
           )
-        )
+        ),
+        live_stream_crews ( crew_id, commission_rate, live_crews ( nickname ) )
       `);
 
     if (status && status !== "all") {
@@ -84,6 +85,14 @@ export async function GET(request: NextRequest) {
         ingestEndpoint: isRequesterAdmin ? stream.ingest_endpoint || null : null,
         streamKey: isRequesterAdmin ? stream.stream_key || null : null,
         channelArn: isRequesterAdmin ? stream.channel_arn || null : null,
+        // 담당 크루·수수료율 (정산 정보라 관리자에게만)
+        crew: isRequesterAdmin && stream.live_stream_crews?.[0]
+          ? {
+              id: stream.live_stream_crews[0].crew_id,
+              nickname: stream.live_stream_crews[0].live_crews?.nickname ?? "",
+              commissionRate: Number(stream.live_stream_crews[0].commission_rate),
+            }
+          : null,
       };
     });
 

@@ -210,6 +210,19 @@ export async function POST(request: NextRequest) {
     });
 
     // 5. 정산 내역 DB에 upsert (매출이 있거나 기존 정산 데이터가 있던 크루 대상)
+    const { data: existingRows, error: existingErr } = await admin
+      .from("crew_settlement_history")
+      .select("crew_id, payout_status")
+      .eq("year_month", yearMonth);
+    if (existingErr) {
+      console.error("[POST /api/admin/settlements] Existing Rows Fetch Error:", existingErr);
+      return NextResponse.json({ success: false, error: "기존 정산 내역을 확인할 수 없습니다." }, { status: 500 });
+    }
+    const existingCrewIds = new Set((existingRows ?? []).map((r: any) => r.crew_id));
+    const paidCrewIds = new Set(
+      (existingRows ?? []).filter((r: any) => r.payout_status === "paid").map((r: any) => r.crew_id)
+    );
+
     const upsertRows = crews
       .map((c) => {
         const calcData = crewSettlementMap[c.id];
@@ -230,7 +243,10 @@ export async function POST(request: NextRequest) {
           payout_status: "pending", // 재계산 시 기본 대기상태
         };
       })
-      .filter((row) => row.total_sales > 0); // 매출액이 존재하는 크루만 저장
+      // 매출이 있는 크루 + 기존 내역이 있던 크루(주문 취소로 0원이 된 경우 0으로 갱신)
+      .filter((row) => row.total_sales > 0 || existingCrewIds.has(row.crew_id))
+      // 이미 지급완료된 정산은 재계산으로 덮어쓰지 않음 (상태가 대기로 돌아가 이중 지급되는 것 방지)
+      .filter((row) => !paidCrewIds.has(row.crew_id));
 
     if (upsertRows.length > 0) {
       const { error: upsertErr } = await admin
@@ -245,7 +261,8 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      message: `${upsertRows.length}명의 크루 정산 데이터가 계산 및 업데이트되었습니다.`,
+      message: `${upsertRows.length}명의 크루 정산 데이터가 계산 및 업데이트되었습니다.` +
+        (paidCrewIds.size > 0 ? ` (지급완료 ${paidCrewIds.size}명은 변경하지 않음)` : ""),
     });
   } catch (error) {
     console.error("[POST /api/admin/settlements]", error);

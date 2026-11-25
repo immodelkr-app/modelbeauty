@@ -24,7 +24,8 @@ export async function isAdmin(): Promise<boolean> {
     if (!user) return false;
 
     const meta = user.app_metadata ?? {};
-    return meta.role === "admin";
+    // super_admin: admin@immodel.kr 계정에 설정된 상위 역할 — 관리자 권한 포함
+    return meta.role === "admin" || meta.role === "super_admin";
   } catch {
     return false;
   }
